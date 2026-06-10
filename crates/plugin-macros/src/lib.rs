@@ -154,7 +154,6 @@ fn generate_plugin_export_all(
             if method_name_str == "metadata"
                 || method_name_str == "on_load"
                 || method_name_str == "on_unload"
-                || method_name_str == "handle_command"
                 || method_name_str == "plugin_type_name"
             {
                 continue;

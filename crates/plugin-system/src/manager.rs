@@ -311,37 +311,6 @@ impl PluginManager {
             .map(|p| unsafe { (p.library.metadata_fn)() })
     }
 
-    pub fn call_plugin(&self, name: &str, command: &str) -> Result<String> {
-        let registry = self.registry.read().expect("registry lock poisoned");
-        let plugin_arc = registry
-            .get_by_name(name)
-            .ok_or_else(|| PluginError::PluginNotFound {
-                name: name.to_string(),
-            })?;
-
-        let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-        Ok(plugin.handle_command(command))
-    }
-
-    pub fn call_plugins(&self, command: &str) -> HashMap<String, String> {
-        let registry = self.registry.read().expect("registry lock poisoned");
-        let mut results = HashMap::new();
-
-        for name in registry.plugin_names() {
-            if let Some(plugin_arc) = registry.get_by_name(&name) {
-                if let Ok(mut plugin) = plugin_arc.write() {
-                    results.insert(name, plugin.handle_command(command));
-                }
-            }
-        }
-
-        results
-    }
-
-    pub fn plugin_commands(&self, name: &str) -> Option<String> {
-        self.call_plugin(name, "help").ok()
-    }
-
     pub fn with_plugin<R>(&self, name: &str, f: impl FnOnce(&dyn Plugin) -> R) -> Result<R> {
         let registry = self.registry.read().expect("registry lock poisoned");
         let plugin_arc = registry
@@ -444,10 +413,9 @@ impl PluginManager {
     pub fn call_plugin_result(
         &self,
         name: &str,
-        command: &str,
+        f: impl FnOnce(&dyn Plugin) -> crate::plugin_info::PluginResult,
     ) -> Result<crate::plugin_info::PluginResult> {
-        let result = self.call_plugin(name, command)?;
-        Ok(crate::plugin_info::PluginResult::String(result))
+        self.with_plugin(name, f)
     }
 
     pub fn get_all_plugin_info(&self) -> Vec<crate::plugin_info::PluginInfo> {

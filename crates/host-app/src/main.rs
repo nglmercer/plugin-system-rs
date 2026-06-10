@@ -122,7 +122,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let logger_providers = manager.plugins_with_interface("Logger");
     println!("  Plugins implementing Logger: {:?}", logger_providers);
 
-    println!("\n=== Phase 4: Direct Method Calls (No handle_command) ===");
+    println!("\n=== Phase 4: Direct Method Calls ===");
 
     println!("\n--- Direct method calls on HelloPlugin ---");
     manager.with_plugin_mut("hello", |plugin| {
@@ -130,7 +130,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .downcast_mut::<plugin_types::HelloPlugin>()
             .expect("must be HelloPlugin");
 
-        // Direct method calls - no string parsing!
         let greeting = hello.get_greeting().to_string();
         println!("  hello.get_greeting() = {}", greeting);
 
@@ -145,34 +144,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .downcast_ref::<plugin_types::GreeterPlugin>()
             .expect("must be GreeterPlugin");
 
-        // Direct method calls
         let count = greeter.get_count();
         println!("  greeter.get_count() = {}", count);
 
         let last = greeter.get_last_greeting();
         println!("  greeter.get_last_greeting() = {}", last);
     })?;
-
-    println!("\n=== Command-based Interaction (Legacy) ===");
-
-    println!("\n--- Hello Plugin Help ---");
-    match manager.call_plugin("hello", "help") {
-        Ok(help) => println!("{}", help),
-        Err(e) => println!("Error: {}", e),
-    }
-
-    println!("\n--- Greeter Plugin Greet ---");
-    match manager.call_plugin("greeter", "greet Charlie") {
-        Ok(result) => println!("{}", result),
-        Err(e) => println!("Error: {}", e),
-    }
-
-    println!("\n=== Call All Plugins: info ===");
-    let results = manager.call_plugins("info");
-    for (name, result) in &results {
-        println!("\n{}:", name);
-        println!("{}", result);
-    }
 
     println!("\n=== Phase 5: PluginInfo and PluginResult Objects ===");
 
@@ -223,7 +200,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  greeter interfaces: {:?}", greeter_ifaces);
 
     println!("\n--- call_plugin_result returns PluginResult ---");
-    let result = manager.call_plugin_result("hello", "greet World")?;
+    // PluginResult is now built via with_plugin + direct method calls
+    let result = manager.with_plugin("hello", |plugin| {
+        let greet: &dyn Greet = plugin
+            .downcast_ref::<plugin_types::HelloPlugin>()
+            .expect("hello must implement Greet");
+        plugin_system::PluginResult::String(greet.greet("World"))
+    })?;
     println!("  result type: {}", std::any::type_name_of_val(&result));
     println!("  result value: {}", result);
     println!("  as_string: {:?}", result.as_string());

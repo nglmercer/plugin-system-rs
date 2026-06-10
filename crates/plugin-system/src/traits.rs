@@ -21,10 +21,6 @@ pub trait Plugin: Any + Send + Sync {
     fn interface_ids(&self) -> Vec<&'static str> {
         Vec::new()
     }
-
-    fn handle_command(&mut self, command: &str) -> String {
-        format!("ERROR: Unknown command '{}'", command)
-    }
 }
 
 impl dyn Plugin {

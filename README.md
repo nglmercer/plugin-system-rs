@@ -242,17 +242,24 @@ impl Plugin for MyPlugin {
         println!("Plugin unloaded!");
     }
 
-    fn handle_command(&mut self, command: &str) -> String {
-        let parts: Vec<&str> = command.splitn(2, ' ').collect();
-        match parts[0] {
-            "help" => "Available commands:\n  help\n  increment\n  count".to_string(),
-            "increment" => {
-                self.count += 1;
-                format!("Count: {}", self.count)
-            }
-            "count" => format!("Count: {}", self.count),
-            _ => format!("Unknown command: {}", parts[0]),
-        }
+    fn plugin_type_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
+
+    fn interface_ids(&self) -> Vec<&'static str> {
+        vec!["Counter"]
+    }
+}
+
+// Implement your trait
+impl Counter for MyPlugin {
+    fn increment(&mut self) -> u32 {
+        self.count += 1;
+        self.count
+    }
+
+    fn get_count(&self) -> u32 {
+        self.count
     }
 }
 
