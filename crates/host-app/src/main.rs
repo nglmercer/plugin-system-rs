@@ -48,7 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n--- Greet interface on hello plugin ---");
     let result = manager.with_plugin("hello", |plugin| {
         let greet: &dyn Greet = plugin
-            .downcast_ref::<plugin_hello::HelloPluginWrapper>()
+            .downcast_ref::<plugin_types::HelloPlugin>()
             .expect("hello must implement Greet");
         greet.greet("World")
     })?;
@@ -57,7 +57,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n--- DataProvider interface on hello plugin ---");
     manager.with_plugin_mut("hello", |plugin| {
         let data: &mut dyn DataProvider = plugin
-            .downcast_mut::<plugin_hello::HelloPluginWrapper>()
+            .downcast_mut::<plugin_types::HelloPlugin>()
             .expect("hello must implement DataProvider");
         data.set_data("key1", "value1".to_string());
         data.set_data("key2", "value2".to_string());
@@ -65,7 +65,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let keys = manager.with_plugin("hello", |plugin| {
         let data: &dyn DataProvider = plugin
-            .downcast_ref::<plugin_hello::HelloPluginWrapper>()
+            .downcast_ref::<plugin_types::HelloPlugin>()
             .expect("hello must implement DataProvider");
         data.list_keys()
     })?;
@@ -73,7 +73,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let value = manager.with_plugin("hello", |plugin| {
         let data: &dyn DataProvider = plugin
-            .downcast_ref::<plugin_hello::HelloPluginWrapper>()
+            .downcast_ref::<plugin_types::HelloPlugin>()
             .expect("hello must implement DataProvider");
         data.get_data("key1")
     })?;
@@ -82,7 +82,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n--- Calculator interface on greeter plugin ---");
     let result = manager.with_plugin("greeter", |plugin| {
         let calc: &dyn Calculator = plugin
-            .downcast_ref::<plugin_greeter::GreeterPluginWrapper>()
+            .downcast_ref::<plugin_types::GreeterPlugin>()
             .expect("greeter must implement Calculator");
         calc.add(10.0, 5.0)
     })?;
@@ -90,7 +90,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let result = manager.with_plugin("greeter", |plugin| {
         let calc: &dyn Calculator = plugin
-            .downcast_ref::<plugin_greeter::GreeterPluginWrapper>()
+            .downcast_ref::<plugin_types::GreeterPlugin>()
             .expect("greeter must implement Calculator");
         calc.divide(10.0, 0.0)
     })?;
@@ -127,8 +127,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n--- Direct method calls on HelloPlugin ---");
     manager.with_plugin_mut("hello", |plugin| {
         let hello = plugin
-            .downcast_mut::<plugin_hello::HelloPluginWrapper>()
-            .expect("must be HelloPluginWrapper");
+            .downcast_mut::<plugin_types::HelloPlugin>()
+            .expect("must be HelloPlugin");
 
         // Direct method calls - no string parsing!
         let greeting = hello.get_greeting().to_string();
@@ -142,8 +142,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n--- Direct method calls on GreeterPlugin ---");
     manager.with_plugin("greeter", |plugin| {
         let greeter = plugin
-            .downcast_ref::<plugin_greeter::GreeterPluginWrapper>()
-            .expect("must be GreeterPluginWrapper");
+            .downcast_ref::<plugin_types::GreeterPlugin>()
+            .expect("must be GreeterPlugin");
 
         // Direct method calls
         let count = greeter.get_count();

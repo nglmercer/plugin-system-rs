@@ -11,7 +11,5 @@ path = "src/main.rs"
 plugin-system = { path = "../plugin-system" }
 plugin-interfaces = { path = "../plugin-interfaces" }
 plugin-types = { path = "../plugin-types" }
-plugin-hello = { path = "../plugin-hello" }
-plugin-greeter = { path = "../plugin-greeter" }
 log = "0.4"
 env_logger = "0.11"
