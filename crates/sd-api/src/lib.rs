@@ -1,6 +1,6 @@
 use axum::{
     extract::{Path, State, WebSocketUpgrade},
-    response::Json,
+    response::{Html, Json},
     routing::{get, post},
     Router,
 };
@@ -14,6 +14,8 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tower_http::cors::{Any, CorsLayer};
+use tower_http::trace::TraceLayer;
+use tower_http::services::ServeDir;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -161,7 +163,7 @@ async fn handle_websocket(socket: axum::extract::ws::WebSocket, state: AppState)
     let events = state.events.clone();
 
     events.subscribe_all(move |event| {
-        let _ = tx.blocking_send(event.clone());
+        let _ = tx.try_send(event.clone());
     });
 
     // Forward events to WebSocket
@@ -212,6 +214,9 @@ pub fn create_router(state: AppState) -> Router {
         .allow_methods(Any)
         .allow_headers(Any);
 
+    let static_files = ServeDir::new("web/dist")
+        .not_found_service(get(|_: axum::extract::Request| async { Html(include_str!("../../../web/dist/index.html")) }));
+
     Router::new()
         .route("/api/devices", get(list_devices))
         .route("/api/devices/:device_id/press/:button_index", post(simulate_button_press))
@@ -221,6 +226,8 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/plugins", get(list_plugins))
         .route("/api/plugins/reload", post(reload_plugins))
         .route("/ws", get(websocket_handler))
+        .nest_service("/", static_files)
         .layer(cors)
+        .layer(TraceLayer::new_for_http())
         .with_state(state)
 }

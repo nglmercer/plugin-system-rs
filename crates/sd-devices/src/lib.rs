@@ -1,7 +1,7 @@
 use sd_types::{DeviceInfo, DeviceId};
 use sd_events::{EventBus, StreamEvent};
-use std::sync::Arc;
-use tokio::sync::RwLock;
+use std::sync::{Arc, RwLock};
+use tokio::sync::RwLock as AsyncRwLock;
 
 pub trait Device: Send + Sync + 'static {
     fn device_info(&self) -> DeviceInfo;
@@ -43,7 +43,7 @@ impl Device for VirtualDevice {
 
     fn press_button(&self, index: usize) {
         if index < self.info.key_count {
-            let mut pressed = self.pressed.blocking_write();
+            let mut pressed = self.pressed.write().unwrap();
             pressed[index] = true;
             println!("[VirtualDevice] Button {} pressed", index);
         }
@@ -51,7 +51,7 @@ impl Device for VirtualDevice {
 
     fn release_button(&self, index: usize) {
         if index < self.info.key_count {
-            let mut pressed = self.pressed.blocking_write();
+            let mut pressed = self.pressed.write().unwrap();
             pressed[index] = false;
             println!("[VirtualDevice] Button {} released", index);
         }
@@ -76,14 +76,14 @@ impl Device for VirtualDevice {
 }
 
 pub struct DeviceManager {
-    devices: Arc<RwLock<Vec<Arc<dyn Device>>>>,
+    devices: Arc<AsyncRwLock<Vec<Arc<dyn Device>>>>,
     events: Arc<EventBus>,
 }
 
 impl DeviceManager {
     pub fn new(events: Arc<EventBus>) -> Self {
         Self {
-            devices: Arc::new(RwLock::new(Vec::new())),
+            devices: Arc::new(AsyncRwLock::new(Vec::new())),
             events,
         }
     }

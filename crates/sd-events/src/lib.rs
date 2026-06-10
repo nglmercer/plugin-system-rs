@@ -1,8 +1,8 @@
 use sd_types::{ActionId, DeviceId, ProfileId, PluginResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::{broadcast, RwLock};
+use std::sync::{Arc, RwLock};
+use tokio::sync::broadcast;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum StreamEvent {
@@ -62,12 +62,8 @@ impl EventBus {
     {
         let cb = Arc::new(callback);
         let key = event_type.to_string();
-        let subscribers = self.subscribers.clone();
-
-        tokio::spawn(async move {
-            let mut subs = subscribers.write().await;
-            subs.entry(key).or_default().push(cb);
-        });
+        let mut subs = self.subscribers.write().unwrap();
+        subs.entry(key).or_default().push(cb);
     }
 
     pub fn subscribe_all<F>(&self, callback: F)
@@ -75,29 +71,16 @@ impl EventBus {
         F: Fn(&StreamEvent) + Send + Sync + 'static,
     {
         let cb = Arc::new(callback);
-        let subscribers = self.subscribers.clone();
-
-        tokio::spawn(async move {
-            let mut subs = subscribers.write().await;
-            subs.entry("*".to_string()).or_default().push(cb);
-        });
+        let mut subs = self.subscribers.write().unwrap();
+        subs.entry("*".to_string()).or_default().push(cb);
     }
 
     pub async fn run(&self) {
         let mut rx = self.tx.subscribe();
-        let subscribers = self.subscribers.clone();
 
         loop {
             match rx.recv().await {
                 Ok(event) => {
-                    let subs = subscribers.read().await;
-
-                    if let Some(callbacks) = subs.get("*") {
-                        for cb in callbacks {
-                            cb(&event);
-                        }
-                    }
-
                     let event_type = match &event {
                         StreamEvent::ButtonPressed { .. } => "button_pressed",
                         StreamEvent::ButtonReleased { .. } => "button_released",
@@ -109,10 +92,18 @@ impl EventBus {
                         StreamEvent::DeviceDisconnected { .. } => "device_disconnected",
                     };
 
-                    if let Some(callbacks) = subs.get(event_type) {
-                        for cb in callbacks {
-                            cb(&event);
-                        }
+                    let subs = self.subscribers.read().unwrap();
+                    let mut all_cbs: Vec<EventCallback> = Vec::new();
+                    if let Some(cbs) = subs.get("*") {
+                        all_cbs.extend(cbs.iter().cloned());
+                    }
+                    if let Some(cbs) = subs.get(event_type) {
+                        all_cbs.extend(cbs.iter().cloned());
+                    }
+                    drop(subs);
+
+                    for cb in all_cbs {
+                        cb(&event);
                     }
                 }
                 Err(broadcast::error::RecvError::Lagged(_)) => continue,
