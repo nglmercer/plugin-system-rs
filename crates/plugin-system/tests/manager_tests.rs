@@ -1,4 +1,4 @@
-use plugin_system::{PluginManager, PluginRegistry};
+use plugin_system::{FileLoader, MultiLoader, PluginLoader, PluginManager, PluginRegistry};
 
 #[test]
 fn test_plugin_manager_new() {
@@ -80,6 +80,135 @@ fn test_plugin_manager_reload_nonexistent() {
     assert!(result.is_err());
 }
 
+// === FileLoader Tests ===
+
+#[test]
+fn test_file_loader_new() {
+    let loader = FileLoader::new("/tmp/test.so");
+    assert_eq!(loader.path().to_str().unwrap(), "/tmp/test.so");
+}
+
+#[test]
+fn test_file_loader_source() {
+    let loader = FileLoader::new("/tmp/test.so");
+    assert_eq!(loader.source(), "/tmp/test.so");
+}
+
+#[test]
+fn test_file_loader_exists_nonexistent() {
+    let loader = FileLoader::new("/tmp/nonexistent_plugin_12345.so");
+    assert!(!loader.exists());
+}
+
+#[test]
+fn test_file_loader_exists_existing() {
+    let temp_file = std::env::temp_dir().join("test_loader_exists.so");
+    std::fs::write(&temp_file, b"fake").unwrap();
+
+    let loader = FileLoader::new(&temp_file);
+    assert!(loader.exists());
+
+    std::fs::remove_file(&temp_file).unwrap();
+}
+
+#[test]
+fn test_file_loader_load_nonexistent() {
+    let loader = FileLoader::new("/tmp/nonexistent_plugin_12345.so");
+    let result = loader.load();
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_file_loader_load_existing() {
+    let temp_file = std::env::temp_dir().join("test_loader_load.so");
+    let test_data = b"test plugin data";
+    std::fs::write(&temp_file, test_data).unwrap();
+
+    let loader = FileLoader::new(&temp_file);
+    let result = loader.load();
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), test_data);
+
+    std::fs::remove_file(&temp_file).unwrap();
+}
+
+#[test]
+fn test_file_loader_with_manager() {
+    let mut manager = PluginManager::new();
+    let temp_file = std::env::temp_dir().join("test_loader_manager.so");
+    std::fs::write(&temp_file, b"fake").unwrap();
+
+    let loader = FileLoader::new(&temp_file);
+    let result = manager.load_plugin_from_loader(&loader, "test_plugin");
+
+    // Should fail because the file is not a valid plugin
+    assert!(result.is_err());
+
+    std::fs::remove_file(&temp_file).unwrap();
+}
+
+// === MultiLoader Tests ===
+
+#[test]
+fn test_multi_loader_new() {
+    let loader = MultiLoader::new();
+    assert!(!loader.exists());
+}
+
+#[test]
+fn test_multi_loader_add_file() {
+    let temp_file = std::env::temp_dir().join("test_multi_loader.so");
+    std::fs::write(&temp_file, b"fake").unwrap();
+
+    let loader = MultiLoader::new().add_file(&temp_file);
+    assert!(loader.exists());
+
+    std::fs::remove_file(&temp_file).unwrap();
+}
+
+#[test]
+fn test_multi_loader_source() {
+    let loader = MultiLoader::new()
+        .add_file("/tmp/test1.so")
+        .add_file("/tmp/test2.so");
+
+    let source = loader.source();
+    assert!(source.contains("/tmp/test1.so"));
+    assert!(source.contains("/tmp/test2.so"));
+}
+
+#[test]
+fn test_multi_loader_fallback() {
+    // First loader doesn't exist, second does
+    let temp_file = std::env::temp_dir().join("test_multi_fallback.so");
+    let test_data = b"fallback data";
+    std::fs::write(&temp_file, test_data).unwrap();
+
+    let loader = MultiLoader::new()
+        .add_file("/tmp/nonexistent_12345.so")
+        .add_file(&temp_file);
+
+    assert!(loader.exists());
+    let result = loader.load();
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), test_data);
+
+    std::fs::remove_file(&temp_file).unwrap();
+}
+
+#[test]
+fn test_multi_loader_all_fail() {
+    let loader = MultiLoader::new()
+        .add_file("/tmp/nonexistent_12345.so")
+        .add_file("/tmp/nonexistent_67890.so");
+
+    assert!(!loader.exists());
+    let result = loader.load();
+    assert!(result.is_err());
+}
+
+// === Registry Tests ===
+
 #[test]
 fn test_registry_plugin_names() {
     let registry = PluginRegistry::new();
@@ -115,6 +244,8 @@ fn test_plugin_context_creation() {
     let names = ctx.registry().plugin_names();
     assert!(names.is_empty());
 }
+
+// === Metadata Tests ===
 
 #[test]
 fn test_plugin_metadata_empty_authors() {

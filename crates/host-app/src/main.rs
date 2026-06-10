@@ -1,5 +1,5 @@
 use plugin_interfaces::{Greet, GreetingService};
-use plugin_system::PluginManager;
+use plugin_system::{copy_cargo_plugin, library_path, PluginManager};
 use std::path::Path;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Scanning for plugins in: {}", plugin_dir);
 
-    // Load all plugins from the directory
+    // Load all plugins from the directory using FileLoader
     let loaded = manager.load_plugins_from_dir(&plugin_dir)?;
 
     if loaded.is_empty() {
@@ -68,6 +68,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // Demonstrate loader usage
+    println!("\n=== Loader Demo ===");
+    println!("You can also load plugins using specific loaders:");
+    println!("  let loader = FileLoader::new(\"{}\");", library_path(".", "my_plugin").display());
+    println!("  manager.load_plugin_from_loader(&loader, \"plugin_name\");");
+
     println!("\n=== Plugin System Ready ===");
     println!("Press Ctrl+C to exit.");
 
@@ -113,45 +119,11 @@ fn build_example_plugins() -> Result<(), Box<dyn std::error::Error>> {
 
     let target_dir = workspace_root.join("target").join("release");
 
-    #[cfg(target_os = "linux")]
-    {
-        let hello_src = target_dir.join("libplugin_hello.so");
-        let greeter_src = target_dir.join("libplugin_greeter.so");
-        if hello_src.exists() {
-            std::fs::copy(&hello_src, plugins_dir.join("libplugin_hello.so"))?;
-            println!("  Copied {}", hello_src.display());
-        }
-        if greeter_src.exists() {
-            std::fs::copy(&greeter_src, plugins_dir.join("libplugin_greeter.so"))?;
-            println!("  Copied {}", greeter_src.display());
-        }
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        let hello_src = target_dir.join("libplugin_hello.dylib");
-        let greeter_src = target_dir.join("libplugin_greeter.dylib");
-        if hello_src.exists() {
-            std::fs::copy(&hello_src, plugins_dir.join("libplugin_hello.dylib"))?;
-            println!("  Copied {}", hello_src.display());
-        }
-        if greeter_src.exists() {
-            std::fs::copy(&greeter_src, plugins_dir.join("libplugin_greeter.dylib"))?;
-            println!("  Copied {}", greeter_src.display());
-        }
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        let hello_src = target_dir.join("plugin_hello.dll");
-        let greeter_src = target_dir.join("plugin_greeter.dll");
-        if hello_src.exists() {
-            std::fs::copy(&hello_src, plugins_dir.join("plugin_hello.dll"))?;
-            println!("  Copied {}", hello_src.display());
-        }
-        if greeter_src.exists() {
-            std::fs::copy(&greeter_src, plugins_dir.join("plugin_greeter.dll"))?;
-            println!("  Copied {}", greeter_src.display());
+    // Copy plugins using helper function
+    for name in &["plugin_hello", "plugin_greeter"] {
+        match copy_cargo_plugin(&target_dir, &plugins_dir, name)? {
+            Some(dest) => println!("  Copied {}", dest.display()),
+            None => println!("  Warning: {} not found in {}", name, target_dir.display()),
         }
     }
 

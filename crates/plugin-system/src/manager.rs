@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use crate::context::PluginContext;
 use crate::error::{PluginError, Result};
-use crate::loader::PluginLoader;
+use crate::loader::{FileLoader, PluginLoader};
 use crate::registry::{new_shared_registry, SharedRegistry};
 use crate::traits::{Plugin, PluginMetadata};
 
@@ -204,14 +204,20 @@ impl PluginManager {
         Ok(name)
     }
 
-    /// Load all plugin libraries from a directory.
+    /// Load all plugin libraries from a directory using `FileLoader`.
     ///
-    /// Scans for `.so` (Linux), `.dylib` (macOS), or `.dll` (Windows) files.
+    /// Scans for `.so` (Linux), `.dylib` (macOS), or `.dll` (Windows) files
+    /// and loads each via `FileLoader`.
     pub fn load_plugins_from_dir(&mut self, dir: impl AsRef<Path>) -> Result<Vec<String>> {
         let dir = dir.as_ref();
         log::info!("Scanning for plugins in {}", dir.display());
 
         let mut loaded = Vec::new();
+
+        if !dir.exists() {
+            log::warn!("Plugin directory {} does not exist", dir.display());
+            return Ok(loaded);
+        }
 
         let expected_ext = if cfg!(target_os = "linux") {
             "so"
@@ -223,25 +229,49 @@ impl PluginManager {
             "so"
         };
 
-        if dir.exists() {
-            for entry in std::fs::read_dir(dir)? {
-                let entry = entry?;
-                let path = entry.path();
-                if path.is_file() {
-                    if let Some(ext) = path.extension() {
-                        if ext == expected_ext {
-                            match self.load_plugin(&path) {
-                                Ok(name) => loaded.push(name),
-                                Err(e) => {
-                                    log::error!("Failed to load {}: {}", path.display(), e);
-                                }
+        for entry in std::fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(ext) = path.extension() {
+                    if ext == expected_ext {
+                        let loader = FileLoader::new(&path);
+                        let name = path
+                            .file_stem()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("unknown")
+                            .to_string();
+
+                        match self.load_plugin_from_loader(&loader, &name) {
+                            Ok(name) => loaded.push(name),
+                            Err(e) => {
+                                log::error!("Failed to load {}: {}", path.display(), e);
                             }
                         }
                     }
                 }
             }
-        } else {
-            log::warn!("Plugin directory {} does not exist", dir.display());
+        }
+
+        Ok(loaded)
+    }
+
+    /// Load plugins from a list of loaders.
+    ///
+    /// Each loader is tried in order. Successful loads are returned.
+    pub fn load_plugins_from_loaders(
+        &mut self,
+        loaders: &[(String, Box<dyn PluginLoader>)],
+    ) -> Result<Vec<String>> {
+        let mut loaded = Vec::new();
+
+        for (name, loader) in loaders {
+            match self.load_plugin_from_loader(loader.as_ref(), name) {
+                Ok(name) => loaded.push(name),
+                Err(e) => {
+                    log::error!("Failed to load plugin '{}': {}", name, e);
+                }
+            }
         }
 
         Ok(loaded)
