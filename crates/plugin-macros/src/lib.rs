@@ -1,6 +1,8 @@
 use proc_macro::TokenStream;
-use quote::quote;
-use syn::{parse_macro_input, ItemImpl};
+use quote::{format_ident, quote};
+use syn::{
+    parse_macro_input, Expr, ExprArray, FnArg, Ident, ImplItem, ItemImpl, ReturnType, Type,
+};
 
 #[proc_macro_attribute]
 pub fn plugin_interface(_attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -8,9 +10,18 @@ pub fn plugin_interface(_attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
-pub fn plugin_export(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn plugin_export(attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as ItemImpl);
-    match generate_plugin_export(input) {
+    match generate_plugin_export(attr, input) {
+        Ok(ts) => ts.into(),
+        Err(e) => e.to_compile_error().into(),
+    }
+}
+
+#[proc_macro_attribute]
+pub fn plugin_export_all(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as ItemImpl);
+    match generate_plugin_export_all(attr, input) {
         Ok(ts) => ts.into(),
         Err(e) => e.to_compile_error().into(),
     }
@@ -24,8 +35,39 @@ pub fn define_plugin(item: TokenStream) -> TokenStream {
         .into()
 }
 
-fn generate_plugin_export(input: ItemImpl) -> syn::Result<proc_macro2::TokenStream> {
-    let (_, trait_path, self_ty) = input.trait_.as_ref().ok_or_else(|| {
+struct ExportArgs {
+    interfaces: Vec<syn::Path>,
+}
+
+impl syn::parse::Parse for ExportArgs {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let mut interfaces = Vec::new();
+        if !input.is_empty() {
+            let ident: Ident = input.parse()?;
+            if ident != "interfaces" {
+                return Err(syn::Error::new(ident.span(), "expected `interfaces`"));
+            }
+            let _eq: syn::Token![=] = input.parse()?;
+            let arr: ExprArray = input.parse()?;
+            for expr in arr.elems {
+                if let Expr::Path(ep) = expr {
+                    interfaces.push(ep.path);
+                } else {
+                    return Err(syn::Error::new_spanned(expr, "expected trait path"));
+                }
+            }
+        }
+        Ok(ExportArgs { interfaces })
+    }
+}
+
+fn generate_plugin_export(
+    attr: TokenStream,
+    input: ItemImpl,
+) -> syn::Result<proc_macro2::TokenStream> {
+    let _args: ExportArgs = syn::parse(attr)?;
+
+    let (_, trait_path, _) = input.trait_.as_ref().ok_or_else(|| {
         syn::Error::new_spanned(
             &input.self_ty,
             "#[plugin_export] must be on a trait impl block",
@@ -45,13 +87,243 @@ fn generate_plugin_export(input: ItemImpl) -> syn::Result<proc_macro2::TokenStre
     }
 
     let impl_items = &input.items;
+    let self_ty = &input.self_ty;
+
+    Ok(quote! {
+        impl #trait_path for #self_ty {
+            #(#impl_items)*
+        }
+
+        #[no_mangle]
+        #[allow(improper_ctypes_definitions)]
+        pub extern "C" fn plugin_create() -> *mut dyn plugin_system::Plugin {
+            let boxed: Box<dyn plugin_system::Plugin> = Box::new(<#self_ty>::new());
+            Box::into_raw(boxed)
+        }
+
+        #[no_mangle]
+        #[allow(improper_ctypes_definitions)]
+        pub unsafe extern "C" fn plugin_destroy(ptr: *mut dyn plugin_system::Plugin) {
+            if !ptr.is_null() {
+                drop(Box::from_raw(ptr));
+            }
+        }
+
+        #[no_mangle]
+        #[allow(improper_ctypes_definitions)]
+        pub extern "C" fn plugin_metadata() -> plugin_system::PluginMetadata {
+            plugin_system::Plugin::metadata(&<#self_ty>::new())
+        }
+    })
+}
+
+fn generate_plugin_export_all(
+    attr: TokenStream,
+    input: ItemImpl,
+) -> syn::Result<proc_macro2::TokenStream> {
+    let args: ExportArgs = syn::parse(attr)?;
+
+    let (_, trait_path, self_ty) = input.trait_.as_ref().ok_or_else(|| {
+        syn::Error::new_spanned(
+            &input.self_ty,
+            "#[plugin_export_all] must be on a trait impl block",
+        )
+    })?;
+
+    let trait_last = trait_path
+        .segments
+        .last()
+        .ok_or_else(|| syn::Error::new_spanned(trait_path, "empty trait path"))?;
+
+    if trait_last.ident != "Plugin" {
+        return Err(syn::Error::new_spanned(
+            &trait_last.ident,
+            "#[plugin_export_all] must be on `impl Plugin for YourType`",
+        ));
+    }
+
+    let impl_items = &input.items;
     let impl_attrs = &input.attrs;
+
+    let mut method_exports = Vec::new();
+    let mut method_names = Vec::new();
+
+    for item in impl_items {
+        if let ImplItem::Fn(method) = item {
+            let method_name = &method.sig.ident;
+            let method_name_str = method_name.to_string();
+
+            if method_name_str == "metadata"
+                || method_name_str == "on_load"
+                || method_name_str == "on_unload"
+                || method_name_str == "handle_command"
+                || method_name_str == "plugin_type_name"
+            {
+                continue;
+            }
+
+            let export_fn_name = format_ident!("plugin_method_{}", method_name);
+            method_names.push(method_name_str);
+
+            let mut params = Vec::new();
+            let mut param_conversions = Vec::new();
+            let mut has_mut_self = false;
+
+            for param in &method.sig.inputs {
+                match param {
+                    FnArg::Receiver(r) => {
+                        has_mut_self = r.mutability.is_some();
+                    }
+                    FnArg::Typed(pat_type) => {
+                        let pat = &pat_type.pat;
+                        let ty = &pat_type.ty;
+                        params.push(quote! { #pat: *const std::ffi::c_void });
+                        param_conversions.push((pat.clone(), ty.clone()));
+                    }
+                }
+            }
+
+            let receiver_type = if has_mut_self {
+                quote! { *mut std::ffi::c_void }
+            } else {
+                quote! { *const std::ffi::c_void }
+            };
+
+            let ret_type = match &method.sig.output {
+                ReturnType::Default => quote! { () },
+                ReturnType::Type(_, ty) => match &**ty {
+                    Type::Path(p) => {
+                        let ident = &p.path.segments.last().unwrap().ident;
+                        match ident.to_string().as_str() {
+                            "String" => quote! { *mut std::ffi::c_char },
+                            "u64" | "u32" | "u16" | "u8" | "i64" | "i32" | "i16" | "i8"
+                            | "f64" | "f32" | "bool" => quote! { #ty },
+                            _ => quote! { *const std::ffi::c_void },
+                        }
+                    }
+                    Type::Reference(r) => {
+                        if let Type::Path(p) = &*r.elem {
+                            let ident = &p.path.segments.last().unwrap().ident;
+                            if ident == "str" {
+                                quote! { *const std::ffi::c_char }
+                            } else {
+                                quote! { *const std::ffi::c_void }
+                            }
+                        } else {
+                            quote! { *const std::ffi::c_void }
+                        }
+                    }
+                    _ => quote! { *const std::ffi::c_void },
+                },
+            };
+
+            let param_args: Vec<_> = param_conversions
+                .iter()
+                .map(|(pat, ty)| {
+                    match &**ty {
+                        Type::Path(p) => {
+                            let ident = &p.path.segments.last().unwrap().ident;
+                            match ident.to_string().as_str() {
+                                "String" => {
+                                    quote! {
+                                        {
+                                            let c_str = #pat as *const std::ffi::c_char;
+                                            std::ffi::CStr::from_ptr(c_str)
+                                                .to_str()
+                                                .unwrap()
+                                                .to_string()
+                                        }
+                                    }
+                                }
+                                _ => quote! { #pat },
+                            }
+                        }
+                        _ => quote! { #pat },
+                    }
+                })
+                .collect();
+
+            let return_conversion = match &method.sig.output {
+                ReturnType::Default => quote! { let _ = __result; },
+                ReturnType::Type(_, ty) => match &**ty {
+                    Type::Path(p) => {
+                        let ident = &p.path.segments.last().unwrap().ident;
+                        match ident.to_string().as_str() {
+                            "String" => {
+                                quote! {
+                                    std::ffi::CString::new(__result)
+                                        .unwrap()
+                                        .into_raw()
+                                }
+                            }
+                            _ => quote! { __result },
+                        }
+                    }
+                    Type::Reference(r) => {
+                        if let Type::Path(p) = &*r.elem {
+                            let ident = &p.path.segments.last().unwrap().ident;
+                            if ident == "str" {
+                                quote! {
+                                    std::ffi::CString::new(__result)
+                                        .unwrap()
+                                        .into_raw()
+                                }
+                            } else {
+                                quote! { __result as *const std::ffi::c_void }
+                            }
+                        } else {
+                            quote! { __result as *const std::ffi::c_void }
+                        }
+                    }
+                    _ => quote! { __result as *const std::ffi::c_void },
+                },
+            };
+
+            let method_call = if has_mut_self {
+                quote! {
+                    let __plugin = __raw as *mut #self_ty;
+                    (*__plugin).#method_name(#(#param_args),*)
+                }
+            } else {
+                quote! {
+                    let __plugin = __raw as *const #self_ty;
+                    (*__plugin).#method_name(#(#param_args),*)
+                }
+            };
+
+            method_exports.push(quote! {
+                #[no_mangle]
+                pub extern "C" fn #export_fn_name(
+                    __raw: #receiver_type,
+                    #(#params),*
+                ) -> #ret_type {
+                    let __result = unsafe { #method_call };
+                    #return_conversion
+                }
+            });
+        }
+    }
+
+    let interface_names: Vec<_> = args
+        .interfaces
+        .iter()
+        .map(|p| {
+            p.segments
+                .last()
+                .map(|s| s.ident.to_string())
+                .unwrap_or_default()
+        })
+        .collect();
+
+    let all_method_names = method_names;
 
     Ok(quote! {
         #(#impl_attrs)*
         impl #trait_path for #self_ty {
             #(#impl_items)*
         }
+
+        #(#method_exports)*
 
         #[no_mangle]
         #[allow(improper_ctypes_definitions)]

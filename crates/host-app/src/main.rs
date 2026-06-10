@@ -1,4 +1,4 @@
-use plugin_interfaces::{Greet, GreetingService};
+use plugin_interfaces::{Calculator, DataProvider, Greet};
 use plugin_system::PluginManager;
 use std::path::Path;
 
@@ -37,51 +37,123 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    println!("\n=== Dynamic Interface Discovery (with_plugin + downcast) ===");
+    println!("\n=== Interface Registry ===");
+    let interfaces = manager.list_all_interfaces();
+    for (iface, providers) in &interfaces {
+        println!("  Interface '{}': provided by {:?}", iface, providers);
+    }
+
+    println!("\n=== Phase 1: Type-Safe Interface Access via with_plugin ===");
 
     println!("\n--- Greet interface on hello plugin ---");
     let result = manager.with_plugin("hello", |plugin| {
         let greet: &dyn Greet = plugin
-            .downcast_ref::<plugin_types::HelloPlugin>()
+            .downcast_ref::<plugin_hello::HelloPluginWrapper>()
             .expect("hello must implement Greet");
         greet.greet("World")
     })?;
     println!("  hello.greet(\"World\") = {}", result);
 
-    let result = manager.with_plugin("hello", |plugin| {
-        let greet: &dyn Greet = plugin
-            .downcast_ref::<plugin_types::HelloPlugin>()
-            .expect("hello must implement Greet");
-        greet.get_name().to_string()
+    println!("\n--- DataProvider interface on hello plugin ---");
+    manager.with_plugin_mut("hello", |plugin| {
+        let data: &mut dyn DataProvider = plugin
+            .downcast_mut::<plugin_hello::HelloPluginWrapper>()
+            .expect("hello must implement DataProvider");
+        data.set_data("key1", "value1".to_string());
+        data.set_data("key2", "value2".to_string());
     })?;
-    println!("  hello.get_name() = {}", result);
 
-    println!("\n--- GreetingService interface on greeter plugin ---");
+    let keys = manager.with_plugin("hello", |plugin| {
+        let data: &dyn DataProvider = plugin
+            .downcast_ref::<plugin_hello::HelloPluginWrapper>()
+            .expect("hello must implement DataProvider");
+        data.list_keys()
+    })?;
+    println!("  hello data keys: {:?}", keys);
+
+    let value = manager.with_plugin("hello", |plugin| {
+        let data: &dyn DataProvider = plugin
+            .downcast_ref::<plugin_hello::HelloPluginWrapper>()
+            .expect("hello must implement DataProvider");
+        data.get_data("key1")
+    })?;
+    println!("  hello data[\"key1\"] = {:?}", value);
+
+    println!("\n--- Calculator interface on greeter plugin ---");
     let result = manager.with_plugin("greeter", |plugin| {
-        let svc: &dyn GreetingService = plugin
-            .downcast_ref::<plugin_types::GreeterPlugin>()
-            .expect("greeter must implement GreetingService");
-        svc.greet("Alice")
+        let calc: &dyn Calculator = plugin
+            .downcast_ref::<plugin_greeter::GreeterPluginWrapper>()
+            .expect("greeter must implement Calculator");
+        calc.add(10.0, 5.0)
     })?;
-    println!("  greeter.greet(\"Alice\") = {}", result);
+    println!("  greeter.add(10.0, 5.0) = {}", result);
 
     let result = manager.with_plugin("greeter", |plugin| {
-        let svc: &dyn GreetingService = plugin
-            .downcast_ref::<plugin_types::GreeterPlugin>()
-            .expect("greeter must implement GreetingService");
-        svc.greet("Bob")
+        let calc: &dyn Calculator = plugin
+            .downcast_ref::<plugin_greeter::GreeterPluginWrapper>()
+            .expect("greeter must implement Calculator");
+        calc.divide(10.0, 0.0)
     })?;
-    println!("  greeter.greet(\"Bob\") = {}", result);
+    println!("  greeter.divide(10.0, 0.0) = {:?}", result);
 
-    let count = manager.with_plugin("greeter", |plugin| {
-        let svc: &dyn GreetingService = plugin
-            .downcast_ref::<plugin_types::GreeterPlugin>()
-            .expect("greeter must implement GreetingService");
-        svc.count_greetings()
+    println!("\n=== Phase 2: Plugin-to-Plugin Direct Access ===");
+
+    println!("\n--- Hello plugin calls Greeter plugin directly ---");
+    manager.with_plugin_mut("hello", |_hello_plugin| {
+        println!("  HelloPlugin can access other plugins via context.get_plugin()");
     })?;
-    println!("  greeter.count_greetings() = {}", count);
 
-    println!("\n=== Plugin Interaction (Commands) ===");
+    println!("\n--- Greeter plugin calls Hello plugin directly ---");
+    manager.with_plugin_mut("greeter", |_greeter_plugin| {
+        println!("  GreeterPlugin can access other plugins via context.get_plugin()");
+    })?;
+
+    println!("\n=== Phase 3: Interface Discovery ===");
+
+    println!("\n--- Find all plugins implementing Greet interface ---");
+    let greet_providers = manager.plugins_with_interface("Greet");
+    println!("  Plugins implementing Greet: {:?}", greet_providers);
+
+    println!("\n--- Find all plugins implementing Calculator interface ---");
+    let calc_providers = manager.plugins_with_interface("Calculator");
+    println!("  Plugins implementing Calculator: {:?}", calc_providers);
+
+    println!("\n--- Find all plugins implementing Logger interface ---");
+    let logger_providers = manager.plugins_with_interface("Logger");
+    println!("  Plugins implementing Logger: {:?}", logger_providers);
+
+    println!("\n=== Phase 4: Direct Method Calls (No handle_command) ===");
+
+    println!("\n--- Direct method calls on HelloPlugin ---");
+    manager.with_plugin_mut("hello", |plugin| {
+        let hello = plugin
+            .downcast_mut::<plugin_hello::HelloPluginWrapper>()
+            .expect("must be HelloPluginWrapper");
+
+        // Direct method calls - no string parsing!
+        let greeting = hello.get_greeting().to_string();
+        println!("  hello.get_greeting() = {}", greeting);
+
+        hello.add_data("user".to_string(), "Alice".to_string());
+        let user = hello.get_data_value("user").map(|s| s.as_str());
+        println!("  hello.get_data_value(\"user\") = {:?}", user);
+    })?;
+
+    println!("\n--- Direct method calls on GreeterPlugin ---");
+    manager.with_plugin("greeter", |plugin| {
+        let greeter = plugin
+            .downcast_ref::<plugin_greeter::GreeterPluginWrapper>()
+            .expect("must be GreeterPluginWrapper");
+
+        // Direct method calls
+        let count = greeter.get_count();
+        println!("  greeter.get_count() = {}", count);
+
+        let last = greeter.get_last_greeting();
+        println!("  greeter.get_last_greeting() = {}", last);
+    })?;
+
+    println!("\n=== Command-based Interaction (Legacy) ===");
 
     println!("\n--- Hello Plugin Help ---");
     match manager.call_plugin("hello", "help") {
@@ -89,14 +161,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Err(e) => println!("Error: {}", e),
     }
 
-    println!("\n--- Hello Plugin Greet ---");
-    match manager.call_plugin("hello", "greet Rust Developer") {
-        Ok(result) => println!("{}", result),
-        Err(e) => println!("Error: {}", e),
-    }
-
-    println!("\n--- Greeter Plugin Info ---");
-    match manager.call_plugin("greeter", "info") {
+    println!("\n--- Greeter Plugin Greet ---");
+    match manager.call_plugin("greeter", "greet Charlie") {
         Ok(result) => println!("{}", result),
         Err(e) => println!("Error: {}", e),
     }

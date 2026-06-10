@@ -369,6 +369,55 @@ impl PluginManager {
         let plugin_ref: &mut dyn Plugin = &mut **guard;
         Ok(f(plugin_ref))
     }
+
+    pub fn get_plugin_arc(
+        &self,
+        name: &str,
+    ) -> Result<std::sync::Arc<std::sync::RwLock<Box<dyn Plugin>>>> {
+        let registry = self.registry.read().expect("registry lock poisoned");
+        registry
+            .get_by_name(name)
+            .ok_or_else(|| PluginError::PluginNotFound {
+                name: name.to_string(),
+            })
+    }
+
+    pub fn plugins_with_interface(&self, interface_name: &str) -> Vec<String> {
+        let registry = self.registry.read().expect("registry lock poisoned");
+        registry.get_by_interface(interface_name)
+    }
+
+    pub fn list_all_interfaces(&self) -> HashMap<String, Vec<String>> {
+        let registry = self.registry.read().expect("registry lock poisoned");
+        registry.list_interfaces()
+    }
+
+    pub fn call_interface_method<R>(
+        &self,
+        plugin_name: &str,
+        interface_name: &str,
+        f: impl FnOnce(&dyn Plugin) -> R,
+    ) -> Result<R> {
+        let registry = self.registry.read().expect("registry lock poisoned");
+        let plugin_arc = registry
+            .get_by_name(plugin_name)
+            .ok_or_else(|| PluginError::PluginNotFound {
+                name: plugin_name.to_string(),
+            })?;
+        let guard = plugin_arc.read().expect("plugin lock poisoned");
+        let plugin_ref: &dyn Plugin = &**guard;
+
+        if !plugin_ref.has_interface(interface_name) {
+            return Err(PluginError::PluginNotFound {
+                name: format!(
+                    "Plugin '{}' does not implement interface '{}'",
+                    plugin_name, interface_name
+                ),
+            });
+        }
+
+        Ok(f(plugin_ref))
+    }
 }
 
 impl Default for PluginManager {
