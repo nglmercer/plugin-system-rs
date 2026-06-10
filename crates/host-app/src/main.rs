@@ -1,5 +1,4 @@
-use plugin_interfaces::{Greet, GreetingService};
-use plugin_system::{copy_cargo_plugin, library_path, PluginManager};
+use plugin_system::PluginManager;
 use std::path::Path;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -23,6 +22,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("No plugins found. Place .so/.dll/.dylib files in the plugins directory.");
         println!("Building example plugins...\n");
         build_example_plugins()?;
+
+        // Reload plugins after building
+        let _ = manager.load_plugins_from_dir(&plugin_dir)?;
     }
 
     println!("\n=== Loaded Plugins ===");
@@ -38,41 +40,88 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // Demonstrate plugin interaction
-    println!("\n=== Plugin Interaction ===");
+    // Demonstrate plugin interaction via commands
+    println!("\n=== Plugin Interaction (Commands) ===");
 
-    {
-        let registry = manager.registry();
-        let registry = registry.read().expect("registry lock poisoned");
+    // Get help from hello plugin
+    println!("\n--- Hello Plugin Help ---");
+    match manager.call_plugin("hello", "help") {
+        Ok(help) => println!("{}", help),
+        Err(e) => println!("Error: {}", e),
+    }
 
-        // Try to use the hello plugin
-        if let Some(hello_arc) = registry.get_by_name("hello") {
-            if let Ok(hello) = hello_arc.read() {
-                if let Some(hello_plugin) = hello.downcast_ref::<plugin_types::HelloPlugin>() {
-                    println!("Hello says: {}", hello_plugin.greet("Charlie"));
-                }
-            }
-        }
+    // Greet using hello plugin
+    println!("\n--- Hello Plugin Greet ---");
+    match manager.call_plugin("hello", "greet World") {
+        Ok(result) => println!("{}", result),
+        Err(e) => println!("Error: {}", e),
+    }
 
-        // Try to use the greeter plugin
-        if let Some(greeter_arc) = registry.get_by_name("greeter") {
-            if let Ok(greeter) = greeter_arc.read() {
-                if let Some(greeter_plugin) =
-                    greeter.downcast_ref::<plugin_types::GreeterPlugin>()
-                {
-                    println!("Greeter says: {}", greeter_plugin.greet("Alice"));
-                    println!("Greeter says: {}", greeter_plugin.greet("Bob"));
-                    println!("Total greetings: {}", greeter_plugin.count_greetings());
-                }
-            }
+    // Get greeting from hello plugin
+    println!("\n--- Hello Plugin Get Greeting ---");
+    match manager.call_plugin("hello", "get_greeting") {
+        Ok(result) => println!("{}", result),
+        Err(e) => println!("Error: {}", e),
+    }
+
+    // Set new greeting
+    println!("\n--- Hello Plugin Set Greeting ---");
+    match manager.call_plugin("hello", "set_greeting Hi") {
+        Ok(result) => println!("{}", result),
+        Err(e) => println!("Error: {}", e),
+    }
+
+    // Greet again with new greeting
+    println!("\n--- Hello Plugin Greet Again ---");
+    match manager.call_plugin("hello", "greet Rust Developer") {
+        Ok(result) => println!("{}", result),
+        Err(e) => println!("Error: {}", e),
+    }
+
+    // Get plugin info
+    println!("\n--- Hello Plugin Info ---");
+    match manager.call_plugin("hello", "info") {
+        Ok(result) => println!("{}", result),
+        Err(e) => println!("Error: {}", e),
+    }
+
+    // Test greeter plugin
+    println!("\n--- Greeter Plugin Help ---");
+    match manager.call_plugin("greeter", "help") {
+        Ok(help) => println!("{}", help),
+        Err(e) => println!("Error: {}", e),
+    }
+
+    // Greet multiple times
+    println!("\n--- Greeter Plugin Greet Multiple Times ---");
+    for name in &["Alice", "Bob", "Charlie"] {
+        match manager.call_plugin("greeter", &format!("greet {}", name)) {
+            Ok(result) => println!("{}", result),
+            Err(e) => println!("Error: {}", e),
         }
     }
 
-    // Demonstrate loader usage
-    println!("\n=== Loader Demo ===");
-    println!("You can also load plugins using specific loaders:");
-    println!("  let loader = FileLoader::new(\"{}\");", library_path(".", "my_plugin").display());
-    println!("  manager.load_plugin_from_loader(&loader, \"plugin_name\");");
+    // Get greeting count
+    println!("\n--- Greeter Plugin Count ---");
+    match manager.call_plugin("greeter", "count") {
+        Ok(result) => println!("{}", result),
+        Err(e) => println!("Error: {}", e),
+    }
+
+    // Get last greeting
+    println!("\n--- Greeter Plugin Last ---");
+    match manager.call_plugin("greeter", "last") {
+        Ok(result) => println!("{}", result),
+        Err(e) => println!("Error: {}", e),
+    }
+
+    // Call all plugins with same command
+    println!("\n--- Call All Plugins: info ---");
+    let results = manager.call_plugins("info");
+    for (name, result) in &results {
+        println!("\n{}:", name);
+        println!("{}", result);
+    }
 
     println!("\n=== Plugin System Ready ===");
     println!("Press Ctrl+C to exit.");
@@ -121,7 +170,7 @@ fn build_example_plugins() -> Result<(), Box<dyn std::error::Error>> {
 
     // Copy plugins using helper function
     for name in &["plugin_hello", "plugin_greeter"] {
-        match copy_cargo_plugin(&target_dir, &plugins_dir, name)? {
+        match plugin_system::copy_cargo_plugin(&target_dir, &plugins_dir, name)? {
             Some(dest) => println!("  Copied {}", dest.display()),
             None => println!("  Warning: {} not found in {}", name, target_dir.display()),
         }

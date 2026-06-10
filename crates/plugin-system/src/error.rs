@@ -19,10 +19,7 @@ pub enum PluginError {
     UnloadFailed { name: String, reason: String },
 
     #[error("Dependency '{dependency}' required by '{plugin}' is not loaded")]
-    MissingDependency {
-        plugin: String,
-        dependency: String,
-    },
+    MissingDependency { plugin: String, dependency: String },
 
     #[error("Version incompatibility: plugin '{name}' requires '{required}', found '{found}'")]
     VersionIncompatible {

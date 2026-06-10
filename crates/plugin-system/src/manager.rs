@@ -90,7 +90,11 @@ impl PluginManager {
         let temp_path = temp_dir.join(format!("{}_{}.{}", name, std::process::id(), ext));
         std::fs::write(&temp_path, &bytes)?;
 
-        log::info!("Wrote {} bytes to temp file: {}", bytes.len(), temp_path.display());
+        log::info!(
+            "Wrote {} bytes to temp file: {}",
+            bytes.len(),
+            temp_path.display()
+        );
 
         // Load the plugin from the temp file
         let result = self.load_plugin(&temp_path);
@@ -124,21 +128,24 @@ impl PluginManager {
 
         // Resolve symbols
         let create: PluginCreateFn = unsafe {
-            *lib.get(b"plugin_create").map_err(|_| PluginError::SymbolNotFound {
-                symbol: "plugin_create".to_string(),
-            })?
+            *lib.get(b"plugin_create")
+                .map_err(|_| PluginError::SymbolNotFound {
+                    symbol: "plugin_create".to_string(),
+                })?
         };
 
         let destroy: PluginDestroyFn = unsafe {
-            *lib.get(b"plugin_destroy").map_err(|_| PluginError::SymbolNotFound {
-                symbol: "plugin_destroy".to_string(),
-            })?
+            *lib.get(b"plugin_destroy")
+                .map_err(|_| PluginError::SymbolNotFound {
+                    symbol: "plugin_destroy".to_string(),
+                })?
         };
 
         let metadata_fn: PluginMetadataFn = unsafe {
-            *lib.get(b"plugin_metadata").map_err(|_| PluginError::SymbolNotFound {
-                symbol: "plugin_metadata".to_string(),
-            })?
+            *lib.get(b"plugin_metadata")
+                .map_err(|_| PluginError::SymbolNotFound {
+                    symbol: "plugin_metadata".to_string(),
+                })?
         };
 
         // Get metadata first to check dependencies
@@ -359,6 +366,53 @@ impl PluginManager {
         self.loaded
             .get(name)
             .map(|p| unsafe { (p.library.metadata_fn)() })
+    }
+
+    /// Call a command on a plugin by name.
+    ///
+    /// The command format is: `"method arg1 arg2 ..."`
+    /// Returns the result string from the plugin.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let result = manager.call_plugin("hello", "greet World")?;
+    /// println!("Result: {}", result);
+    /// ```
+    pub fn call_plugin(&self, name: &str, command: &str) -> Result<String> {
+        let registry = self.registry.read().expect("registry lock poisoned");
+        let plugin_arc = registry
+            .get_by_name(name)
+            .ok_or_else(|| PluginError::PluginNotFound {
+                name: name.to_string(),
+            })?;
+
+        let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
+        Ok(plugin.handle_command(command))
+    }
+
+    /// Call a command on multiple plugins.
+    ///
+    /// Returns a map of plugin names to their results.
+    pub fn call_plugins(&self, command: &str) -> HashMap<String, String> {
+        let registry = self.registry.read().expect("registry lock poisoned");
+        let mut results = HashMap::new();
+
+        for name in registry.plugin_names() {
+            if let Some(plugin_arc) = registry.get_by_name(&name) {
+                if let Ok(mut plugin) = plugin_arc.write() {
+                    results.insert(name, plugin.handle_command(command));
+                }
+            }
+        }
+
+        results
+    }
+
+    /// Get a list of available commands for a plugin.
+    ///
+    /// Calls the plugin with "help" command to get the list of commands.
+    pub fn plugin_commands(&self, name: &str) -> Option<String> {
+        self.call_plugin(name, "help").ok()
     }
 }
 

@@ -25,6 +25,18 @@ pub trait Plugin: Any + Send + Sync {
     /// Called when the plugin is being unloaded.
     /// Clean up any resources here.
     fn on_unload(&mut self);
+
+    /// Handle a command from the host or another plugin.
+    ///
+    /// This is the primary way for the host to interact with plugins.
+    /// The command string format is: `"method arg1 arg2 ..."`
+    /// The return value is the result string, or an error message.
+    ///
+    /// # Default Implementation
+    /// Returns an error message for unknown commands.
+    fn handle_command(&mut self, command: &str) -> String {
+        format!("ERROR: Unknown command '{}'", command)
+    }
 }
 
 impl dyn Plugin {

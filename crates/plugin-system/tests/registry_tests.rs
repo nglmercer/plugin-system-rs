@@ -94,11 +94,7 @@ fn test_plugin_metadata_multiple_dependencies() {
         name: "multi_deps".to_string(),
         version: "1.0.0".to_string(),
         authors: vec![],
-        dependencies: vec![
-            "dep1".to_string(),
-            "dep2".to_string(),
-            "dep3".to_string(),
-        ],
+        dependencies: vec!["dep1".to_string(), "dep2".to_string(), "dep3".to_string()],
     };
 
     assert_eq!(metadata.dependencies.len(), 3);

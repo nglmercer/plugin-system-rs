@@ -1,4 +1,3 @@
-use std::any::Any;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -35,11 +34,8 @@ impl PluginRegistry {
     /// Remove a plugin by name, returning the wrapped instance.
     pub fn unregister(&mut self, name: &str) -> Option<Arc<RwLock<Box<dyn Plugin>>>> {
         if let Some(arc) = self.plugins.remove(name) {
-            // Remove type index entry
-            if let Ok(p) = arc.read() {
-                let type_id = (*p).type_id();
-                self.type_index.remove(&type_id);
-            }
+            // Clean up type index by scanning for this name
+            self.type_index.retain(|_, n| n != name);
             Some(arc)
         } else {
             None

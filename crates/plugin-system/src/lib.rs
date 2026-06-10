@@ -10,9 +10,9 @@ pub mod traits;
 // Re-export commonly used types
 pub use context::PluginContext;
 pub use error::{PluginError, Result};
-pub use loader::{FileLoader, MultiLoader, PluginLoader};
 #[cfg(feature = "url-loader")]
 pub use loader::UrlLoader;
+pub use loader::{FileLoader, MultiLoader, PluginLoader};
 pub use manager::PluginManager;
 pub use platform::{
     copy_cargo_plugin, copy_plugin, library_extension, library_filename, library_path,

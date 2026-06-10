@@ -195,6 +195,70 @@ let path = library_path("./plugins", "hello");
 copy_cargo_plugin(&target_dir, &plugins_dir, "plugin_hello")?;
 ```
 
+### Plugin Interaction (Commands)
+
+Plugins can handle commands from the host or other plugins:
+
+```rust
+// Call a command on a plugin
+let result = manager.call_plugin("hello", "greet World")?;
+println!("{}", result); // "Hello, World!"
+
+// Get help from a plugin
+let help = manager.call_plugin("hello", "help")?;
+println!("{}", help);
+
+// Call all plugins with the same command
+let results = manager.call_plugins("info");
+for (name, result) in &results {
+    println!("{}: {}", name, result);
+}
+```
+
+### Creating a Plugin with Commands
+
+```rust
+use plugin_system::{define_plugin, plugin_metadata, Plugin, PluginMetadata, PluginContext};
+
+struct MyPlugin {
+    count: u32,
+}
+
+impl Plugin for MyPlugin {
+    fn metadata(&self) -> PluginMetadata {
+        plugin_metadata! {
+            name: "my_plugin",
+            version: "1.0.0",
+            authors: ["Author"],
+            dependencies: []
+        }
+    }
+
+    fn on_load(&mut self, _ctx: &PluginContext) {
+        println!("Plugin loaded!");
+    }
+
+    fn on_unload(&mut self) {
+        println!("Plugin unloaded!");
+    }
+
+    fn handle_command(&mut self, command: &str) -> String {
+        let parts: Vec<&str> = command.splitn(2, ' ').collect();
+        match parts[0] {
+            "help" => "Available commands:\n  help\n  increment\n  count".to_string(),
+            "increment" => {
+                self.count += 1;
+                format!("Count: {}", self.count)
+            }
+            "count" => format!("Count: {}", self.count),
+            _ => format!("Unknown command: {}", parts[0]),
+        }
+    }
+}
+
+define_plugin!(MyPlugin);
+```
+
 ## Features
 
 Enable features in your `Cargo.toml`:

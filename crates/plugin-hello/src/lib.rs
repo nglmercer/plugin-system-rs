@@ -10,13 +10,16 @@ pub extern "C" fn plugin_create() -> *mut dyn Plugin {
 }
 
 /// Destroy a HelloPlugin instance.
+///
+/// # Safety
+///
+/// This function is called via FFI and must receive a valid pointer
+/// previously returned by `plugin_create`.
 #[no_mangle]
 #[allow(improper_ctypes_definitions)]
-pub extern "C" fn plugin_destroy(ptr: *mut dyn Plugin) {
+pub unsafe extern "C" fn plugin_destroy(ptr: *mut dyn Plugin) {
     if !ptr.is_null() {
-        unsafe {
-            drop(Box::from_raw(ptr));
-        }
+        drop(Box::from_raw(ptr));
     }
 }
 

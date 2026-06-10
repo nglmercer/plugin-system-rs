@@ -34,7 +34,7 @@ impl FileLoader {
 impl PluginLoader for FileLoader {
     fn load(&self) -> Result<Vec<u8>> {
         log::info!("Loading plugin from file: {}", self.path.display());
-        std::fs::read(&self.path).map_err(|e| PluginError::Io(e))
+        std::fs::read(&self.path).map_err(PluginError::Io)
     }
 
     fn source(&self) -> String {
@@ -239,8 +239,7 @@ impl MultiLoader {
     /// Add a URL loader (requires url-loader feature).
     #[cfg(feature = "url-loader")]
     pub fn add_url(mut self, url: impl Into<String>, cache_dir: Option<PathBuf>) -> Self {
-        self.loaders
-            .push(Box::new(UrlLoader::new(url, cache_dir)));
+        self.loaders.push(Box::new(UrlLoader::new(url, cache_dir)));
         self
     }
 }
@@ -258,11 +257,7 @@ impl PluginLoader for MultiLoader {
                 match loader.load() {
                     Ok(data) => return Ok(data),
                     Err(e) => {
-                        log::warn!(
-                            "Failed to load from {}: {}",
-                            loader.source(),
-                            e
-                        );
+                        log::warn!("Failed to load from {}: {}", loader.source(), e);
                     }
                 }
             }

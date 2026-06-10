@@ -48,9 +48,9 @@ pub fn copy_plugin(
     dest_dir: impl AsRef<Path>,
 ) -> std::io::Result<PathBuf> {
     let source = source.as_ref();
-    let filename = source
-        .file_name()
-        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid source path"))?;
+    let filename = source.file_name().ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid source path")
+    })?;
     let dest = dest_dir.as_ref().join(filename);
     std::fs::copy(source, &dest)?;
     Ok(dest)
