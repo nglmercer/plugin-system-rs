@@ -1,9 +1,0 @@
-[package]
-name = "plugin-types"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-plugin-system = { path = "../plugin-system" }
-plugin-interfaces = { path = "../plugin-interfaces" }
-log = "0.4"

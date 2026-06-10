@@ -1,0 +1,10 @@
+[package]
+name = "sd-actions"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sd-types = { path = "../sd-types" }
+sd-events = { path = "../sd-events" }
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1", features = ["sync"] }

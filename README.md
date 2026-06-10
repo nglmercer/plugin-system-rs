@@ -1,245 +1,132 @@
-# Plugin System
+# StreamDeck Core
 
-A multiplatform Rust plugin system using `libloading` for dynamic library loading. Plugins can be loaded from files or URLs, with support for hot-reloading and inter-plugin communication.
+A plugin-based StreamDeck control system with web UI, built in Rust.
 
-## Features
-
-- **Dynamic Loading** - Load `.so` / `.dylib` / `.dll` plugins at runtime via `libloading`
-- **Multiple Loaders** - `FileLoader`, `UrlLoader`, `MultiLoader` for flexible plugin sources
-- **Hot Reload** - Unload and reload plugins without restarting the application
-- **Inter-Plugin Communication** - Plugins can discover and interact with each other via the registry
-- **Cross-Platform** - Works on Linux, macOS, and Windows
-- **Dependency Management** - Automatic dependency checking before loading
-
-## Project Structure
+## Architecture
 
 ```
-libloading/
-├── Cargo.toml                    # Workspace root
+streamdeck/
 ├── crates/
-│   ├── plugin-system/           # Core library
-│   │   ├── src/
-│   │   │   ├── lib.rs           # Public API
-│   │   │   ├── traits.rs        # Plugin trait, PluginMetadata
-│   │   │   ├── error.rs         # Error types
-│   │   │   ├── registry.rs      # Plugin registry
-│   │   │   ├── context.rs       # PluginContext for inter-plugin access
-│   │   │   ├── manager.rs       # PluginManager lifecycle
-│   │   │   ├── loader.rs        # FileLoader, UrlLoader, MultiLoader
-│   │   │   ├── platform.rs      # Platform helpers
-│   │   │   └── macros.rs        # define_plugin!, plugin_metadata!
-│   │   └── tests/
-│   ├── plugin-interfaces/       # Shared trait definitions
-│   ├── plugin-types/            # Concrete plugin implementations
-│   ├── plugin-hello/            # Example plugin (cdylib)
-│   ├── plugin-greeter/          # Example plugin (cdylib)
-│   └── host-app/                # Example host application
+│   ├── plugin-system/      Core plugin framework (libloading-based)
+│   ├── plugin-interfaces/  Shared trait definitions
+│   ├── plugin-macros/      Proc macros for plugin exports
+│   ├── sd-types/           Shared types (ActionId, ProfileId, etc.)
+│   ├── sd-events/          Event bus for inter-plugin communication
+│   ├── sd-actions/         Action trait + built-in actions
+│   ├── sd-profiles/        Profile management (in-memory)
+│   ├── sd-devices/         Device abstraction (virtual devices)
+│   ├── sd-api/             axum HTTP + WebSocket server
+│   ├── sd-plugins/         Plugin manager integration
+│   └── sd-core/            Main binary
+├── plugins/
+│   ├── plugin-timer/       Timer/countdown plugin
+│   ├── plugin-system-monitor/  System resource monitoring
+│   ── plugin-hotkey/      Hotkey management
+└── web/                    Preact web UI
 ```
 
 ## Quick Start
 
-### 1. Build the workspace
+### 1. Build the backend
 
 ```bash
-cargo build --release
+cargo build
 ```
 
-### 2. Run the host application
+### 2. Build plugins
 
 ```bash
-./target/release/host-app
+cargo build --release -p plugin-timer -p plugin-system-monitor -p plugin-hotkey
 ```
 
-On first run, it will automatically build and copy example plugins to `./plugins/`.
-
-### 3. Run with logging
+### 3. Copy plugins
 
 ```bash
-RUST_LOG=info ./target/release/host-app
+mkdir -p plugins
+cp target/release/libplugin_*.so plugins/
 ```
 
-## Usage
+### 4. Run the core
 
-### Host Application
+```bash
+cargo run -p sd-core
+```
+
+The server starts on `http://localhost:3000`.
+
+### 5. Run the web UI (development)
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+The web UI starts on `http://localhost:5173` and proxies API requests to the backend.
+
+## Features
+
+### Plugin System
+- Dynamic loading via `libloading`
+- Type-safe interface discovery
+- Plugin-to-plugin communication
+- Hot-reload support
+
+### Built-in Actions
+- **HotkeyAction**: Send keyboard shortcuts
+- **TextAction**: Type text
+- **OpenUrlAction**: Open URLs
+
+### Example Plugins
+- **Timer Plugin**: Countdown timers with start/stop
+- **System Monitor**: CPU/memory usage widgets
+- **Hotkey Plugin**: Custom key bindings
+
+### Web UI
+- Virtual StreamDeck with 15 buttons
+- Profile management
+- Plugin browser
+- Real-time event feed via WebSocket
+- Mobile/tablet responsive design
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/devices` | List connected devices |
+| POST | `/api/devices/:id/press/:index` | Simulate button press |
+| GET | `/api/profiles` | List profiles |
+| POST | `/api/profiles` | Create profile |
+| GET | `/api/profiles/:id` | Get profile |
+| DELETE | `/api/profiles/:id` | Delete profile |
+| GET | `/api/actions` | List available actions |
+| GET | `/api/plugins` | List loaded plugins |
+| POST | `/api/plugins/reload` | Reload all plugins |
+| WS | `/ws` | WebSocket for real-time events |
+
+## Creating a Plugin
 
 ```rust
-use plugin_system::{PluginManager, FileLoader};
+use plugin_system::{Plugin, PluginMetadata};
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut manager = PluginManager::new();
-
-    // Load plugins from a directory
-    manager.load_plugins_from_dir("./plugins")?;
-
-    // Or load a specific plugin using a loader
-    let loader = FileLoader::new("./plugins/my_plugin.so");
-    manager.load_plugin_from_loader(&loader, "my_plugin")?;
-
-    // List loaded plugins
-    for name in manager.plugin_names() {
-        if let Some(meta) = manager.plugin_metadata(&name) {
-            println!("{} v{}", meta.name, meta.version);
-        }
-    }
-
-    // Unload a plugin
-    manager.unload_plugin("my_plugin")?;
-
-    Ok(())
-}
-```
-
-### Creating a Plugin
-
-```rust
-use plugin_system::{define_plugin, plugin_metadata, Plugin, PluginMetadata, PluginContext};
-
-struct MyPlugin {
-    data: String,
-}
-
-impl MyPlugin {
-    fn new() -> Self {
-        Self {
-            data: "Hello".to_string(),
-        }
-    }
-}
+pub struct MyPlugin;
 
 impl Plugin for MyPlugin {
     fn metadata(&self) -> PluginMetadata {
-        plugin_metadata! {
-            name: "my_plugin",
-            version: "1.0.0",
-            authors: ["Author"],
+        plugin_system::plugin_metadata! {
+            name: "my-plugin",
+            version: "0.1.0",
+            authors: ["You"],
             dependencies: []
         }
     }
 
-    fn on_load(&mut self, ctx: &PluginContext) {
-        println!("Plugin loaded!");
+    fn on_load(&mut self, _ctx: &plugin_system::PluginContext) {
+        log::info!("MyPlugin loaded");
     }
 
     fn on_unload(&mut self) {
-        println!("Plugin unloaded!");
-    }
-}
-
-// Generate the FFI exports
-define_plugin!(MyPlugin);
-```
-
-Add to `Cargo.toml`:
-
-```toml
-[lib]
-crate-type = ["cdylib"]
-
-[dependencies]
-plugin-system = { path = "../plugin-system" }
-```
-
-### Using Loaders
-
-#### FileLoader
-
-```rust
-use plugin_system::{PluginManager, FileLoader};
-
-let mut manager = PluginManager::new();
-let loader = FileLoader::new("./plugins/my_plugin.so");
-manager.load_plugin_from_loader(&loader, "my_plugin")?;
-```
-
-#### UrlLoader (requires `url-loader` feature)
-
-```toml
-[dependencies]
-plugin-system = { path = "../plugin-system", features = ["url-loader"] }
-```
-
-```rust
-use plugin_system::{PluginManager, UrlLoader};
-
-let mut manager = PluginManager::new();
-let loader = UrlLoader::with_default_cache("https://example.com/plugin.so");
-manager.load_plugin_from_loader(&loader, "my_plugin")?;
-```
-
-#### MultiLoader
-
-```rust
-use plugin_system::{PluginManager, MultiLoader, FileLoader};
-
-let mut manager = PluginManager::new();
-let loader = MultiLoader::new()
-    .add_file("./plugins/my_plugin.so")
-    .add_url("https://example.com/plugin.so", None);
-
-manager.load_plugin_from_loader(&loader, "my_plugin")?;
-```
-
-### Platform Helpers
-
-```rust
-use plugin_system::{library_filename, library_path, copy_cargo_plugin};
-
-// Get platform-specific filename
-let name = library_filename("hello");
-// Linux: "libhello.so", macOS: "libhello.dylib", Windows: "hello.dll"
-
-// Get full path
-let path = library_path("./plugins", "hello");
-
-// Copy a cargo-built plugin
-copy_cargo_plugin(&target_dir, &plugins_dir, "plugin_hello")?;
-```
-
-### Plugin Interaction (Commands)
-
-Plugins can handle commands from the host or other plugins:
-
-```rust
-// Call a command on a plugin
-let result = manager.call_plugin("hello", "greet World")?;
-println!("{}", result); // "Hello, World!"
-
-// Get help from a plugin
-let help = manager.call_plugin("hello", "help")?;
-println!("{}", help);
-
-// Call all plugins with the same command
-let results = manager.call_plugins("info");
-for (name, result) in &results {
-    println!("{}: {}", name, result);
-}
-```
-
-### Creating a Plugin with Commands
-
-```rust
-use plugin_system::{define_plugin, plugin_metadata, Plugin, PluginMetadata, PluginContext};
-
-struct MyPlugin {
-    count: u32,
-}
-
-impl Plugin for MyPlugin {
-    fn metadata(&self) -> PluginMetadata {
-        plugin_metadata! {
-            name: "my_plugin",
-            version: "1.0.0",
-            authors: ["Author"],
-            dependencies: []
-        }
-    }
-
-    fn on_load(&mut self, _ctx: &PluginContext) {
-        println!("Plugin loaded!");
-    }
-
-    fn on_unload(&mut self) {
-        println!("Plugin unloaded!");
+        log::info!("MyPlugin unloading");
     }
 
     fn plugin_type_name(&self) -> &'static str {
@@ -247,44 +134,22 @@ impl Plugin for MyPlugin {
     }
 
     fn interface_ids(&self) -> Vec<&'static str> {
-        vec!["Counter"]
+        vec!["MyInterface"]
     }
 }
 
-// Implement your trait
-impl Counter for MyPlugin {
-    fn increment(&mut self) -> u32 {
-        self.count += 1;
-        self.count
-    }
-
-    fn get_count(&self) -> u32 {
-        self.count
-    }
+#[plugin_system::plugin_export]
+impl Plugin for MyPlugin {
+    // ... implementation
 }
-
-define_plugin!(MyPlugin);
 ```
 
-## Features
+## Tech Stack
 
-Enable features in your `Cargo.toml`:
-
-```toml
-[dependencies]
-plugin-system = { path = "../plugin-system", features = ["url-loader"] }
-```
-
-| Feature | Description | Default |
-|---------|-------------|---------|
-| `file-loader` | FileLoader support | Yes |
-| `url-loader` | UrlLoader for downloading plugins | No |
-
-## Running Tests
-
-```bash
-cargo test -p plugin-system
-```
+- **Backend**: Rust, tokio, axum
+- **Plugin System**: libloading, custom proc macros
+- **Frontend**: Preact, TypeScript, Vite
+- **Communication**: REST + WebSocket
 
 ## License
 

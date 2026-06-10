@@ -2,10 +2,17 @@
 members = [
     "crates/plugin-system",
     "crates/plugin-interfaces",
-    "crates/plugin-types",
     "crates/plugin-macros",
-    "crates/host-app",
-    "crates/plugin-hello",
-    "crates/plugin-greeter",
+    "crates/sd-types",
+    "crates/sd-events",
+    "crates/sd-actions",
+    "crates/sd-profiles",
+    "crates/sd-devices",
+    "crates/sd-api",
+    "crates/sd-plugins",
+    "crates/sd-core",
+    "plugins/plugin-timer",
+    "plugins/plugin-system-monitor",
+    "plugins/plugin-hotkey",
 ]
 resolver = "2"

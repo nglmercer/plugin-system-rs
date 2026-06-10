@@ -1,0 +1,9 @@
+[package]
+name = "sd-events"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sd-types = { path = "../sd-types" }
+tokio = { version = "1", features = ["sync", "macros"] }
+serde = { version = "1", features = ["derive"] }
