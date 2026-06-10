@@ -1,6 +1,5 @@
 pub mod context;
 pub mod error;
-pub mod ffi;
 pub mod loader;
 pub mod macros;
 pub mod manager;
