@@ -299,6 +299,18 @@ dependencies = [
 [[package]]
 name = "plugin-interfaces"
 version = "0.1.0"
+dependencies = [
+ "plugin-macros",
+]
+
+[[package]]
+name = "plugin-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "plugin-system"
@@ -307,6 +319,7 @@ dependencies = [
  "dirs",
  "libloading",
  "log",
+ "plugin-macros",
  "serde",
  "serde_json",
  "thiserror 1.0.69",

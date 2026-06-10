@@ -1,5 +1,6 @@
 pub mod context;
 pub mod error;
+pub mod ffi;
 pub mod loader;
 pub mod macros;
 pub mod manager;
@@ -7,9 +8,9 @@ pub mod platform;
 pub mod registry;
 pub mod traits;
 
-// Re-export commonly used types
 pub use context::PluginContext;
 pub use error::{PluginError, Result};
+
 #[cfg(feature = "url-loader")]
 pub use loader::UrlLoader;
 pub use loader::{FileLoader, MultiLoader, PluginLoader};
@@ -19,3 +20,5 @@ pub use platform::{
 };
 pub use registry::{new_shared_registry, PluginRegistry, SharedRegistry};
 pub use traits::{Plugin, PluginMetadata};
+
+pub use plugin_macros::{define_plugin, plugin_export, plugin_interface};

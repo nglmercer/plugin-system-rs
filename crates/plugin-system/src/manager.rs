@@ -7,7 +7,6 @@ use crate::loader::{FileLoader, PluginLoader};
 use crate::registry::{new_shared_registry, SharedRegistry};
 use crate::traits::{Plugin, PluginMetadata};
 
-/// Raw C ABI function types exported by plugin libraries.
 #[allow(improper_ctypes_definitions)]
 type PluginCreateFn = unsafe extern "C" fn() -> *mut dyn Plugin;
 #[allow(improper_ctypes_definitions)]
@@ -15,7 +14,6 @@ type PluginDestroyFn = unsafe extern "C" fn(*mut dyn Plugin);
 #[allow(improper_ctypes_definitions)]
 type PluginMetadataFn = unsafe extern "C" fn() -> PluginMetadata;
 
-/// Holds a loaded dynamic library and its raw function pointers.
 struct PluginLibrary {
     _lib: libloading::Library,
     #[allow(dead_code)]
@@ -25,20 +23,17 @@ struct PluginLibrary {
     metadata_fn: PluginMetadataFn,
 }
 
-/// A loaded plugin instance with its associated library handle.
 struct LoadedPlugin {
     library: PluginLibrary,
     path: PathBuf,
 }
 
-/// Manages the lifecycle of plugins: loading, unloading, and hot-reloading.
 pub struct PluginManager {
     registry: SharedRegistry,
     loaded: HashMap<String, LoadedPlugin>,
 }
 
 impl PluginManager {
-    /// Create a new plugin manager with an empty registry.
     pub fn new() -> Self {
         Self {
             registry: new_shared_registry(),
@@ -46,19 +41,10 @@ impl PluginManager {
         }
     }
 
-    /// Get a shared reference to the plugin registry.
     pub fn registry(&self) -> SharedRegistry {
         self.registry.clone()
     }
 
-    /// Load a plugin from a `PluginLoader`.
-    ///
-    /// This method loads the plugin bytes from the loader, writes them
-    /// to a temporary file, and then loads the dynamic library from that file.
-    ///
-    /// # Arguments
-    /// * `loader` - The loader to fetch plugin bytes from
-    /// * `name` - An identifier for this plugin source (used in error messages)
     pub fn load_plugin_from_loader(
         &mut self,
         loader: &dyn PluginLoader,
@@ -66,13 +52,11 @@ impl PluginManager {
     ) -> Result<String> {
         log::info!("Loading plugin '{}' from {}", name, loader.source());
 
-        // Load bytes from the loader
         let bytes = loader.load().map_err(|e| PluginError::PluginLoad {
             name: name.to_string(),
             reason: e.to_string(),
         })?;
 
-        // Determine the appropriate extension
         let ext = if cfg!(target_os = "linux") {
             "so"
         } else if cfg!(target_os = "macos") {
@@ -83,7 +67,6 @@ impl PluginManager {
             "so"
         };
 
-        // Write to a temporary file
         let temp_dir = std::env::temp_dir().join("plugin-system");
         std::fs::create_dir_all(&temp_dir)?;
 
@@ -96,29 +79,15 @@ impl PluginManager {
             temp_path.display()
         );
 
-        // Load the plugin from the temp file
-        let result = self.load_plugin(&temp_path);
-
-        // Clean up temp file (the plugin is now loaded in memory)
-        // We don't delete it immediately because the library might need it
-        // until it's fully loaded. The OS will clean up temp files.
-
-        result
+        self.load_plugin(&temp_path)
     }
 
-    /// Load a single plugin from a dynamic library path.
-    ///
-    /// The library must export:
-    /// - `plugin_create() -> *mut dyn Plugin`
-    /// - `plugin_destroy(*mut dyn Plugin)`
-    /// - `plugin_metadata() -> PluginMetadata`
     pub fn load_plugin(&mut self, path: impl AsRef<Path>) -> Result<String> {
         let path = path.as_ref().to_path_buf();
         let path_display = path.display().to_string();
 
         log::info!("Loading plugin from {}", path_display);
 
-        // Load the dynamic library
         let lib = unsafe {
             libloading::Library::new(&path).map_err(|e| PluginError::LibraryLoad {
                 path: path.clone(),
@@ -126,7 +95,6 @@ impl PluginManager {
             })?
         };
 
-        // Resolve symbols
         let create: PluginCreateFn = unsafe {
             *lib.get(b"plugin_create")
                 .map_err(|_| PluginError::SymbolNotFound {
@@ -148,13 +116,11 @@ impl PluginManager {
                 })?
         };
 
-        // Get metadata first to check dependencies
         let metadata = unsafe { metadata_fn() };
         let name = metadata.name.clone();
 
         log::info!("Plugin metadata: {} v{}", name, metadata.version);
 
-        // Check dependencies
         {
             let registry = self.registry.read().expect("registry lock poisoned");
             for dep in &metadata.dependencies {
@@ -167,16 +133,13 @@ impl PluginManager {
             }
         }
 
-        // Create plugin instance
         let raw_instance = unsafe { create() };
         let instance: Box<dyn Plugin> = unsafe { Box::from_raw(raw_instance) };
 
-        // If a plugin with this name already exists, unload it first
         if self.loaded.contains_key(&name) {
             self.unload_plugin(&name)?;
         }
 
-        // Register in the plugin's internal state
         {
             let mut registry = self.registry.write().expect("registry lock poisoned");
             registry.register(instance);
@@ -196,7 +159,6 @@ impl PluginManager {
 
         self.loaded.insert(name.clone(), loaded_plugin);
 
-        // Call on_load with context
         {
             let ctx = PluginContext::new(self.registry.clone());
             let registry = self.registry.read().expect("registry lock poisoned");
@@ -211,10 +173,6 @@ impl PluginManager {
         Ok(name)
     }
 
-    /// Load all plugin libraries from a directory using `FileLoader`.
-    ///
-    /// Scans for `.so` (Linux), `.dylib` (macOS), or `.dll` (Windows) files
-    /// and loads each via `FileLoader`.
     pub fn load_plugins_from_dir(&mut self, dir: impl AsRef<Path>) -> Result<Vec<String>> {
         let dir = dir.as_ref();
         log::info!("Scanning for plugins in {}", dir.display());
@@ -263,9 +221,6 @@ impl PluginManager {
         Ok(loaded)
     }
 
-    /// Load plugins from a list of loaders.
-    ///
-    /// Each loader is tried in order. Successful loads are returned.
     pub fn load_plugins_from_loaders(
         &mut self,
         loaders: &[(String, Box<dyn PluginLoader>)],
@@ -284,14 +239,9 @@ impl PluginManager {
         Ok(loaded)
     }
 
-    /// Unload a plugin by name.
-    ///
-    /// Calls `on_unload()` on the plugin, then the destroy function,
-    /// then removes it from the registry.
     pub fn unload_plugin(&mut self, name: &str) -> Result<()> {
         log::info!("Unloading plugin '{}'", name);
 
-        // Call on_unload
         {
             let registry = self.registry.read().expect("registry lock poisoned");
             if let Some(plugin_arc) = registry.get_by_name(name) {
@@ -301,7 +251,6 @@ impl PluginManager {
             }
         }
 
-        // Remove from registry
         {
             let mut registry = self.registry.write().expect("registry lock poisoned");
             registry
@@ -311,7 +260,6 @@ impl PluginManager {
                 })?;
         }
 
-        // Remove from loaded map (this drops the Library, unloading the .so)
         self.loaded
             .remove(name)
             .ok_or_else(|| PluginError::PluginNotFound {
@@ -322,7 +270,6 @@ impl PluginManager {
         Ok(())
     }
 
-    /// Reload a plugin: unload then load from the same path.
     pub fn reload_plugin(&mut self, name: &str) -> Result<()> {
         let path = self
             .loaded
@@ -340,7 +287,6 @@ impl PluginManager {
         Ok(())
     }
 
-    /// Get a list of all loaded plugin names.
     pub fn plugin_names(&self) -> Vec<String> {
         self.registry
             .read()
@@ -348,7 +294,6 @@ impl PluginManager {
             .plugin_names()
     }
 
-    /// Check if a plugin is loaded.
     pub fn is_loaded(&self, name: &str) -> bool {
         self.registry
             .read()
@@ -356,28 +301,16 @@ impl PluginManager {
             .contains(name)
     }
 
-    /// Get the path a plugin was loaded from.
     pub fn plugin_path(&self, name: &str) -> Option<PathBuf> {
         self.loaded.get(name).map(|p| p.path.clone())
     }
 
-    /// Get metadata for a loaded plugin without instantiating it.
     pub fn plugin_metadata(&self, name: &str) -> Option<PluginMetadata> {
         self.loaded
             .get(name)
             .map(|p| unsafe { (p.library.metadata_fn)() })
     }
 
-    /// Call a command on a plugin by name.
-    ///
-    /// The command format is: `"method arg1 arg2 ..."`
-    /// Returns the result string from the plugin.
-    ///
-    /// # Example
-    /// ```ignore
-    /// let result = manager.call_plugin("hello", "greet World")?;
-    /// println!("Result: {}", result);
-    /// ```
     pub fn call_plugin(&self, name: &str, command: &str) -> Result<String> {
         let registry = self.registry.read().expect("registry lock poisoned");
         let plugin_arc = registry
@@ -390,9 +323,6 @@ impl PluginManager {
         Ok(plugin.handle_command(command))
     }
 
-    /// Call a command on multiple plugins.
-    ///
-    /// Returns a map of plugin names to their results.
     pub fn call_plugins(&self, command: &str) -> HashMap<String, String> {
         let registry = self.registry.read().expect("registry lock poisoned");
         let mut results = HashMap::new();
@@ -408,11 +338,36 @@ impl PluginManager {
         results
     }
 
-    /// Get a list of available commands for a plugin.
-    ///
-    /// Calls the plugin with "help" command to get the list of commands.
     pub fn plugin_commands(&self, name: &str) -> Option<String> {
         self.call_plugin(name, "help").ok()
+    }
+
+    pub fn with_plugin<R>(&self, name: &str, f: impl FnOnce(&dyn Plugin) -> R) -> Result<R> {
+        let registry = self.registry.read().expect("registry lock poisoned");
+        let plugin_arc = registry
+            .get_by_name(name)
+            .ok_or_else(|| PluginError::PluginNotFound {
+                name: name.to_string(),
+            })?;
+        let guard = plugin_arc.read().expect("plugin lock poisoned");
+        let plugin_ref: &dyn Plugin = &**guard;
+        Ok(f(plugin_ref))
+    }
+
+    pub fn with_plugin_mut<R>(
+        &self,
+        name: &str,
+        f: impl FnOnce(&mut dyn Plugin) -> R,
+    ) -> Result<R> {
+        let registry = self.registry.read().expect("registry lock poisoned");
+        let plugin_arc = registry
+            .get_by_name(name)
+            .ok_or_else(|| PluginError::PluginNotFound {
+                name: name.to_string(),
+            })?;
+        let mut guard = plugin_arc.write().expect("plugin lock poisoned");
+        let plugin_ref: &mut dyn Plugin = &mut **guard;
+        Ok(f(plugin_ref))
     }
 }
 

@@ -3,6 +3,7 @@ members = [
     "crates/plugin-system",
     "crates/plugin-interfaces",
     "crates/plugin-types",
+    "crates/plugin-macros",
     "crates/host-app",
     "crates/plugin-hello",
     "crates/plugin-greeter",

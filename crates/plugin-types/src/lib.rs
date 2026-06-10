@@ -1,7 +1,6 @@
 use plugin_interfaces::{Greet, GreetingService};
 use plugin_system::{Plugin, PluginMetadata};
 
-/// The Hello plugin - a simple example that other plugins can depend on.
 pub struct HelloPlugin {
     greeting: String,
 }
@@ -36,6 +35,10 @@ impl Plugin for HelloPlugin {
 
     fn on_unload(&mut self) {
         log::info!("HelloPlugin unloading...");
+    }
+
+    fn plugin_type_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
     }
 
     fn handle_command(&mut self, command: &str) -> String {
@@ -89,7 +92,6 @@ impl Greet for HelloPlugin {
     }
 }
 
-/// The Greeter plugin - demonstrates plugin lifecycle and capabilities.
 pub struct GreeterPlugin {
     greeting_count: u64,
     last_greeting: String,
@@ -129,6 +131,10 @@ impl Plugin for GreeterPlugin {
             "GreeterPlugin unloading after {} greetings",
             self.greeting_count
         );
+    }
+
+    fn plugin_type_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
     }
 
     fn handle_command(&mut self, command: &str) -> String {
