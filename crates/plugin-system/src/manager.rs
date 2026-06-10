@@ -399,11 +399,12 @@ impl PluginManager {
         f: impl FnOnce(&dyn Plugin) -> R,
     ) -> Result<R> {
         let registry = self.registry.read().expect("registry lock poisoned");
-        let plugin_arc = registry
-            .get_by_name(plugin_name)
-            .ok_or_else(|| PluginError::PluginNotFound {
-                name: plugin_name.to_string(),
-            })?;
+        let plugin_arc =
+            registry
+                .get_by_name(plugin_name)
+                .ok_or_else(|| PluginError::PluginNotFound {
+                    name: plugin_name.to_string(),
+                })?;
         let guard = plugin_arc.read().expect("plugin lock poisoned");
         let plugin_ref: &dyn Plugin = &**guard;
 
@@ -417,6 +418,83 @@ impl PluginManager {
         }
 
         Ok(f(plugin_ref))
+    }
+
+    pub fn get_plugin_info(&self, name: &str) -> Result<crate::plugin_info::PluginInfo> {
+        let registry = self.registry.read().expect("registry lock poisoned");
+        let plugin_arc = registry
+            .get_by_name(name)
+            .ok_or_else(|| PluginError::PluginNotFound {
+                name: name.to_string(),
+            })?;
+        let guard = plugin_arc.read().expect("plugin lock poisoned");
+        let plugin_ref: &dyn Plugin = &**guard;
+        let meta = plugin_ref.metadata();
+        let interfaces = plugin_ref.interface_ids();
+        Ok(crate::plugin_info::PluginInfo {
+            name: meta.name,
+            version: meta.version,
+            authors: meta.authors,
+            dependencies: meta.dependencies,
+            interfaces: interfaces.into_iter().map(|s| s.to_string()).collect(),
+            public_methods: Vec::new(),
+        })
+    }
+
+    pub fn call_plugin_result(
+        &self,
+        name: &str,
+        command: &str,
+    ) -> Result<crate::plugin_info::PluginResult> {
+        let result = self.call_plugin(name, command)?;
+        Ok(crate::plugin_info::PluginResult::String(result))
+    }
+
+    pub fn get_all_plugin_info(&self) -> Vec<crate::plugin_info::PluginInfo> {
+        let registry = self.registry.read().expect("registry lock poisoned");
+        let mut infos = Vec::new();
+        for (_name, plugin_arc) in registry.iter_plugins() {
+            let guard = plugin_arc.read().expect("plugin lock poisoned");
+            let plugin_ref: &dyn Plugin = &**guard;
+            let meta = plugin_ref.metadata();
+            let interfaces = plugin_ref.interface_ids();
+            infos.push(crate::plugin_info::PluginInfo {
+                name: meta.name,
+                version: meta.version,
+                authors: meta.authors,
+                dependencies: meta.dependencies,
+                interfaces: interfaces.into_iter().map(|s| s.to_string()).collect(),
+                public_methods: Vec::new(),
+            });
+        }
+        infos
+    }
+
+    pub fn has_interface(&self, plugin_name: &str, interface_name: &str) -> bool {
+        let registry = self.registry.read().expect("registry lock poisoned");
+        if let Some(plugin_arc) = registry.get_by_name(plugin_name) {
+            let guard = plugin_arc.read().expect("plugin lock poisoned");
+            let plugin_ref: &dyn Plugin = &**guard;
+            plugin_ref.has_interface(interface_name)
+        } else {
+            false
+        }
+    }
+
+    pub fn get_plugin_interfaces(&self, name: &str) -> Result<Vec<String>> {
+        let registry = self.registry.read().expect("registry lock poisoned");
+        let plugin_arc = registry
+            .get_by_name(name)
+            .ok_or_else(|| PluginError::PluginNotFound {
+                name: name.to_string(),
+            })?;
+        let guard = plugin_arc.read().expect("plugin lock poisoned");
+        let plugin_ref: &dyn Plugin = &**guard;
+        Ok(plugin_ref
+            .interface_ids()
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect())
     }
 }
 

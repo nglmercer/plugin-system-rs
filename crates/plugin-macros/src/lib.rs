@@ -1,8 +1,6 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-use syn::{
-    parse_macro_input, Expr, ExprArray, FnArg, Ident, ImplItem, ItemImpl, ReturnType, Type,
-};
+use syn::{parse_macro_input, Expr, ExprArray, FnArg, Ident, ImplItem, ItemImpl, ReturnType, Type};
 
 #[proc_macro_attribute]
 pub fn plugin_interface(_attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -196,8 +194,8 @@ fn generate_plugin_export_all(
                         let ident = &p.path.segments.last().unwrap().ident;
                         match ident.to_string().as_str() {
                             "String" => quote! { *mut std::ffi::c_char },
-                            "u64" | "u32" | "u16" | "u8" | "i64" | "i32" | "i16" | "i8"
-                            | "f64" | "f32" | "bool" => quote! { #ty },
+                            "u64" | "u32" | "u16" | "u8" | "i64" | "i32" | "i16" | "i8" | "f64"
+                            | "f32" | "bool" => quote! { #ty },
                             _ => quote! { *const std::ffi::c_void },
                         }
                     }
@@ -219,27 +217,25 @@ fn generate_plugin_export_all(
 
             let param_args: Vec<_> = param_conversions
                 .iter()
-                .map(|(pat, ty)| {
-                    match &**ty {
-                        Type::Path(p) => {
-                            let ident = &p.path.segments.last().unwrap().ident;
-                            match ident.to_string().as_str() {
-                                "String" => {
-                                    quote! {
-                                        {
-                                            let c_str = #pat as *const std::ffi::c_char;
-                                            std::ffi::CStr::from_ptr(c_str)
-                                                .to_str()
-                                                .unwrap()
-                                                .to_string()
-                                        }
+                .map(|(pat, ty)| match &**ty {
+                    Type::Path(p) => {
+                        let ident = &p.path.segments.last().unwrap().ident;
+                        match ident.to_string().as_str() {
+                            "String" => {
+                                quote! {
+                                    {
+                                        let c_str = #pat as *const std::ffi::c_char;
+                                        std::ffi::CStr::from_ptr(c_str)
+                                            .to_str()
+                                            .unwrap()
+                                            .to_string()
                                     }
                                 }
-                                _ => quote! { #pat },
                             }
+                            _ => quote! { #pat },
                         }
-                        _ => quote! { #pat },
                     }
+                    _ => quote! { #pat },
                 })
                 .collect();
 
@@ -304,7 +300,7 @@ fn generate_plugin_export_all(
         }
     }
 
-    let interface_names: Vec<_> = args
+    let _interface_names: Vec<_> = args
         .interfaces
         .iter()
         .map(|p| {
@@ -315,7 +311,7 @@ fn generate_plugin_export_all(
         })
         .collect();
 
-    let all_method_names = method_names;
+    let _all_method_names = method_names;
 
     Ok(quote! {
         #(#impl_attrs)*

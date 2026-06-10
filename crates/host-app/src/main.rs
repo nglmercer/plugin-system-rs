@@ -174,6 +174,74 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("{}", result);
     }
 
+    println!("\n=== Phase 5: PluginInfo and PluginResult Objects ===");
+
+    println!("\n--- Get PluginInfo for hello ---");
+    let info = manager.get_plugin_info("hello")?;
+    println!("  name: {}", info.name);
+    println!("  version: {}", info.version);
+    println!("  authors: {:?}", info.authors);
+    println!("  interfaces: {:?}", info.interfaces);
+
+    println!("\n--- Get PluginInfo for greeter ---");
+    let info = manager.get_plugin_info("greeter")?;
+    println!("  name: {}", info.name);
+    println!("  version: {}", info.version);
+    println!("  interfaces: {:?}", info.interfaces);
+
+    println!("\n--- Get all plugin info ---");
+    let all_info = manager.get_all_plugin_info();
+    for info in &all_info {
+        println!(
+            "  {} v{} (interfaces: {:?})",
+            info.name, info.version, info.interfaces
+        );
+    }
+
+    println!("\n--- Check interface support ---");
+    println!(
+        "  hello has Greet: {}",
+        manager.has_interface("hello", "Greet")
+    );
+    println!(
+        "  hello has Calculator: {}",
+        manager.has_interface("hello", "Calculator")
+    );
+    println!(
+        "  greeter has Calculator: {}",
+        manager.has_interface("greeter", "Calculator")
+    );
+    println!(
+        "  greeter has Logger: {}",
+        manager.has_interface("greeter", "Logger")
+    );
+
+    println!("\n--- Get plugin interfaces ---");
+    let hello_ifaces = manager.get_plugin_interfaces("hello")?;
+    println!("  hello interfaces: {:?}", hello_ifaces);
+    let greeter_ifaces = manager.get_plugin_interfaces("greeter")?;
+    println!("  greeter interfaces: {:?}", greeter_ifaces);
+
+    println!("\n--- call_plugin_result returns PluginResult ---");
+    let result = manager.call_plugin_result("hello", "greet World")?;
+    println!("  result type: {}", std::any::type_name_of_val(&result));
+    println!("  result value: {}", result);
+    println!("  as_string: {:?}", result.as_string());
+
+    println!("\n--- PluginResult type conversions ---");
+    let s: plugin_system::PluginResult = "hello".into();
+    println!("  from &str: {}", s);
+    let i: plugin_system::PluginResult = 42i64.into();
+    println!("  from i64: {}", i);
+    let f: plugin_system::PluginResult = std::f64::consts::PI.into();
+    println!("  from f64: {}", f);
+    let b: plugin_system::PluginResult = true.into();
+    println!("  from bool: {}", b);
+    let l: plugin_system::PluginResult = vec!["a".to_string(), "b".to_string()].into();
+    println!("  from Vec<String>: {}", l);
+    let n: plugin_system::PluginResult = Option::<String>::None.into();
+    println!("  from None: {}", n);
+
     println!("\n=== Plugin System Ready ===");
 
     Ok(())

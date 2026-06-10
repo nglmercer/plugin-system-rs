@@ -86,6 +86,10 @@ impl PluginRegistry {
     pub fn list_interfaces(&self) -> HashMap<String, Vec<String>> {
         self.interfaces.clone()
     }
+
+    pub fn iter_plugins(&self) -> impl Iterator<Item = (&String, &Arc<RwLock<Box<dyn Plugin>>>)> {
+        self.plugins.iter()
+    }
 }
 
 impl Default for PluginRegistry {
