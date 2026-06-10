@@ -1,0 +1,10 @@
+[workspace]
+members = [
+    "crates/plugin-system",
+    "crates/plugin-interfaces",
+    "crates/plugin-types",
+    "crates/host-app",
+    "crates/plugin-hello",
+    "crates/plugin-greeter",
+]
+resolver = "2"
