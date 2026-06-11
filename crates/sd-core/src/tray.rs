@@ -94,22 +94,20 @@ pub fn spawn_tray(shutdown: Arc<AtomicBool>) {
 
             loop {
                 match menu_channel.try_recv() {
-                    Ok(event) => {
-                        match event.id().0.as_str() {
-                            "open" => {
-                                let url = format!("http://localhost:{}", PORT);
-                                println!("Opening browser: {}", url);
-                                let _ = open::that(&url);
-                            }
-                            "exit" => {
-                                println!("Exit requested from tray");
-                                shutdown.store(true, Ordering::Relaxed);
-                                *control_flow = ControlFlow::Exit;
-                                std::process::exit(0);
-                            }
-                            _ => {}
+                    Ok(event) => match event.id().0.as_str() {
+                        "open" => {
+                            let url = format!("http://localhost:{}", PORT);
+                            println!("Opening browser: {}", url);
+                            let _ = open::that(&url);
                         }
-                    }
+                        "exit" => {
+                            println!("Exit requested from tray");
+                            shutdown.store(true, Ordering::Relaxed);
+                            *control_flow = ControlFlow::Exit;
+                            std::process::exit(0);
+                        }
+                        _ => {}
+                    },
                     Err(_) => break,
                 }
             }

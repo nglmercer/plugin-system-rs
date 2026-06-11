@@ -14,12 +14,11 @@ pub fn per_app_supported() -> bool {
 
 impl VolumeControl for MacOSController {
     fn get_master_volume(&self) -> Result<VolumeState, String> {
-        use coreaudio::sys::{
+        use coreaudio_rs::sys::{
             kAudioDevicePropertyScopeOutput, kAudioHardwarePropertyDefaultOutputDevice,
             kAudioObjectPropertyElementMain, kAudioObjectPropertyScopeGlobal, AudioDeviceID,
-            AudioObjectID, AudioObjectPropertyAddress,
+            AudioObjectPropertyAddress,
         };
-        use coreaudio_rs as coreaudio;
 
         unsafe {
             let mut device_id: AudioDeviceID = 0;
@@ -30,8 +29,8 @@ impl VolumeControl for MacOSController {
                 mElement: kAudioObjectPropertyElementMain,
             };
 
-            let status = coreaudio::sys::audio_object_get_property_data(
-                coreaudio::sys::kAudioObjectSystemObject,
+            let status = coreaudio_rs::sys::audio_object_get_property_data(
+                coreaudio_rs::sys::kAudioObjectSystemObject,
                 &address,
                 &mut size,
                 &mut device_id as *mut _ as *mut _,
@@ -44,12 +43,12 @@ impl VolumeControl for MacOSController {
             let mut volume: f32 = 0.0;
             let mut vol_size = std::mem::size_of::<f32>() as u32;
             let vol_address = AudioObjectPropertyAddress {
-                mSelector: coreaudio::sys::kAudioDevicePropertyVolumeScalar,
+                mSelector: coreaudio_rs::sys::kAudioDevicePropertyVolumeScalar,
                 mScope: kAudioDevicePropertyScopeOutput,
                 mElement: kAudioObjectPropertyElementMain,
             };
 
-            let status = coreaudio::sys::audio_object_get_property_data(
+            let status = coreaudio_rs::sys::audio_object_get_property_data(
                 device_id,
                 &vol_address,
                 &mut vol_size,
@@ -63,12 +62,12 @@ impl VolumeControl for MacOSController {
             let mut muted: u32 = 0;
             let mut mute_size = std::mem::size_of::<u32>() as u32;
             let mute_address = AudioObjectPropertyAddress {
-                mSelector: coreaudio::sys::kAudioDevicePropertyMute,
+                mSelector: coreaudio_rs::sys::kAudioDevicePropertyMute,
                 mScope: kAudioDevicePropertyScopeOutput,
                 mElement: kAudioObjectPropertyElementMain,
             };
 
-            let _ = coreaudio::sys::audio_object_get_property_data(
+            let _ = coreaudio_rs::sys::audio_object_get_property_data(
                 device_id,
                 &mute_address,
                 &mut mute_size,
@@ -84,12 +83,11 @@ impl VolumeControl for MacOSController {
     }
 
     fn set_master_volume(&mut self, volume: f32) -> Result<(), String> {
-        use coreaudio::sys::{
+        use coreaudio_rs::sys::{
             kAudioDevicePropertyScopeOutput, kAudioHardwarePropertyDefaultOutputDevice,
             kAudioObjectPropertyElementMain, kAudioObjectPropertyScopeGlobal, AudioDeviceID,
             AudioObjectPropertyAddress,
         };
-        use coreaudio_rs as coreaudio;
 
         unsafe {
             let mut device_id: AudioDeviceID = 0;
@@ -100,8 +98,8 @@ impl VolumeControl for MacOSController {
                 mElement: kAudioObjectPropertyElementMain,
             };
 
-            let status = coreaudio::sys::audio_object_get_property_data(
-                coreaudio::sys::kAudioObjectSystemObject,
+            let status = coreaudio_rs::sys::audio_object_get_property_data(
+                coreaudio_rs::sys::kAudioObjectSystemObject,
                 &address,
                 &mut size,
                 &mut device_id as *mut _ as *mut _,
@@ -113,12 +111,12 @@ impl VolumeControl for MacOSController {
 
             let scalar = (volume / 100.0).clamp(0.0, 1.0);
             let vol_address = AudioObjectPropertyAddress {
-                mSelector: coreaudio::sys::kAudioDevicePropertyVolumeScalar,
+                mSelector: coreaudio_rs::sys::kAudioDevicePropertyVolumeScalar,
                 mScope: kAudioDevicePropertyScopeOutput,
                 mElement: kAudioObjectPropertyElementMain,
             };
 
-            let status = coreaudio::sys::audio_object_set_property_data(
+            let status = coreaudio_rs::sys::audio_object_set_property_data(
                 device_id,
                 &vol_address,
                 &scalar as *const _ as *const _,
@@ -134,12 +132,11 @@ impl VolumeControl for MacOSController {
     }
 
     fn set_muted(&mut self, muted: bool) -> Result<(), String> {
-        use coreaudio::sys::{
+        use coreaudio_rs::sys::{
             kAudioDevicePropertyScopeOutput, kAudioHardwarePropertyDefaultOutputDevice,
             kAudioObjectPropertyElementMain, kAudioObjectPropertyScopeGlobal, AudioDeviceID,
             AudioObjectPropertyAddress,
         };
-        use coreaudio_rs as coreaudio;
 
         unsafe {
             let mut device_id: AudioDeviceID = 0;
@@ -150,8 +147,8 @@ impl VolumeControl for MacOSController {
                 mElement: kAudioObjectPropertyElementMain,
             };
 
-            let status = coreaudio::sys::audio_object_get_property_data(
-                coreaudio::sys::kAudioObjectSystemObject,
+            let status = coreaudio_rs::sys::audio_object_get_property_data(
+                coreaudio_rs::sys::kAudioObjectSystemObject,
                 &address,
                 &mut size,
                 &mut device_id as *mut _ as *mut _,
@@ -163,12 +160,12 @@ impl VolumeControl for MacOSController {
 
             let mute_val: u32 = if muted { 1 } else { 0 };
             let mute_address = AudioObjectPropertyAddress {
-                mSelector: coreaudio::sys::kAudioDevicePropertyMute,
+                mSelector: coreaudio_rs::sys::kAudioDevicePropertyMute,
                 mScope: kAudioDevicePropertyScopeOutput,
                 mElement: kAudioObjectPropertyElementMain,
             };
 
-            let status = coreaudio::sys::audio_object_set_property_data(
+            let status = coreaudio_rs::sys::audio_object_set_property_data(
                 device_id,
                 &mute_address,
                 &mute_val as *const _ as *const _,

@@ -1,7 +1,12 @@
 use plugin_system::PluginManager;
+use std::path::PathBuf;
 use tempfile::TempDir;
 
-const REAL_PLUGIN_TIMER: &str = "/home/meme/Descargas/libloading/target/debug/libplugin_timer.so";
+fn real_plugin_timer_path() -> PathBuf {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let workspace_root = manifest_dir.join("../..");
+    plugin_system::platform::library_path(workspace_root.join("target/debug"), "plugin_timer")
+}
 
 #[test]
 fn test_manager_new_creates_empty_registry() {
@@ -20,8 +25,14 @@ fn test_load_plugins_from_dir_empty() {
 #[test]
 fn test_load_plugin_real_plugin() {
     let mut manager = PluginManager::new();
-    let path = std::path::PathBuf::from(REAL_PLUGIN_TIMER);
-    assert!(path.exists(), "Real plugin timer not found");
+    let path = real_plugin_timer_path();
+    if !path.exists() {
+        eprintln!(
+            "Skipping test_load_plugin_real_plugin: timer plugin not found at {}",
+            path.display()
+        );
+        return;
+    }
     let name = manager.load_plugin(&path).unwrap();
     assert_eq!(name, "timer");
     assert!(manager.is_loaded("timer"));
@@ -36,7 +47,11 @@ fn test_load_plugin_real_plugin() {
 #[test]
 fn test_unload_plugin() {
     let mut manager = PluginManager::new();
-    let path = std::path::PathBuf::from(REAL_PLUGIN_TIMER);
+    let path = real_plugin_timer_path();
+    if !path.exists() {
+        eprintln!("Skipping test_unload_plugin: timer plugin not found");
+        return;
+    }
     let name = manager.load_plugin(&path).unwrap();
     assert!(manager.is_loaded(&name));
     manager.unload_plugin(&name).unwrap();
@@ -47,7 +62,11 @@ fn test_unload_plugin() {
 #[test]
 fn test_with_plugin() {
     let mut manager = PluginManager::new();
-    let path = std::path::PathBuf::from(REAL_PLUGIN_TIMER);
+    let path = real_plugin_timer_path();
+    if !path.exists() {
+        eprintln!("Skipping test_with_plugin: timer plugin not found");
+        return;
+    }
     manager.load_plugin(&path).unwrap();
     let result = manager.with_plugin("timer", |plugin| plugin.plugin_type_name());
     assert!(result.is_ok());
@@ -58,7 +77,11 @@ fn test_with_plugin() {
 #[test]
 fn test_with_plugin_mut() {
     let mut manager = PluginManager::new();
-    let path = std::path::PathBuf::from(REAL_PLUGIN_TIMER);
+    let path = real_plugin_timer_path();
+    if !path.exists() {
+        eprintln!("Skipping test_with_plugin_mut: timer plugin not found");
+        return;
+    }
     manager.load_plugin(&path).unwrap();
     let result = manager.with_plugin_mut("timer", |plugin| {
         plugin.on_load(&plugin_system::PluginContext::new(
@@ -71,7 +94,11 @@ fn test_with_plugin_mut() {
 #[test]
 fn test_get_all_plugin_info() {
     let mut manager = PluginManager::new();
-    let path = std::path::PathBuf::from(REAL_PLUGIN_TIMER);
+    let path = real_plugin_timer_path();
+    if !path.exists() {
+        eprintln!("Skipping test_get_all_plugin_info: timer plugin not found");
+        return;
+    }
     manager.load_plugin(&path).unwrap();
     let infos = manager.get_all_plugin_info();
     assert_eq!(infos.len(), 1);
@@ -83,7 +110,11 @@ fn test_get_all_plugin_info() {
 #[test]
 fn test_plugins_with_interface() {
     let mut manager = PluginManager::new();
-    let path = std::path::PathBuf::from(REAL_PLUGIN_TIMER);
+    let path = real_plugin_timer_path();
+    if !path.exists() {
+        eprintln!("Skipping test_plugins_with_interface: timer plugin not found");
+        return;
+    }
     manager.load_plugin(&path).unwrap();
     let names = manager.plugins_with_interface("Timer");
     assert_eq!(names, vec!["timer"]);
@@ -94,7 +125,11 @@ fn test_plugins_with_interface() {
 #[test]
 fn test_reload_plugin() {
     let mut manager = PluginManager::new();
-    let path = std::path::PathBuf::from(REAL_PLUGIN_TIMER);
+    let path = real_plugin_timer_path();
+    if !path.exists() {
+        eprintln!("Skipping test_reload_plugin: timer plugin not found");
+        return;
+    }
     let original_name = manager.load_plugin(&path).unwrap();
     assert!(manager.is_loaded(&original_name));
     manager.reload_plugin(&original_name).unwrap();

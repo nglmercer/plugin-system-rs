@@ -94,12 +94,12 @@ fn discover_plugins(workspace_root: &Path) -> Result<Vec<PluginInfo>> {
 
     for package in &metadata.packages {
         let manifest_str = package.manifest_path.to_string();
-        if manifest_str.contains("/plugins/plugin-") || manifest_str.contains("\\plugins\\plugin-") {
-            let is_cdylib = package.targets.iter().any(|t| {
-                t.kind
-                    .iter()
-                    .any(|k| k == "cdylib" || k == "lib")
-            });
+        if manifest_str.contains("/plugins/plugin-") || manifest_str.contains("\\plugins\\plugin-")
+        {
+            let is_cdylib = package
+                .targets
+                .iter()
+                .any(|t| t.kind.iter().any(|k| k == "cdylib" || k == "lib"));
 
             if is_cdylib {
                 let dir_name = package
@@ -157,7 +157,11 @@ fn get_host_target() -> Result<String> {
         ("macos", "aarch64") => "aarch64-apple-darwin",
         ("windows", "x86_64") => "x86_64-pc-windows-msvc",
         ("windows", "aarch64") => "aarch64-pc-windows-msvc",
-        _ => anyhow::bail!("Unsupported host platform: {}-{}", std::env::consts::OS, std::env::consts::ARCH),
+        _ => anyhow::bail!(
+            "Unsupported host platform: {}-{}",
+            std::env::consts::OS,
+            std::env::consts::ARCH
+        ),
     };
 
     Ok(host.to_string())
@@ -297,10 +301,8 @@ fn cmd_build(
             let dst = workspace_root.join("plugins").join(&lib_filename);
 
             if src.exists() {
-                std::fs::copy(&src, &dst).context(format!(
-                    "Failed to copy {} to plugins/",
-                    lib_filename
-                ))?;
+                std::fs::copy(&src, &dst)
+                    .context(format!("Failed to copy {} to plugins/", lib_filename))?;
                 println!("    -> {}", dst.display());
             }
         } else {
@@ -413,8 +415,7 @@ fn cmd_package(version: &str, output_dir: &str) -> Result<()> {
     let pkg_dir = release_dir.join(platform_dir);
     let plugins_out = pkg_dir.join("plugins");
 
-    std::fs::create_dir_all(&plugins_out)
-        .context("Failed to create release directory")?;
+    std::fs::create_dir_all(&plugins_out).context("Failed to create release directory")?;
 
     // Copy sd-core binary
     let core_ext = if host_target.contains("windows") {
@@ -431,7 +432,10 @@ fn cmd_package(version: &str, output_dir: &str) -> Result<()> {
         std::fs::copy(&core_src, &core_dst)?;
         println!("  Copied sd-core{}", core_ext);
     } else {
-        println!("  {} sd-core not found (build with --with-core)", "Warning:".yellow());
+        println!(
+            "  {} sd-core not found (build with --with-core)",
+            "Warning:".yellow()
+        );
     }
 
     // Copy plugins
@@ -444,11 +448,7 @@ fn cmd_package(version: &str, output_dir: &str) -> Result<()> {
             std::fs::copy(&src, &dst)?;
             println!("  Copied {}", lib_filename);
         } else {
-            println!(
-                "  {} {} not found",
-                "Warning:".yellow(),
-                lib_filename
-            );
+            println!("  {} {} not found", "Warning:".yellow(), lib_filename);
         }
     }
 
@@ -459,7 +459,10 @@ fn cmd_package(version: &str, output_dir: &str) -> Result<()> {
         copy_dir_recursive(&web_src, &web_dst)?;
         println!("  Copied web/");
     } else {
-        println!("  {} web/dist not found (build with --with-web)", "Warning:".yellow());
+        println!(
+            "  {} web/dist not found (build with --with-web)",
+            "Warning:".yellow()
+        );
     }
 
     // Create archive
