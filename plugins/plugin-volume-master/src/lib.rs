@@ -157,7 +157,11 @@ impl Plugin for VolumeMasterPlugin {
         serde_json::to_value(&self.data).ok()
     }
 
-    fn handle_command(&mut self, method: &str, args: serde_json::Value) -> Option<serde_json::Value> {
+    fn handle_command(
+        &mut self,
+        method: &str,
+        args: serde_json::Value,
+    ) -> Option<serde_json::Value> {
         match method {
             "refresh" => {
                 self.refresh();

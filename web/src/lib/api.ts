@@ -191,3 +191,141 @@ export async function setAppMute(appName: string, muted: boolean) {
   const data = await res.json();
   return data.success;
 }
+
+export async function fetchObsStatus() {
+  const res = await fetch(`${API_BASE}/obs/status`);
+  const data = await res.json();
+  return data.data;
+}
+
+export async function connectObs(host: string, port: number, password: string) {
+  const res = await fetch(`${API_BASE}/obs/connect`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ host, port, password: password || undefined }),
+  });
+  const data = await res.json();
+  return data.success;
+}
+
+export async function disconnectObs() {
+  const res = await fetch(`${API_BASE}/obs/disconnect`, { method: "POST" });
+  const data = await res.json();
+  return data.success;
+}
+
+export async function startStream() {
+  const res = await fetch(`${API_BASE}/obs/stream/start`, { method: "POST" });
+  const data = await res.json();
+  return data.success;
+}
+
+export async function stopStream() {
+  const res = await fetch(`${API_BASE}/obs/stream/stop`, { method: "POST" });
+  const data = await res.json();
+  return data.success;
+}
+
+export async function startRecord() {
+  const res = await fetch(`${API_BASE}/obs/record/start`, { method: "POST" });
+  const data = await res.json();
+  return data.success;
+}
+
+export async function stopRecord() {
+  const res = await fetch(`${API_BASE}/obs/record/stop`, { method: "POST" });
+  const data = await res.json();
+  return data.success;
+}
+
+export async function toggleRecordPause() {
+  const res = await fetch(`${API_BASE}/obs/record/pause`, { method: "POST" });
+  const data = await res.json();
+  return data.success;
+}
+
+export async function fetchObsScenes() {
+  const res = await fetch(`${API_BASE}/obs/scenes`);
+  const data = await res.json();
+  return data.data;
+}
+
+export async function setCurrentScene(sceneName: string) {
+  const res = await fetch(`${API_BASE}/obs/scenes/current`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scene_name: sceneName }),
+  });
+  const data = await res.json();
+  return data.success;
+}
+
+export async function fetchObsInputs() {
+  const res = await fetch(`${API_BASE}/obs/inputs`);
+  const data = await res.json();
+  return data.data || [];
+}
+
+export async function setInputVolume(inputName: string, volume: number) {
+  const res = await fetch(`${API_BASE}/obs/inputs/volume`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ input_name: inputName, volume }),
+  });
+  const data = await res.json();
+  return data.success;
+}
+
+export async function setInputMute(inputName: string, muted: boolean) {
+  const res = await fetch(`${API_BASE}/obs/inputs/mute`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ input_name: inputName, muted }),
+  });
+  const data = await res.json();
+  return data.success;
+}
+
+export async function toggleVirtualCam() {
+  const res = await fetch(`${API_BASE}/obs/virtualcam/toggle`, { method: "POST" });
+  const data = await res.json();
+  return data.success;
+}
+
+export async function saveReplayBuffer() {
+  const res = await fetch(`${API_BASE}/obs/replay/save`, { method: "POST" });
+  const data = await res.json();
+  return data.success;
+}
+
+export async function fetchObsTransitions() {
+  const res = await fetch(`${API_BASE}/obs/transitions`);
+  const data = await res.json();
+  return data.data || [];
+}
+
+export async function setTransition(name: string) {
+  const res = await fetch(`${API_BASE}/obs/transitions/current`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  const data = await res.json();
+  return data.success;
+}
+
+export async function fetchObsSceneItems(sceneName: string) {
+  const res = await fetch(`${API_BASE}/obs/scene-items?scene_name=${encodeURIComponent(sceneName)}`);
+  const data = await res.json();
+  return data.data || [];
+}
+
+export async function setSceneItemEnabled(sceneName: string, itemId: number, enabled: boolean) {
+  const res = await fetch(`${API_BASE}/obs/scene-item/enabled`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scene_name: sceneName, item_id: itemId, enabled }),
+  });
+  const data = await res.json();
+  return data.success;
+}

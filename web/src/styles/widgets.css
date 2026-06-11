@@ -697,3 +697,572 @@
 .volapps-mute-btn-detailed.muted {
     background: #f44336;
 }
+
+/* OBS Control Widget */
+.obs-loading,
+.obs-error {
+    color: #888;
+    text-align: center;
+    padding: 1rem;
+}
+.obs-error {
+    color: #f44336;
+}
+.obs-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #666;
+    display: inline-block;
+}
+.obs-dot.green {
+    background: #4caf50;
+}
+.obs-dot.red {
+    background: #f44336;
+}
+.obs-btn {
+    background: #00d4ff;
+    color: #000;
+    border: none;
+    padding: 0.3rem 0.8rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: bold;
+    margin-top: 0.3rem;
+}
+.obs-btn:hover {
+    opacity: 0.8;
+}
+.obs-btn-sm {
+    background: #00d4ff;
+    color: #000;
+    border: none;
+    padding: 0.15rem 0.5rem;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.65rem;
+    font-weight: bold;
+}
+
+.obs-variant.minimal {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.5rem;
+}
+.obs-status-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+}
+.obs-conn-label {
+    color: #888;
+    font-size: 0.75rem;
+}
+
+.obs-variant.compact {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.5rem;
+}
+.obs-compact-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.obs-scene-name {
+    color: #ccc;
+    font-size: 0.85rem;
+    font-weight: bold;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+}
+.obs-compact-controls {
+    display: flex;
+    gap: 0.3rem;
+}
+.obs-toggle-btn {
+    flex: 1;
+    background: #404040;
+    border: 1px solid #555;
+    color: #888;
+    padding: 0.3rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.7rem;
+    font-weight: bold;
+}
+.obs-toggle-btn:hover:not(:disabled) {
+    background: #555;
+}
+.obs-toggle-btn.active {
+    background: #f44336;
+    border-color: #f44336;
+    color: #fff;
+}
+.obs-toggle-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.obs-variant.detailed {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.5rem;
+}
+.obs-detail-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.obs-controls-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.3rem;
+}
+.obs-ctrl-btn {
+    background: #404040;
+    border: 1px solid #555;
+    color: #ccc;
+    padding: 0.35rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.7rem;
+    font-weight: bold;
+}
+.obs-ctrl-btn:hover:not(:disabled) {
+    background: #555;
+}
+.obs-ctrl-btn.active {
+    background: #f44336;
+    border-color: #f44336;
+    color: #fff;
+}
+.obs-ctrl-btn.small {
+    font-size: 0.6rem;
+    padding: 0.2rem;
+}
+.obs-ctrl-btn.paused {
+    background: #ff9800;
+    border-color: #ff9800;
+}
+.obs-ctrl-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+.obs-pause-row {
+    display: flex;
+    justify-content: center;
+}
+.obs-stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.3rem;
+}
+.obs-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+.obs-stat-label {
+    color: #666;
+    font-size: 0.6rem;
+    text-transform: uppercase;
+}
+.obs-stat-value {
+    color: #ccc;
+    font-size: 0.75rem;
+    font-family: monospace;
+}
+
+/* OBS Scenes Widget */
+.obsscene-loading,
+.obsscene-error {
+    color: #888;
+    text-align: center;
+    padding: 1rem;
+}
+.obsscene-error {
+    color: #f44336;
+}
+
+.obsscene-variant.minimal {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.5rem;
+}
+.obsscene-current {
+    color: #00d4ff;
+    font-size: 0.9rem;
+    font-weight: bold;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.obsscene-grid-mini {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+    gap: 0.2rem;
+}
+.obsscene-mini-btn {
+    background: #404040;
+    border: 1px solid #555;
+    color: #ccc;
+    padding: 0.2rem;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.6rem;
+    text-align: center;
+}
+.obsscene-mini-btn:hover {
+    background: #555;
+}
+.obsscene-mini-btn.active {
+    background: #00d4ff;
+    border-color: #00d4ff;
+    color: #000;
+}
+
+.obsscene-variant.compact,
+.obsscene-variant.detailed {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.5rem;
+}
+.obsscene-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.obsscene-title {
+    color: #888;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+}
+.obsscene-current-label {
+    color: #00d4ff;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+.obsscene-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    max-height: 200px;
+    overflow-y: auto;
+}
+.obsscene-item-btn {
+    background: #1a1a1a;
+    border: 1px solid #404040;
+    color: #ccc;
+    padding: 0.3rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    text-align: left;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.obsscene-item-btn:hover {
+    background: #333;
+    border-color: #555;
+}
+.obsscene-item-btn.active {
+    background: #00d4ff;
+    border-color: #00d4ff;
+    color: #000;
+    font-weight: bold;
+}
+.obsscene-item-index {
+    color: #666;
+    font-size: 0.6rem;
+}
+.obsscene-item-btn.active .obsscene-item-index {
+    color: #000;
+}
+
+.obsscene-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    margin-top: 0.3rem;
+    padding-top: 0.3rem;
+    border-top: 1px solid #404040;
+}
+.obsscene-section-title {
+    color: #666;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+}
+.obsscene-transition-list {
+    display: flex;
+    gap: 0.2rem;
+    flex-wrap: wrap;
+}
+.obsscene-transition-btn {
+    background: #404040;
+    border: 1px solid #555;
+    color: #ccc;
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.65rem;
+}
+.obsscene-transition-btn:hover {
+    background: #555;
+}
+.obsscene-items-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+.obsscene-source-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+.obsscene-eye-btn {
+    background: #404040;
+    border: 1px solid #555;
+    color: #888;
+    padding: 0.15rem 0.4rem;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.6rem;
+    font-weight: bold;
+}
+.obsscene-eye-btn.active {
+    background: #4caf50;
+    border-color: #4caf50;
+    color: #fff;
+}
+.obsscene-source-name {
+    color: #ccc;
+    font-size: 0.7rem;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* OBS Inputs Widget */
+.obsinput-loading,
+.obsinput-error {
+    color: #888;
+    text-align: center;
+    padding: 1rem;
+}
+.obsinput-error {
+    color: #f44336;
+}
+.obsinput-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    height: 100%;
+    color: #666;
+}
+.obsinput-empty-icon {
+    font-size: 1.5rem;
+    color: #444;
+    font-weight: bold;
+}
+
+.obsinput-variant.minimal {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 0.5rem;
+}
+.obsinput-count {
+    color: #888;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+}
+.obsinput-mini-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.obsinput-mini-name {
+    color: #ccc;
+    font-size: 0.7rem;
+}
+.obsinput-mini-mute {
+    background: #404040;
+    border: 1px solid #555;
+    color: #ccc;
+    width: 20px;
+    height: 20px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.6rem;
+    font-weight: bold;
+}
+.obsinput-mini-mute.muted {
+    background: #f44336;
+    border-color: #f44336;
+    color: #fff;
+}
+.obsinput-more {
+    color: #666;
+    font-size: 0.65rem;
+}
+
+.obsinput-variant.compact,
+.obsinput-variant.detailed {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.5rem;
+}
+.obsinput-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.obsinput-title {
+    color: #888;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+}
+.obsinput-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    max-height: 200px;
+    overflow-y: auto;
+}
+.obsinput-list.detailed {
+    max-height: 300px;
+}
+.obsinput-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.3rem;
+    background: #1a1a1a;
+    border-radius: 4px;
+}
+.obsinput-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.obsinput-item-name {
+    color: #ccc;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+}
+.obsinput-mute-btn-sm {
+    background: #404040;
+    border: 1px solid #555;
+    color: #ccc;
+    width: 22px;
+    height: 22px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.65rem;
+    font-weight: bold;
+}
+.obsinput-mute-btn-sm:hover {
+    background: #555;
+}
+.obsinput-mute-btn-sm.muted {
+    background: #f44336;
+    border-color: #f44336;
+    color: #fff;
+}
+.obsinput-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+.obsinput-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: linear-gradient(
+        to right,
+        #4caf50 0%,
+        #4caf50 var(--vol-pct, 50%),
+        #404040 var(--vol-pct, 50%),
+        #404040 100%
+    );
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+}
+.obsinput-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 10px;
+    height: 10px;
+    background: #fff;
+    border-radius: 50%;
+    cursor: pointer;
+}
+.obsinput-slider::-moz-range-thumb {
+    width: 10px;
+    height: 10px;
+    background: #fff;
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+}
+.obsinput-value {
+    color: #ccc;
+    font-size: 0.7rem;
+    min-width: 2.5em;
+    text-align: right;
+}
+
+.obsinput-item-detailed {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 0.4rem;
+    background: #1a1a1a;
+    border-radius: 4px;
+}
+.obsinput-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+.obsinput-item-kind {
+    color: #666;
+    font-size: 0.6rem;
+    font-family: monospace;
+}
+.obsinput-mute-btn {
+    background: #4caf50;
+    border: none;
+    color: #fff;
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.6rem;
+    font-weight: bold;
+}
+.obsinput-mute-btn:hover {
+    opacity: 0.8;
+}
+.obsinput-mute-btn.muted {
+    background: #f44336;
+}

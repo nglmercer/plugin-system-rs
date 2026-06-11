@@ -1,7 +1,4 @@
-use axum::{
-    extract::State,
-    Json,
-};
+use axum::{extract::State, Json};
 use serde::{Deserialize, Serialize};
 
 use crate::{response::ApiResponse, state::AppState};
@@ -53,24 +50,51 @@ pub(crate) struct SetAppMuteRequest {
 
 fn parse_volume_data(data: serde_json::Value) -> Option<VolumeDataResponse> {
     let state = data.get("state")?;
-    let apps = data.get("apps").and_then(|a| a.as_array()).cloned().unwrap_or_default();
+    let apps = data
+        .get("apps")
+        .and_then(|a| a.as_array())
+        .cloned()
+        .unwrap_or_default();
 
     Some(VolumeDataResponse {
         state: VolumeStateResponse {
-            master_volume: state.get("master_volume").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
-            muted: state.get("muted").and_then(|v| v.as_bool()).unwrap_or(false),
-            default_device_name: state.get("default_device_name").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-            platform_supported: data.get("platform_supported").and_then(|v| v.as_bool()).unwrap_or(false),
-            per_app_supported: data.get("per_app_supported").and_then(|v| v.as_bool()).unwrap_or(false),
+            master_volume: state
+                .get("master_volume")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0) as f32,
+            muted: state
+                .get("muted")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false),
+            default_device_name: state
+                .get("default_device_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
+            platform_supported: data
+                .get("platform_supported")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false),
+            per_app_supported: data
+                .get("per_app_supported")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false),
         },
-        apps: apps.into_iter().filter_map(|a| {
-            Some(AppVolumeResponse {
-                name: a.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                volume: a.get("volume").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
-                muted: a.get("muted").and_then(|v| v.as_bool()).unwrap_or(false),
-                pid: a.get("pid").and_then(|v| v.as_u64()).map(|p| p as u32),
+        apps: apps
+            .into_iter()
+            .filter_map(|a| {
+                Some(AppVolumeResponse {
+                    name: a
+                        .get("name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    volume: a.get("volume").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
+                    muted: a.get("muted").and_then(|v| v.as_bool()).unwrap_or(false),
+                    pid: a.get("pid").and_then(|v| v.as_u64()).map(|p| p as u32),
+                })
             })
-        }).collect(),
+            .collect(),
     })
 }
 
@@ -104,17 +128,28 @@ pub(crate) async fn get_app_volumes(
         let plugin = plugin_arc.read().expect("plugin lock poisoned");
         if plugin.has_interface("VolumeMaster") {
             if let Some(data) = plugin.interface_data() {
-                let apps = data.get("apps")
+                let apps = data
+                    .get("apps")
                     .and_then(|a| a.as_array())
                     .map(|arr| {
-                        arr.iter().filter_map(|a| {
-                            Some(AppVolumeResponse {
-                                name: a.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                                volume: a.get("volume").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
-                                muted: a.get("muted").and_then(|v| v.as_bool()).unwrap_or(false),
-                                pid: a.get("pid").and_then(|v| v.as_u64()).map(|p| p as u32),
+                        arr.iter()
+                            .filter_map(|a| {
+                                Some(AppVolumeResponse {
+                                    name: a
+                                        .get("name")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("")
+                                        .to_string(),
+                                    volume: a.get("volume").and_then(|v| v.as_f64()).unwrap_or(0.0)
+                                        as f32,
+                                    muted: a
+                                        .get("muted")
+                                        .and_then(|v| v.as_bool())
+                                        .unwrap_or(false),
+                                    pid: a.get("pid").and_then(|v| v.as_u64()).map(|p| p as u32),
+                                })
                             })
-                        }).collect()
+                            .collect()
                     })
                     .unwrap_or_default();
                 return Json(ApiResponse::success(apps));
@@ -140,7 +175,10 @@ pub(crate) async fn set_master_volume(
                 if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
                     return Json(ApiResponse::success("Volume set".to_string()));
                 } else {
-                    let error = result.get("error").and_then(|v| v.as_str()).unwrap_or("Unknown error");
+                    let error = result
+                        .get("error")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("Unknown error");
                     return Json(ApiResponse::error(error.to_string()));
                 }
             }
@@ -165,7 +203,10 @@ pub(crate) async fn set_master_mute(
                 if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
                     return Json(ApiResponse::success("Mute set".to_string()));
                 } else {
-                    let error = result.get("error").and_then(|v| v.as_str()).unwrap_or("Unknown error");
+                    let error = result
+                        .get("error")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("Unknown error");
                     return Json(ApiResponse::error(error.to_string()));
                 }
             }
@@ -190,7 +231,10 @@ pub(crate) async fn set_app_volume(
                 if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
                     return Json(ApiResponse::success("App volume set".to_string()));
                 } else {
-                    let error = result.get("error").and_then(|v| v.as_str()).unwrap_or("Unknown error");
+                    let error = result
+                        .get("error")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("Unknown error");
                     return Json(ApiResponse::error(error.to_string()));
                 }
             }
@@ -215,7 +259,10 @@ pub(crate) async fn set_app_mute(
                 if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
                     return Json(ApiResponse::success("App mute set".to_string()));
                 } else {
-                    let error = result.get("error").and_then(|v| v.as_str()).unwrap_or("Unknown error");
+                    let error = result
+                        .get("error")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("Unknown error");
                     return Json(ApiResponse::error(error.to_string()));
                 }
             }

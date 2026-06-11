@@ -266,6 +266,68 @@ function WizardConfig({
             ),
         }),
       ),
+    widget.type === "obs-control" &&
+      h(
+        "div",
+        { class: "wizard-field" },
+        h("label", null, "OBS Host"),
+        h("input", {
+          type: "text",
+          value: settings.host || "127.0.0.1",
+          placeholder: "127.0.0.1",
+          onInput: (e: Event) => set("host", (e.target as HTMLInputElement).value),
+        }),
+        h("label", null, "Port"),
+        h("input", {
+          type: "number",
+          value: String(settings.port || 4455),
+          onInput: (e: Event) => set("port", parseInt((e.target as HTMLInputElement).value) || 4455),
+        }),
+        h("label", null, "Password"),
+        h("input", {
+          type: "password",
+          value: settings.password || "",
+          placeholder: "OBS WebSocket password",
+          onInput: (e: Event) => set("password", (e.target as HTMLInputElement).value),
+        }),
+        h("label", null, "Refresh Interval (ms)"),
+        h("input", {
+          type: "number",
+          min: "500",
+          step: "500",
+          value: String(settings.refreshInterval || 2000),
+          onInput: (e: Event) =>
+            set("refreshInterval", parseInt((e.target as HTMLInputElement).value) || 2000),
+        }),
+      ),
+    widget.type === "obs-scenes" &&
+      h(
+        "div",
+        { class: "wizard-field" },
+        h("label", null, "Refresh Interval (ms)"),
+        h("input", {
+          type: "number",
+          min: "500",
+          step: "500",
+          value: String(settings.refreshInterval || 2000),
+          onInput: (e: Event) =>
+            set("refreshInterval", parseInt((e.target as HTMLInputElement).value) || 2000),
+        }),
+      ),
+    widget.type === "obs-inputs" &&
+      h(
+        "div",
+        { class: "wizard-field" },
+        h("label", null, "Refresh Interval (ms)"),
+        h("input", {
+          type: "number",
+          min: "500",
+          step: "500",
+          value: String(settings.refreshInterval || 2000),
+          onInput: (e: Event) =>
+            set("refreshInterval", parseInt((e.target as HTMLInputElement).value) || 2000),
+        }),
+      ),
   );
 }
 
@@ -708,6 +770,124 @@ function VariantPreview({ type, variant }: { type: string; variant: string }) {
               }),
             ),
             h("div", null, "60%"),
+          );
+      }
+    case "obs-control":
+      switch (variant) {
+        case "minimal":
+          return h(
+            "div",
+            { class: "variant-preview obs-minimal" },
+            h("div", { class: "mini-row" },
+              h("div", { class: "mini-dot green" }),
+              h("span", null, "Connected"),
+            ),
+            h("div", { class: "mini-row" },
+              h("div", { class: "mini-dot red" }),
+              h("span", null, "Stream"),
+            ),
+          );
+        case "compact":
+          return h(
+            "div",
+            { class: "variant-preview obs-compact" },
+            h("div", null, "Scene 1"),
+            h("div", { class: "mini-btns" },
+              h("div", { class: "mini-btn" }, "STR"),
+              h("div", { class: "mini-btn" }, "REC"),
+              h("div", { class: "mini-btn" }, "VC"),
+            ),
+          );
+        case "detailed":
+          return h(
+            "div",
+            { class: "variant-preview obs-detailed" },
+            h("div", { class: "mini-btns" },
+              h("div", { class: "mini-btn active" }, "Stream"),
+              h("div", { class: "mini-btn" }, "Record"),
+            ),
+            h("div", { class: "mini-grid" },
+              h("div", null, "CPU"),
+              h("div", null, "FPS"),
+            ),
+          );
+      }
+    case "obs-scenes":
+      switch (variant) {
+        case "minimal":
+          return h(
+            "div",
+            { class: "variant-preview obscene-minimal" },
+            h("div", null, "Scene 1"),
+            h("div", { class: "mini-grid" },
+              h("div", { class: "mini-btn active" }, "S1"),
+              h("div", { class: "mini-btn" }, "S2"),
+            ),
+          );
+        case "compact":
+          return h(
+            "div",
+            { class: "variant-preview obscene-compact" },
+            h("div", { class: "mini-list" },
+              h("div", { class: "mini-btn active" }, "Scene 1"),
+              h("div", { class: "mini-btn" }, "Scene 2"),
+            ),
+          );
+        case "detailed":
+          return h(
+            "div",
+            { class: "variant-preview obscene-detailed" },
+            h("div", { class: "mini-list" },
+              h("div", { class: "mini-btn active" }, "Scene 1"),
+              h("div", { class: "mini-btn" }, "Scene 2"),
+            ),
+            h("div", { class: "mini-btns" },
+              h("div", { class: "mini-btn" }, "Fade"),
+            ),
+          );
+      }
+    case "obs-inputs":
+      switch (variant) {
+        case "minimal":
+          return h(
+            "div",
+            { class: "variant-preview obsinput-minimal" },
+            h("div", null, "3 inputs"),
+            h("div", { class: "mini-list" },
+              h("div", { class: "mini-row" },
+                h("span", null, "Mic"),
+                h("div", { class: "mini-btn" }, "M"),
+              ),
+            ),
+          );
+        case "compact":
+          return h(
+            "div",
+            { class: "variant-preview obsinput-compact" },
+            h("div", null, "Mic"),
+            h(
+              "div",
+              { class: "mini-bar" },
+              h("div", {
+                class: "mini-bar-fill",
+                style: { width: "75%", background: "#4caf50" },
+              }),
+            ),
+          );
+        case "detailed":
+          return h(
+            "div",
+            { class: "variant-preview obsinput-detailed" },
+            h("div", null, "Mic (audio)"),
+            h(
+              "div",
+              { class: "mini-bar" },
+              h("div", {
+                class: "mini-bar-fill",
+                style: { width: "75%", background: "#4caf50" },
+              }),
+            ),
+            h("div", null, "75%"),
           );
       }
     default:

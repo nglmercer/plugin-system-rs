@@ -50,9 +50,7 @@ pub(crate) struct OpenUrlRequest {
     url: String,
 }
 
-pub(crate) async fn open_url(
-    Json(req): Json<OpenUrlRequest>,
-) -> Json<ApiResponse<String>> {
+pub(crate) async fn open_url(Json(req): Json<OpenUrlRequest>) -> Json<ApiResponse<String>> {
     if req.url.is_empty() {
         return Json(ApiResponse::error("No URL provided"));
     }

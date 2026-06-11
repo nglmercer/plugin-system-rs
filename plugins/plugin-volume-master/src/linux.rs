@@ -52,7 +52,11 @@ fn get_default_sink_name() -> Option<String> {
         .and_then(|o| {
             if o.status.success() {
                 let name = String::from_utf8_lossy(&o.stdout).trim().to_string();
-                if name.is_empty() { None } else { Some(name) }
+                if name.is_empty() {
+                    None
+                } else {
+                    Some(name)
+                }
             } else {
                 None
             }
@@ -95,7 +99,9 @@ fn parse_sink_inputs(output: &str) -> Vec<SinkInput> {
             current_pid = None;
             current_vol = 0.0;
             current_muted = false;
-        } else if trimmed.starts_with("application.name") || trimmed.starts_with("application.process.binary") {
+        } else if trimmed.starts_with("application.name")
+            || trimmed.starts_with("application.process.binary")
+        {
             if current_name.is_none() {
                 if let Some(val) = trimmed.split('=').nth(1) {
                     current_name = Some(val.trim().trim_matches('"').to_string());
@@ -137,8 +143,7 @@ impl VolumeControl for PulseController {
         let mute_output = run_pactl(&["get-sink-mute", "@DEFAULT_SINK@"])?;
         let muted = mute_output.contains("yes");
 
-        let device_name = get_default_sink_name()
-            .unwrap_or_else(|| "Default".to_string());
+        let device_name = get_default_sink_name().unwrap_or_else(|| "Default".to_string());
 
         let state = VolumeState {
             master_volume: volume,
@@ -170,24 +175,33 @@ impl VolumeControl for PulseController {
         let output = run_pactl(&["list", "sink-inputs"])?;
         let inputs = parse_sink_inputs(&output);
 
-        Ok(inputs.into_iter().map(|inp| AppVolume {
-            name: inp.name,
-            volume: inp.volume,
-            muted: inp.muted,
-            pid: inp.pid,
-        }).collect())
+        Ok(inputs
+            .into_iter()
+            .map(|inp| AppVolume {
+                name: inp.name,
+                volume: inp.volume,
+                muted: inp.muted,
+                pid: inp.pid,
+            })
+            .collect())
     }
 
     fn set_app_volume(&mut self, app_name: &str, volume: f32) -> Result<(), String> {
         let output = run_pactl(&["list", "sink-inputs"])?;
         let inputs = parse_sink_inputs(&output);
 
-        let input = inputs.iter().find(|i| i.name == app_name)
+        let input = inputs
+            .iter()
+            .find(|i| i.name == app_name)
             .ok_or_else(|| format!("App '{}' not found", app_name))?;
 
         let idx = input.index.to_string();
         let clamped = volume.clamp(0.0, 100.0);
-        run_pactl(&["set-sink-input-volume", &idx, &format!("{}%", clamped as i32)])?;
+        run_pactl(&[
+            "set-sink-input-volume",
+            &idx,
+            &format!("{}%", clamped as i32),
+        ])?;
         Ok(())
     }
 
@@ -195,7 +209,9 @@ impl VolumeControl for PulseController {
         let output = run_pactl(&["list", "sink-inputs"])?;
         let inputs = parse_sink_inputs(&output);
 
-        let input = inputs.iter().find(|i| i.name == app_name)
+        let input = inputs
+            .iter()
+            .find(|i| i.name == app_name)
             .ok_or_else(|| format!("App '{}' not found", app_name))?;
 
         let idx = input.index.to_string();
@@ -211,8 +227,14 @@ mod tests {
 
     #[test]
     fn test_parse_volume_percent() {
-        assert_eq!(parse_volume_percent("Volume: front-left: 52429 /  80% / -5,81 dB"), Some(80.0));
-        assert_eq!(parse_volume_percent("Volume: front-left: 22702 /  35% / -27,62 dB"), Some(35.0));
+        assert_eq!(
+            parse_volume_percent("Volume: front-left: 52429 /  80% / -5,81 dB"),
+            Some(80.0)
+        );
+        assert_eq!(
+            parse_volume_percent("Volume: front-left: 22702 /  35% / -27,62 dB"),
+            Some(35.0)
+        );
         assert_eq!(parse_volume_percent("no volume here"), None);
         assert_eq!(parse_volume_percent("Volume: 0%"), Some(0.0));
         assert_eq!(parse_volume_percent("Volume: 100%"), Some(100.0));

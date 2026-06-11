@@ -40,7 +40,11 @@ pub trait Plugin: Any + Send + Sync {
         None
     }
 
-    fn handle_command(&mut self, _method: &str, _args: serde_json::Value) -> Option<serde_json::Value> {
+    fn handle_command(
+        &mut self,
+        _method: &str,
+        _args: serde_json::Value,
+    ) -> Option<serde_json::Value> {
         None
     }
 

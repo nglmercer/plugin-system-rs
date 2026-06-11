@@ -56,6 +56,53 @@ Multiplatform volume control.
   - `muted` (bool): Mute status
   - `pid` (Option<u32>): Process ID
 
+### plugin-obs
+
+OBS Studio control via WebSocket 5.x protocol.
+
+- **Interface**: `ObsControl`
+- **Connection**:
+  - `host` (String): OBS WebSocket host (default: "127.0.0.1")
+  - `port` (u16): OBS WebSocket port (default: 4455)
+  - `password` (Option<String>): OBS WebSocket password
+- **Commands**:
+  - `connect` - Connect to OBS
+  - `disconnect` - Disconnect from OBS
+  - `refresh` - Refresh status
+  - `get_status` - Get connection + stream/record state
+  - `start_stream` - Start streaming
+  - `stop_stream` - Stop streaming
+  - `start_record` - Start recording
+  - `stop_record` - Stop recording
+  - `toggle_record_pause` - Toggle record pause
+  - `get_scenes` - List scenes
+  - `set_scene` - Switch scene (arg: `scene_name`)
+  - `get_inputs` - List inputs
+  - `set_input_volume` - Set input volume (args: `input_name`, `volume`)
+  - `set_input_mute` - Mute/unmute input (args: `input_name`, `muted`)
+  - `toggle_virtual_cam` - Toggle virtual camera
+  - `save_replay` - Save replay buffer
+  - `get_transitions` - List transitions
+  - `set_transition` - Set active transition (arg: `name`)
+  - `get_scene_items` - List scene items (arg: `scene_name`)
+  - `set_scene_item_enabled` - Toggle source visibility (args: `scene_name`, `item_id`, `enabled`)
+  - `get_studio_mode` - Get studio mode state
+  - `set_studio_mode` - Set studio mode (arg: `enabled`)
+- **Data**:
+  - `connected` (bool): Whether connected to OBS
+  - `host` (String): Connected host
+  - `port` (u16): Connected port
+  - `stream_active` (bool): Streaming status
+  - `record_active` (bool): Recording status
+  - `record_paused` (bool): Record pause status
+  - `virtual_cam_active` (bool): Virtual camera status
+  - `replay_buffer_active` (bool): Replay buffer status
+  - `current_scene` (String): Current scene name
+  - `studio_mode` (bool): Studio mode enabled
+  - `cpu_usage` (f64): OBS CPU usage
+  - `memory_usage` (f64): OBS memory usage (MB)
+  - `fps` (f64): OBS FPS
+
 ## Widgets
 
 ### Volume Control Widget (`volume-master`)
@@ -78,11 +125,47 @@ Per-app volume control for active audio streams.
 | `compact` | List with individual sliders |
 | `detailed` | Full per-app controls with PID |
 
+### OBS Control Widget (`obs-control`)
+
+Main OBS control with stream/record/virtual cam toggles.
+
+| Variant | Description |
+|---------|-------------|
+| `minimal` | Status dots for stream/record |
+| `compact` | Current scene + toggle buttons |
+| `detailed` | Full controls + stats + transitions |
+
+**Settings**:
+- `host` (string): OBS WebSocket host (default: "127.0.0.1")
+- `port` (number): OBS WebSocket port (default: 4455)
+- `password` (string): OBS WebSocket password
+- `refreshInterval` (number): Poll interval in ms (default: 2000)
+
+### OBS Scenes Widget (`obs-scenes`)
+
+Scene switcher with transitions and source visibility.
+
+| Variant | Description |
+|---------|-------------|
+| `minimal` | Current scene + grid buttons |
+| `compact` | Scene list with active highlight |
+| `detailed` | Scenes + transitions + source toggles |
+
+### OBS Inputs Widget (`obs-inputs`)
+
+Per-input volume and mute controls.
+
+| Variant | Description |
+|---------|-------------|
+| `minimal` | Input count + mute toggles |
+| `compact` | List with sliders and mute |
+| `detailed` | Full input controls with kind info |
+
 ## Building
 
 ```bash
 # Build all plugins
-cargo build --release -p plugin-timer -p plugin-system-monitor -p plugin-key-simulator -p plugin-volume-master
+cargo build --release -p plugin-timer -p plugin-system-monitor -p plugin-key-simulator -p plugin-volume-master -p plugin-obs
 
 # Copy to plugins directory
 mkdir -p plugins
@@ -91,6 +174,7 @@ cp target/release/libplugin_*.so plugins/
 
 ## API Endpoints
 
+### Volume
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/volume` | Get master volume state + apps |
@@ -99,6 +183,35 @@ cp target/release/libplugin_*.so plugins/
 | GET | `/api/volume/apps` | List per-app volumes |
 | PUT | `/api/volume/app/volume` | Set app volume |
 | PUT | `/api/volume/app/mute` | Set app mute |
+
+### OBS
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/obs/status` | Get OBS connection + stream/record state |
+| POST | `/api/obs/connect` | Connect to OBS |
+| POST | `/api/obs/disconnect` | Disconnect from OBS |
+| POST | `/api/obs/stream/start` | Start streaming |
+| POST | `/api/obs/stream/stop` | Stop streaming |
+| POST | `/api/obs/record/start` | Start recording |
+| POST | `/api/obs/record/stop` | Stop recording |
+| POST | `/api/obs/record/pause` | Toggle record pause |
+| GET | `/api/obs/scenes` | List scenes |
+| POST | `/api/obs/scenes/current` | Switch scene |
+| GET | `/api/obs/inputs` | List inputs |
+| PUT | `/api/obs/inputs/volume` | Set input volume |
+| PUT | `/api/obs/inputs/mute` | Set input mute |
+| POST | `/api/obs/virtualcam/toggle` | Toggle virtual camera |
+| POST | `/api/obs/replay/save` | Save replay buffer |
+| GET | `/api/obs/transitions` | List transitions |
+| POST | `/api/obs/transitions/current` | Set transition |
+| GET | `/api/obs/scene-items` | List scene items |
+| PUT | `/api/obs/scene-item/enabled` | Toggle source visibility |
+| GET | `/api/obs/studio-mode` | Get studio mode state |
+| POST | `/api/obs/studio-mode` | Set studio mode |
+
+### Plugins
+| Method | Endpoint | Description |
+|--------|----------|-------------|
 | GET | `/api/plugins` | List loaded plugins |
 | POST | `/api/plugins/reload` | Reload all plugins |
 | GET | `/api/plugins/:name` | Get plugin data |
@@ -245,6 +358,20 @@ To add a widget for your plugin in the web UI:
 | plugin-key-simulator | ✓ | ✓ | ✓ |
 | plugin-volume-master | ✓ | ✓ | ✓ |
 | plugin-volume-master (per-app) | ✓ | ✓ | ✗ |
+| plugin-obs | ✓ | ✓ | ✓ |
+
+## OBS WebSocket Setup
+
+1. Open OBS Studio
+2. Go to **Tools > WebSocket Server Settings**
+3. Enable the WebSocket server
+4. Set a password (recommended for security)
+5. Note the port (default: 4455)
+6. In the web UI, add an **OBS Control** widget
+7. Configure the widget with your OBS host/port/password
+8. Click "Connect" in the widget
+
+The OBS plugin uses the `obws` crate (v0.15) which implements the OBS WebSocket 5.x protocol.
 
 ## Notes
 

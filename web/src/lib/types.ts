@@ -56,7 +56,10 @@ export type WidgetType =
   | "open-url"
   | "type-text"
   | "volume-master"
-  | "volume-apps";
+  | "volume-apps"
+  | "obs-control"
+  | "obs-scenes"
+  | "obs-inputs";
 
 export interface WidgetConfig {
   id: string;
@@ -188,6 +191,66 @@ export const WIDGET_VARIANTS: {
         value: "detailed",
         label: "Detailed",
         description: "Full per-app controls",
+      },
+    ],
+  },
+  {
+    type: "obs-control",
+    variants: [
+      {
+        value: "minimal",
+        label: "Minimal",
+        description: "Status dots for stream/record",
+      },
+      {
+        value: "compact",
+        label: "Compact",
+        description: "Current scene + toggle buttons",
+      },
+      {
+        value: "detailed",
+        label: "Detailed",
+        description: "Full controls + stats + transitions",
+      },
+    ],
+  },
+  {
+    type: "obs-scenes",
+    variants: [
+      {
+        value: "minimal",
+        label: "Minimal",
+        description: "Current scene + grid buttons",
+      },
+      {
+        value: "compact",
+        label: "Compact",
+        description: "Scene list with active highlight",
+      },
+      {
+        value: "detailed",
+        label: "Detailed",
+        description: "Scenes + transitions + source toggles",
+      },
+    ],
+  },
+  {
+    type: "obs-inputs",
+    variants: [
+      {
+        value: "minimal",
+        label: "Minimal",
+        description: "Input count + mute toggles",
+      },
+      {
+        value: "compact",
+        label: "Compact",
+        description: "List with sliders and mute",
+      },
+      {
+        value: "detailed",
+        label: "Detailed",
+        description: "Full input controls with kind info",
       },
     ],
   },

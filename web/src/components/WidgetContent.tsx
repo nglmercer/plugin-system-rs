@@ -7,6 +7,9 @@ import { OpenUrlWidget } from "./OpenUrlWidget";
 import { TypeTextWidget } from "./TypeTextWidget";
 import { VolumeWidget } from "./VolumeWidget";
 import { VolumeAppsWidget } from "./VolumeAppsWidget";
+import { ObsWidget } from "./ObsWidget";
+import { ObsScenesWidget } from "./ObsScenesWidget";
+import { ObsInputsWidget } from "./ObsInputsWidget";
 
 export function WidgetContent({ widget }: { widget: WidgetConfig }) {
   switch (widget.type) {
@@ -24,6 +27,12 @@ export function WidgetContent({ widget }: { widget: WidgetConfig }) {
       return h(VolumeWidget, { settings: widget.settings });
     case "volume-apps":
       return h(VolumeAppsWidget, { settings: widget.settings });
+    case "obs-control":
+      return h(ObsWidget, { settings: widget.settings });
+    case "obs-scenes":
+      return h(ObsScenesWidget, { settings: widget.settings });
+    case "obs-inputs":
+      return h(ObsInputsWidget, { settings: widget.settings });
     default:
       return h("div", { class: "widget-unknown" }, "Unknown widget");
   }

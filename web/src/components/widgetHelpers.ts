@@ -64,6 +64,30 @@ export const WIDGET_CATALOG: {
     defaultColSpan: 1,
     defaultRowSpan: 1,
   },
+  {
+    type: "obs-control",
+    label: "OBS Control",
+    icon: "O",
+    description: "Stream, record, virtual cam",
+    defaultColSpan: 1,
+    defaultRowSpan: 1,
+  },
+  {
+    type: "obs-scenes",
+    label: "OBS Scenes",
+    icon: "S",
+    description: "Scene switcher",
+    defaultColSpan: 1,
+    defaultRowSpan: 1,
+  },
+  {
+    type: "obs-inputs",
+    label: "OBS Inputs",
+    icon: "I",
+    description: "Input volume & mute",
+    defaultColSpan: 1,
+    defaultRowSpan: 1,
+  },
 ];
 
 export function generateId(): string {
@@ -79,6 +103,9 @@ export function getDefaultVariant(type: WidgetType): string {
     "type-text": "compact",
     "volume-master": "compact",
     "volume-apps": "compact",
+    "obs-control": "compact",
+    "obs-scenes": "compact",
+    "obs-inputs": "compact",
   };
   return variants[type] || "compact";
 }
@@ -102,6 +129,18 @@ export function getDefaultSettings(type: WidgetType): Record<string, any> {
       settings.refreshInterval = 2000;
       break;
     case "volume-apps":
+      settings.refreshInterval = 2000;
+      break;
+    case "obs-control":
+      settings.refreshInterval = 2000;
+      settings.host = "127.0.0.1";
+      settings.port = 4455;
+      settings.password = "";
+      break;
+    case "obs-scenes":
+      settings.refreshInterval = 2000;
+      break;
+    case "obs-inputs":
       settings.refreshInterval = 2000;
       break;
   }
