@@ -3,7 +3,7 @@ use sd_actions::{ActionRegistry, HotkeyAction, TextAction, OpenUrlAction};
 use sd_profiles::ProfileManager;
 use sd_devices::{DeviceManager, VirtualDevice};
 use sd_plugins::SdPluginManager;
-use sd_api::{AppState, create_router};
+use sd_api::{AppState, create_router, load_dashboard_config};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -68,12 +68,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Create API state
+    let dashboard_config = Arc::new(RwLock::new(load_dashboard_config()));
     let state = AppState {
         events: events.clone(),
         action_registry,
         profile_manager,
         device_manager,
         plugin_manager,
+        dashboard_config,
     };
 
     // Start event bus listener

@@ -1,28 +1,11 @@
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState } from 'preact/hooks';
 import { Dashboard } from './routes/Dashboard';
 import { Profiles } from './routes/Profiles';
 import { Plugins } from './routes/Plugins';
-import { wsClient } from './lib/websocket';
-import { StreamEvent } from './lib/types';
 
 export function App() {
   const [currentPage, setCurrentPage] = useState<'dashboard' | 'profiles' | 'plugins'>('dashboard');
-  const [events, setEvents] = useState<StreamEvent[]>([]);
-
-  useEffect(() => {
-    wsClient.connect();
-
-    const unsubscribe = wsClient.onEvent((event) => {
-      setEvents(prev => [event, ...prev].slice(0, 50));
-      console.log('Event:', event);
-    });
-
-    return () => {
-      unsubscribe();
-      wsClient.disconnect();
-    };
-  }, []);
 
   return h('div', { class: 'app' },
     h('nav', { class: 'nav' },
@@ -43,7 +26,7 @@ export function App() {
       )
     ),
     h('main', { class: 'main' },
-      currentPage === 'dashboard' && h(Dashboard, { events }),
+      currentPage === 'dashboard' && h(Dashboard, null),
       currentPage === 'profiles' && h(Profiles, null),
       currentPage === 'plugins' && h(Plugins, null),
     )

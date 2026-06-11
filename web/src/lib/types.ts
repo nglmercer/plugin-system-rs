@@ -46,7 +46,7 @@ export interface PluginData {
   data: Record<string, any>;
 }
 
-export type WidgetType = 'button-grid' | 'event-log' | 'system-monitor' | 'clock' | 'actions';
+export type WidgetType = 'system-monitor' | 'clock' | 'actions';
 
 export interface WidgetConfig {
   id: string;

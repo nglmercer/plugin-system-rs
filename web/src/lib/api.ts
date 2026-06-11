@@ -1,3 +1,5 @@
+import { DashboardLayout } from './types';
+
 const API_BASE = '/api';
 
 export async function fetchDevices() {
@@ -68,4 +70,20 @@ export async function fetchPluginData(pluginName: string) {
   const res = await fetch(`${API_BASE}/plugins/${pluginName}`);
   const data = await res.json();
   return data.data;
+}
+
+export async function fetchDashboard(): Promise<DashboardLayout> {
+  const res = await fetch(`${API_BASE}/dashboard`);
+  const data = await res.json();
+  return data.data || { widgets: [], columns: 3 };
+}
+
+export async function saveDashboard(layout: DashboardLayout): Promise<boolean> {
+  const res = await fetch(`${API_BASE}/dashboard`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(layout),
+  });
+  const data = await res.json();
+  return data.success;
 }

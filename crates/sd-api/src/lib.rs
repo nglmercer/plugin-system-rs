@@ -17,6 +17,54 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tower_http::services::ServeDir;
 
+const DASHBOARD_CONFIG_PATH: &str = "data/dashboard.json";
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct DashboardWidget {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub widget_type: String,
+    pub title: String,
+    #[serde(rename = "colSpan")]
+    pub col_span: u32,
+    #[serde(rename = "rowSpan")]
+    pub row_span: u32,
+    #[serde(default)]
+    pub settings: serde_json::Value,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct DashboardLayout {
+    pub widgets: Vec<DashboardWidget>,
+    pub columns: u32,
+}
+
+impl Default for DashboardLayout {
+    fn default() -> Self {
+        Self {
+            widgets: Vec::new(),
+            columns: 3,
+        }
+    }
+}
+
+pub fn load_dashboard_config() -> DashboardLayout {
+    std::fs::read_to_string(DASHBOARD_CONFIG_PATH)
+        .ok()
+        .and_then(|content| serde_json::from_str(&content).ok())
+        .unwrap_or_default()
+}
+
+fn save_dashboard_config(layout: &DashboardLayout) -> bool {
+    if let Some(parent) = std::path::Path::new(DASHBOARD_CONFIG_PATH).parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    match serde_json::to_string_pretty(layout) {
+        Ok(json) => std::fs::write(DASHBOARD_CONFIG_PATH, json).is_ok(),
+        Err(_) => false,
+    }
+}
+
 #[derive(Serialize)]
 struct SystemStats {
     cpu_usage: f64,
@@ -132,6 +180,7 @@ pub struct AppState {
     pub profile_manager: Arc<ProfileManager>,
     pub device_manager: Arc<DeviceManager>,
     pub plugin_manager: Arc<SdPluginManager>,
+    pub dashboard_config: Arc<RwLock<DashboardLayout>>,
 }
 
 #[derive(Serialize)]
@@ -309,6 +358,28 @@ async fn get_system_stats() -> Json<ApiResponse<SystemStats>> {
     }))
 }
 
+// Dashboard config endpoints
+async fn get_dashboard(State(state): State<AppState>) -> Json<ApiResponse<DashboardLayout>> {
+    let layout = state.dashboard_config.read().await;
+    Json(ApiResponse::success(layout.clone()))
+}
+
+async fn save_dashboard(
+    State(state): State<AppState>,
+    Json(layout): Json<DashboardLayout>,
+) -> Json<ApiResponse<bool>> {
+    {
+        let mut config = state.dashboard_config.write().await;
+        *config = layout.clone();
+    }
+    let ok = save_dashboard_config(&layout);
+    if ok {
+        Json(ApiResponse::success(true))
+    } else {
+        Json(ApiResponse::error("Failed to save dashboard config"))
+    }
+}
+
 // WebSocket handler
 async fn websocket_handler(
     ws: WebSocketUpgrade,
@@ -400,6 +471,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/plugins/reload", post(reload_plugins))
         .route("/api/plugins/:plugin_name", get(get_plugin_data))
         .route("/api/system-stats", get(get_system_stats))
+        .route("/api/dashboard", get(get_dashboard).put(save_dashboard))
         .route("/ws", get(websocket_handler))
         .nest_service("/", static_files)
         .layer(cors)
