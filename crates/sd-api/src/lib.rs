@@ -429,7 +429,9 @@ struct RecordHotkeyRequest {
     timeout_ms: u64,
 }
 
-fn default_timeout() -> u64 { 15000 }
+fn default_timeout() -> u64 {
+    15000
+}
 
 #[derive(Serialize)]
 struct RecordHotkeyResponse {
@@ -452,6 +454,12 @@ async fn record_hotkey(
         }
         Err(e) => Json(ApiResponse::error(e)),
     }
+}
+
+async fn reset_hotkey_recording() -> Json<ApiResponse<String>> {
+    plugin_key_simulator::KeySimulatorPlugin::reset_recording_state();
+    log::info!("[Hotkey] Recording state reset");
+    Json(ApiResponse::success("Recording state reset".to_string()))
 }
 
 // Plugin endpoints
@@ -660,6 +668,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/actions", get(list_actions).post(execute_action))
         .route("/api/hotkey/send", post(send_hotkey))
         .route("/api/hotkey/record", post(record_hotkey))
+        .route("/api/hotkey/record/reset", post(reset_hotkey_recording))
         .route("/api/plugins", get(list_plugins))
         .route("/api/plugins/reload", post(reload_plugins))
         .route("/api/plugins/:plugin_name", get(get_plugin_data))

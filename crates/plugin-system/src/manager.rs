@@ -7,10 +7,8 @@ use crate::loader::{FileLoader, PluginLoader};
 use crate::registry::{new_shared_registry, SharedRegistry};
 use crate::traits::{Plugin, PluginMetadata};
 
-#[allow(improper_ctypes_definitions)]
-type PluginCreateFn = unsafe extern "C" fn() -> *mut dyn Plugin;
-#[allow(improper_ctypes_definitions)]
-type PluginDestroyFn = unsafe extern "C" fn(*mut dyn Plugin);
+type PluginCreateFn = unsafe extern "C" fn() -> *mut ();
+type PluginDestroyFn = unsafe extern "C" fn(*mut ());
 #[allow(improper_ctypes_definitions)]
 type PluginMetadataFn = unsafe extern "C" fn() -> PluginMetadata;
 
@@ -134,7 +132,9 @@ impl PluginManager {
         }
 
         let raw_instance = unsafe { create() };
-        let instance: Box<dyn Plugin> = unsafe { Box::from_raw(raw_instance) };
+        let boxed: Box<Box<dyn Plugin>> =
+            unsafe { Box::from_raw(raw_instance as *mut Box<dyn Plugin>) };
+        let instance: Box<dyn Plugin> = *boxed;
 
         if self.loaded.contains_key(&name) {
             self.unload_plugin(&name)?;

@@ -115,7 +115,7 @@ export async function sendHotkeyCombo(combo: string): Promise<string> {
   return data.data?.combo || data.data || data.error || "Sent";
 }
 
-export async function recordHotkey(timeoutMs: number = 5000): Promise<string> {
+export async function recordHotkey(timeoutMs: number = 3000): Promise<string> {
   const res = await fetch(`${API_BASE}/hotkey/record`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -124,4 +124,8 @@ export async function recordHotkey(timeoutMs: number = 5000): Promise<string> {
   const data = await res.json();
   if (!data.success) throw new Error(data.error || "Recording failed");
   return data.data.combo;
+}
+
+export async function resetHotkeyRecording(): Promise<void> {
+  await fetch(`${API_BASE}/hotkey/record/reset`, { method: "POST" });
 }

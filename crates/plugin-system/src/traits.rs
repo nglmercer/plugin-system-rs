@@ -25,21 +25,11 @@ pub trait Plugin: Any + Send + Sync {
 
 impl dyn Plugin {
     pub fn downcast_ref<T: Plugin + 'static>(&self) -> Option<&T> {
-        if self.plugin_type_name() == std::any::type_name::<T>() {
-            let ptr = self as *const dyn Plugin as *const T;
-            Some(unsafe { &*ptr })
-        } else {
-            None
-        }
+        (self as &dyn Any).downcast_ref::<T>()
     }
 
     pub fn downcast_mut<T: Plugin + 'static>(&mut self) -> Option<&mut T> {
-        if self.plugin_type_name() == std::any::type_name::<T>() {
-            let ptr = self as *mut dyn Plugin as *mut T;
-            Some(unsafe { &mut *ptr })
-        } else {
-            None
-        }
+        (self as &mut dyn Any).downcast_mut::<T>()
     }
 
     pub fn has_interface(&self, interface_name: &str) -> bool {

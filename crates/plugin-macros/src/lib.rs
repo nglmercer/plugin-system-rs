@@ -93,22 +93,21 @@ fn generate_plugin_export(
         }
 
         #[no_mangle]
-        #[allow(improper_ctypes_definitions)]
-        pub extern "C" fn plugin_create() -> *mut dyn plugin_system::Plugin {
+        pub extern "C" fn plugin_create() -> *mut () {
             let boxed: Box<dyn plugin_system::Plugin> = Box::new(<#self_ty>::new());
-            Box::into_raw(boxed)
+            let outer = Box::new(boxed);
+            Box::into_raw(outer) as *mut ()
         }
 
         #[no_mangle]
-        #[allow(improper_ctypes_definitions)]
-        pub unsafe extern "C" fn plugin_destroy(ptr: *mut dyn plugin_system::Plugin) {
+        pub unsafe extern "C" fn plugin_destroy(ptr: *mut ()) {
             if !ptr.is_null() {
-                drop(Box::from_raw(ptr));
+                let outer = Box::from_raw(ptr as *mut Box<dyn plugin_system::Plugin>);
+                drop(outer);
             }
         }
 
         #[no_mangle]
-        #[allow(improper_ctypes_definitions)]
         pub extern "C" fn plugin_metadata() -> plugin_system::PluginMetadata {
             plugin_system::Plugin::metadata(&<#self_ty>::new())
         }
@@ -321,22 +320,21 @@ fn generate_plugin_export_all(
         #(#method_exports)*
 
         #[no_mangle]
-        #[allow(improper_ctypes_definitions)]
-        pub extern "C" fn plugin_create() -> *mut dyn plugin_system::Plugin {
+        pub extern "C" fn plugin_create() -> *mut () {
             let boxed: Box<dyn plugin_system::Plugin> = Box::new(<#self_ty>::new());
-            Box::into_raw(boxed)
+            let outer = Box::new(boxed);
+            Box::into_raw(outer) as *mut ()
         }
 
         #[no_mangle]
-        #[allow(improper_ctypes_definitions)]
-        pub unsafe extern "C" fn plugin_destroy(ptr: *mut dyn plugin_system::Plugin) {
+        pub unsafe extern "C" fn plugin_destroy(ptr: *mut ()) {
             if !ptr.is_null() {
-                drop(Box::from_raw(ptr));
+                let outer = Box::from_raw(ptr as *mut Box<dyn plugin_system::Plugin>);
+                drop(outer);
             }
         }
 
         #[no_mangle]
-        #[allow(improper_ctypes_definitions)]
         pub extern "C" fn plugin_metadata() -> plugin_system::PluginMetadata {
             plugin_system::Plugin::metadata(&<#self_ty>::new())
         }
@@ -346,22 +344,21 @@ fn generate_plugin_export_all(
 fn generate_define_plugin(struct_type: syn::TypePath) -> syn::Result<proc_macro2::TokenStream> {
     Ok(quote! {
         #[no_mangle]
-        #[allow(improper_ctypes_definitions)]
-        pub extern "C" fn plugin_create() -> *mut dyn plugin_system::Plugin {
+        pub extern "C" fn plugin_create() -> *mut () {
             let boxed: Box<dyn plugin_system::Plugin> = Box::new(<#struct_type>::new());
-            Box::into_raw(boxed)
+            let outer = Box::new(boxed);
+            Box::into_raw(outer) as *mut ()
         }
 
         #[no_mangle]
-        #[allow(improper_ctypes_definitions)]
-        pub unsafe extern "C" fn plugin_destroy(ptr: *mut dyn plugin_system::Plugin) {
+        pub unsafe extern "C" fn plugin_destroy(ptr: *mut ()) {
             if !ptr.is_null() {
-                drop(Box::from_raw(ptr));
+                let outer = Box::from_raw(ptr as *mut Box<dyn plugin_system::Plugin>);
+                drop(outer);
             }
         }
 
         #[no_mangle]
-        #[allow(improper_ctypes_definitions)]
         pub extern "C" fn plugin_metadata() -> plugin_system::PluginMetadata {
             plugin_system::Plugin::metadata(&<#struct_type>::new())
         }
