@@ -57,3 +57,15 @@ export async function simulateButtonPress(deviceId: string, buttonIndex: number)
   const data = await res.json();
   return data;
 }
+
+export async function fetchSystemStats() {
+  const res = await fetch(`${API_BASE}/system-stats`);
+  const data = await res.json();
+  return data.data;
+}
+
+export async function fetchPluginData(pluginName: string) {
+  const res = await fetch(`${API_BASE}/plugins/${pluginName}`);
+  const data = await res.json();
+  return data.data;
+}

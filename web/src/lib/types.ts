@@ -26,3 +26,38 @@ export interface StreamEvent {
   type: string;
   [key: string]: any;
 }
+
+export interface SystemStats {
+  cpu_usage: number;
+  memory_total: number;
+  memory_used: number;
+  memory_usage: number;
+  swap_total: number;
+  swap_used: number;
+  load_avg: [number, number, number];
+  uptime: number;
+  process_count: number;
+}
+
+export interface PluginData {
+  name: string;
+  version: string;
+  interfaces: string[];
+  data: Record<string, any>;
+}
+
+export type WidgetType = 'button-grid' | 'event-log' | 'system-monitor' | 'clock' | 'actions';
+
+export interface WidgetConfig {
+  id: string;
+  type: WidgetType;
+  title: string;
+  colSpan: number;
+  rowSpan: number;
+  settings: Record<string, any>;
+}
+
+export interface DashboardLayout {
+  widgets: WidgetConfig[];
+  columns: number;
+}

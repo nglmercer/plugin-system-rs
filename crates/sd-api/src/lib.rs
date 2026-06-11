@@ -17,6 +17,114 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tower_http::services::ServeDir;
 
+#[derive(Serialize)]
+struct SystemStats {
+    cpu_usage: f64,
+    memory_total: u64,
+    memory_used: u64,
+    memory_usage: f64,
+    swap_total: u64,
+    swap_used: u64,
+    load_avg: [f64; 3],
+    uptime: u64,
+    process_count: usize,
+}
+
+#[derive(Serialize)]
+struct PluginDataResponse {
+    name: String,
+    version: String,
+    interfaces: Vec<String>,
+    data: serde_json::Value,
+}
+
+fn read_cpu_usage() -> f64 {
+    std::fs::read_to_string("/proc/stat")
+        .ok()
+        .and_then(|content| {
+            let line = content.lines().next()?;
+            let parts: Vec<u64> = line.split_whitespace()
+                .skip(1)
+                .filter_map(|s| s.parse().ok())
+                .collect();
+            if parts.len() >= 4 {
+                let idle = parts[3];
+                let total: u64 = parts.iter().sum();
+                Some((total - idle) as f64 / total as f64 * 100.0)
+            } else {
+                None
+            }
+        })
+        .unwrap_or(0.0)
+}
+
+fn read_memory_info() -> (u64, u64, u64, u64) {
+    let content = std::fs::read_to_string("/proc/meminfo").unwrap_or_default();
+    let mut mem_total = 0u64;
+    let mut mem_available = 0u64;
+    let mut swap_total = 0u64;
+    let mut swap_free = 0u64;
+
+    for line in content.lines() {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() >= 2 {
+            let value = parts[1].parse::<u64>().unwrap_or(0) * 1024;
+            match parts[0] {
+                "MemTotal:" => mem_total = value,
+                "MemAvailable:" => mem_available = value,
+                "SwapTotal:" => swap_total = value,
+                "SwapFree:" => swap_free = value,
+                _ => {}
+            }
+        }
+    }
+
+    let mem_used = mem_total.saturating_sub(mem_available.min(mem_total));
+    let swap_used = swap_total.saturating_sub(swap_free.min(swap_total));
+    (mem_total, mem_used, swap_total, swap_used)
+}
+
+fn read_load_avg() -> [f64; 3] {
+    std::fs::read_to_string("/proc/loadavg")
+        .ok()
+        .and_then(|content| {
+            let parts: Vec<&str> = content.split_whitespace().collect();
+            if parts.len() >= 3 {
+                Some([
+                    parts[0].parse().unwrap_or(0.0),
+                    parts[1].parse().unwrap_or(0.0),
+                    parts[2].parse().unwrap_or(0.0),
+                ])
+            } else {
+                None
+            }
+        })
+        .unwrap_or([0.0, 0.0, 0.0])
+}
+
+fn read_uptime() -> u64 {
+    std::fs::read_to_string("/proc/uptime")
+        .ok()
+        .and_then(|content| {
+            content.split_whitespace()
+                .next()
+                .and_then(|s| s.parse::<f64>().ok())
+                .map(|v| v as u64)
+        })
+        .unwrap_or(0)
+}
+
+fn read_process_count() -> usize {
+    std::fs::read_dir("/proc")
+        .map(|entries| {
+            entries
+                .filter_map(|e| e.ok())
+                .filter(|e| e.file_name().to_str().map_or(false, |s| s.chars().all(|c| c.is_ascii_digit())))
+                .count()
+        })
+        .unwrap_or(0)
+}
+
 #[derive(Clone)]
 pub struct AppState {
     pub events: Arc<EventBus>,
@@ -136,6 +244,71 @@ async fn reload_plugins(State(state): State<AppState>) -> Json<ApiResponse<Strin
     }
 }
 
+async fn get_plugin_data(
+    State(state): State<AppState>,
+    Path(plugin_name): Path<String>,
+) -> Json<ApiResponse<PluginDataResponse>> {
+    let plugin_manager = state.plugin_manager.plugin_manager();
+    let manager = plugin_manager.read().await;
+
+    match manager.get_plugin_info(&plugin_name) {
+        Ok(info) => {
+            let data = match plugin_name.as_str() {
+                "system-monitor" => {
+                    let cpu = read_cpu_usage();
+                    let (mem_total, mem_used, swap_total, swap_used) = read_memory_info();
+                    let load = read_load_avg();
+                    serde_json::json!({
+                        "cpu_usage": cpu,
+                        "memory_total": mem_total,
+                        "memory_used": mem_used,
+                        "memory_usage": if mem_total > 0 { mem_used as f64 / mem_total as f64 * 100.0 } else { 0.0 },
+                        "swap_total": swap_total,
+                        "swap_used": swap_used,
+                        "load_avg": load,
+                    })
+                }
+                _ => serde_json::json!({}),
+            };
+
+            Json(ApiResponse::success(PluginDataResponse {
+                name: info.name,
+                version: info.version,
+                interfaces: info.interfaces,
+                data,
+            }))
+        }
+        Err(e) => Json(ApiResponse::error(e.to_string())),
+    }
+}
+
+// System stats endpoint
+async fn get_system_stats() -> Json<ApiResponse<SystemStats>> {
+    let cpu_usage = read_cpu_usage();
+    let (mem_total, mem_used, swap_total, swap_used) = read_memory_info();
+    let load_avg = read_load_avg();
+    let uptime = read_uptime();
+    let process_count = read_process_count();
+
+    let memory_usage = if mem_total > 0 {
+        mem_used as f64 / mem_total as f64 * 100.0
+    } else {
+        0.0
+    };
+
+    Json(ApiResponse::success(SystemStats {
+        cpu_usage,
+        memory_total: mem_total,
+        memory_used: mem_used,
+        memory_usage,
+        swap_total,
+        swap_used,
+        load_avg,
+        uptime,
+        process_count,
+    }))
+}
+
 // WebSocket handler
 async fn websocket_handler(
     ws: WebSocketUpgrade,
@@ -225,6 +398,8 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/actions", get(list_actions))
         .route("/api/plugins", get(list_plugins))
         .route("/api/plugins/reload", post(reload_plugins))
+        .route("/api/plugins/:plugin_name", get(get_plugin_data))
+        .route("/api/system-stats", get(get_system_stats))
         .route("/ws", get(websocket_handler))
         .nest_service("/", static_files)
         .layer(cors)
