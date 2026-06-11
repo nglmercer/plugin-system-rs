@@ -12,3 +12,4 @@
 - [x] Add per-app volume control for Linux and Windows.
 - [x] Add volume API endpoints in sd-api.
 - [x] Add VolumeWidget component with minimal, compact, and detailed variants.
+- [x] Add system plugins documentation.
