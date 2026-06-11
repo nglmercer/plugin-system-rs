@@ -29,23 +29,33 @@ pub enum PluginValue {
 
 impl PluginResult {
     pub fn string(s: impl Into<String>) -> Self {
-        Self { value: PluginValue::String(s.into()) }
+        Self {
+            value: PluginValue::String(s.into()),
+        }
     }
 
     pub fn int(i: i64) -> Self {
-        Self { value: PluginValue::Int(i) }
+        Self {
+            value: PluginValue::Int(i),
+        }
     }
 
     pub fn float(f: f64) -> Self {
-        Self { value: PluginValue::Float(f) }
+        Self {
+            value: PluginValue::Float(f),
+        }
     }
 
     pub fn bool(b: bool) -> Self {
-        Self { value: PluginValue::Bool(b) }
+        Self {
+            value: PluginValue::Bool(b),
+        }
     }
 
     pub fn null() -> Self {
-        Self { value: PluginValue::Null }
+        Self {
+            value: PluginValue::Null,
+        }
     }
 
     pub fn as_string(&self) -> Option<&str> {
@@ -103,7 +113,9 @@ impl Profile {
         Self {
             id: ProfileId(Uuid::new_v4()),
             name: name.into(),
-            pages: vec![Page { buttons: vec![ButtonBinding::empty(); 15] }],
+            pages: vec![Page {
+                buttons: vec![ButtonBinding::empty(); 15],
+            }],
         }
     }
 }

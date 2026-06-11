@@ -1,9 +1,9 @@
-use sd_events::EventBus;
-use sd_actions::{ActionRegistry, HotkeyAction, TextAction, OpenUrlAction};
-use sd_profiles::ProfileManager;
+use sd_actions::{ActionRegistry, HotkeyAction, OpenUrlAction, TextAction};
+use sd_api::{create_router, load_dashboard_config, AppState};
 use sd_devices::{DeviceManager, VirtualDevice};
+use sd_events::EventBus;
 use sd_plugins::SdPluginManager;
-use sd_api::{AppState, create_router, load_dashboard_config};
+use sd_profiles::ProfileManager;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 

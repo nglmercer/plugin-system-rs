@@ -1,7 +1,7 @@
-use sd_types::ActionId;
-use sd_events::EventBus;
-use sd_actions::ActionRegistry;
 use plugin_system::PluginManager;
+use sd_actions::ActionRegistry;
+use sd_events::EventBus;
+use sd_types::ActionId;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -25,7 +25,8 @@ impl SdPluginManager {
 
     pub async fn load_plugins_from_dir(&self, dir: &str) -> Result<Vec<String>, String> {
         let mut manager = self.plugin_manager.write().await;
-        manager.load_plugins_from_dir(dir)
+        manager
+            .load_plugins_from_dir(dir)
             .map_err(|e| e.to_string())
     }
 

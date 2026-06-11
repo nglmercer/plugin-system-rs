@@ -13,6 +13,6 @@ members = [
     "crates/sd-core",
     "plugins/plugin-timer",
     "plugins/plugin-system-monitor",
-    "plugins/plugin-hotkey",
+    "plugins/plugin-key-simulator",
 ]
 resolver = "2"

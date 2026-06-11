@@ -1,5 +1,5 @@
-use sd_types::{Profile, ProfileId};
 use sd_events::{EventBus, StreamEvent};
+use sd_types::{Profile, ProfileId};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -58,7 +58,8 @@ impl ProfileManager {
             drop(profiles);
             let mut active = self.active_profile.write().await;
             *active = Some(id.clone());
-            self.events.emit(StreamEvent::ProfileChanged { profile: id });
+            self.events
+                .emit(StreamEvent::ProfileChanged { profile: id });
             true
         } else {
             false

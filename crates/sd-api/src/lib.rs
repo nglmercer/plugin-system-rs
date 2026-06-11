@@ -4,18 +4,19 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use sd_types::*;
-use sd_events::{EventBus, StreamEvent};
-use sd_actions::{ActionRegistry, ActionContext};
-use sd_profiles::ProfileManager;
+use plugin_interfaces::KeySimulator;
+use sd_actions::{ActionContext, ActionRegistry};
 use sd_devices::DeviceManager;
+use sd_events::{EventBus, StreamEvent};
 use sd_plugins::SdPluginManager;
+use sd_profiles::ProfileManager;
+use sd_types::*;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tower_http::cors::{Any, CorsLayer};
-use tower_http::trace::TraceLayer;
 use tower_http::services::ServeDir;
+use tower_http::trace::TraceLayer;
 
 const DASHBOARD_CONFIG_PATH: &str = "data/dashboard.json";
 
@@ -97,7 +98,8 @@ struct CpuTimes {
 fn read_cpu_times() -> Option<CpuTimes> {
     let content = std::fs::read_to_string("/proc/stat").ok()?;
     let line = content.lines().next()?;
-    let parts: Vec<u64> = line.split_whitespace()
+    let parts: Vec<u64> = line
+        .split_whitespace()
         .skip(1)
         .filter_map(|s| s.parse().ok())
         .collect();
@@ -132,7 +134,8 @@ fn read_cpu_model() -> String {
     std::fs::read_to_string("/proc/cpuinfo")
         .ok()
         .and_then(|content| {
-            content.lines()
+            content
+                .lines()
                 .find(|l| l.starts_with("model name"))
                 .and_then(|l| l.split(':').nth(1))
                 .map(|s| s.trim().to_string())
@@ -144,7 +147,8 @@ fn read_cpu_cores() -> usize {
     std::fs::read_to_string("/proc/cpuinfo")
         .ok()
         .map(|content| {
-            content.lines()
+            content
+                .lines()
                 .filter(|l| l.starts_with("processor"))
                 .count()
         })
@@ -199,7 +203,8 @@ fn read_uptime() -> u64 {
     std::fs::read_to_string("/proc/uptime")
         .ok()
         .and_then(|content| {
-            content.split_whitespace()
+            content
+                .split_whitespace()
                 .next()
                 .and_then(|s| s.parse::<f64>().ok())
                 .map(|v| v as u64)
@@ -272,7 +277,10 @@ async fn simulate_button_press(
     State(state): State<AppState>,
     Path((device_id, button_index)): Path<(String, usize)>,
 ) -> Json<ApiResponse<String>> {
-    let device = state.device_manager.get_device(&DeviceId(device_id.clone())).await;
+    let device = state
+        .device_manager
+        .get_device(&DeviceId(device_id.clone()))
+        .await;
     if let Some(device) = device {
         device.press_button(button_index);
         state.events.emit(StreamEvent::ButtonPressed {
@@ -328,7 +336,9 @@ async fn delete_profile(
 // Action endpoints
 async fn list_actions(State(state): State<AppState>) -> Json<ApiResponse<Vec<String>>> {
     let registry = state.action_registry.read().await;
-    let actions: Vec<String> = registry.list().iter()
+    let actions: Vec<String> = registry
+        .list()
+        .iter()
         .map(|a| format!("{} ({})", a.action_name(), a.category()))
         .collect();
     Json(ApiResponse::success(actions))
@@ -358,6 +368,58 @@ async fn execute_action(
         }
         None => Json(ApiResponse::error("Action not found")),
     }
+}
+
+// Hotkey send endpoint
+#[derive(Deserialize)]
+struct SendHotkeyRequest {
+    keys: Vec<String>,
+}
+
+#[derive(Serialize)]
+struct SendHotkeyResponse {
+    combo: String,
+    keys: Vec<String>,
+    simulated: bool,
+    error: Option<String>,
+}
+
+async fn send_hotkey(
+    State(state): State<AppState>,
+    Json(req): Json<SendHotkeyRequest>,
+) -> Json<ApiResponse<SendHotkeyResponse>> {
+    let combo = req.keys.join("+");
+    let keys_for_sim = req.keys.clone();
+
+    let sim_result = tokio::task::spawn_blocking(move || {
+        let sim = plugin_key_simulator::KeySimulatorPlugin::new();
+        sim.simulate_keys(&keys_for_sim)
+    })
+    .await
+    .unwrap_or(Err("Blocking task failed".to_string()));
+
+    let (simulated, sim_error) = match sim_result {
+        Ok(()) => (true, None),
+        Err(e) => (false, Some(e)),
+    };
+
+    state.events.emit(StreamEvent::ActionExecuted {
+        action: sd_types::ActionId("hotkey".to_string()),
+        result: sd_types::PluginResult::string(format!("Keys: {}", combo)),
+    });
+
+    if let Some(ref err) = sim_error {
+        log::warn!("[Hotkey] simulation failed for {}: {}", combo, err);
+    } else {
+        log::info!("[Hotkey] simulation succeeded for {}", combo);
+    }
+
+    Json(ApiResponse::success(SendHotkeyResponse {
+        combo,
+        keys: req.keys,
+        simulated,
+        error: sim_error,
+    }))
 }
 
 // Plugin endpoints
@@ -519,7 +581,11 @@ async fn handle_websocket(socket: axum::extract::ws::WebSocket, state: AppState)
                                 parsed.get("device").and_then(|d| d.as_str()),
                                 parsed.get("index").and_then(|i| i.as_u64()),
                             ) {
-                                if let Some(dev) = state.device_manager.get_device(&DeviceId(device.to_string())).await {
+                                if let Some(dev) = state
+                                    .device_manager
+                                    .get_device(&DeviceId(device.to_string()))
+                                    .await
+                                {
                                     dev.press_button(index as usize);
                                 }
                             }
@@ -543,15 +609,24 @@ pub fn create_router(state: AppState) -> Router {
         .allow_methods(Any)
         .allow_headers(Any);
 
-    let static_files = ServeDir::new("web/dist")
-        .not_found_service(get(|_: axum::extract::Request| async { Html(include_str!("../../../web/dist/index.html")) }));
+    let static_files =
+        ServeDir::new("web/dist").not_found_service(get(|_: axum::extract::Request| async {
+            Html(include_str!("../../../web/dist/index.html"))
+        }));
 
     Router::new()
         .route("/api/devices", get(list_devices))
-        .route("/api/devices/:device_id/press/:button_index", post(simulate_button_press))
+        .route(
+            "/api/devices/:device_id/press/:button_index",
+            post(simulate_button_press),
+        )
         .route("/api/profiles", get(list_profiles).post(create_profile))
-        .route("/api/profiles/:profile_id", get(get_profile).delete(delete_profile))
+        .route(
+            "/api/profiles/:profile_id",
+            get(get_profile).delete(delete_profile),
+        )
         .route("/api/actions", get(list_actions).post(execute_action))
+        .route("/api/hotkey/send", post(send_hotkey))
         .route("/api/plugins", get(list_plugins))
         .route("/api/plugins/reload", post(reload_plugins))
         .route("/api/plugins/:plugin_name", get(get_plugin_data))

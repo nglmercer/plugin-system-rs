@@ -1,4 +1,4 @@
-use sd_types::{ActionId, DeviceId, ProfileId, PluginResult};
+use sd_types::{ActionId, DeviceId, PluginResult, ProfileId};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};

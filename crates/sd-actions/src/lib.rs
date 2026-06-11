@@ -1,5 +1,5 @@
-use sd_types::{ActionId, PluginResult, DeviceId, ProfileId};
 use sd_events::EventBus;
+use sd_types::{ActionId, DeviceId, PluginResult, ProfileId};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -46,8 +46,10 @@ impl Action for HotkeyAction {
     }
 
     fn execute(&self, ctx: &ActionContext) -> PluginResult {
-        println!("[HotkeyAction] Sending keys: {} (device: {:?}, button: {})",
-            self.keys, ctx.device_id, ctx.button_index);
+        println!(
+            "[HotkeyAction] Sending keys: {} (device: {:?}, button: {})",
+            self.keys, ctx.device_id, ctx.button_index
+        );
 
         // In real implementation, this would use enigo or similar
         // to actually send keyboard events
@@ -86,8 +88,10 @@ impl Action for TextAction {
     }
 
     fn execute(&self, ctx: &ActionContext) -> PluginResult {
-        println!("[TextAction] Typing: {} (device: {:?}, button: {})",
-            self.text, ctx.device_id, ctx.button_index);
+        println!(
+            "[TextAction] Typing: {} (device: {:?}, button: {})",
+            self.text, ctx.device_id, ctx.button_index
+        );
 
         ctx.events.emit(sd_events::StreamEvent::ActionExecuted {
             action: self.action_id(),
@@ -124,8 +128,10 @@ impl Action for OpenUrlAction {
     }
 
     fn execute(&self, ctx: &ActionContext) -> PluginResult {
-        println!("[OpenUrlAction] Opening: {} (device: {:?}, button: {})",
-            self.url, ctx.device_id, ctx.button_index);
+        println!(
+            "[OpenUrlAction] Opening: {} (device: {:?}, button: {})",
+            self.url, ctx.device_id, ctx.button_index
+        );
 
         // In real implementation, this would use open::that() or similar
         ctx.events.emit(sd_events::StreamEvent::ActionExecuted {

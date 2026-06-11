@@ -1,7 +1,7 @@
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import { WidgetConfig, WidgetType, WidgetVariant, DashboardLayout, SystemStats, WIDGET_VARIANTS, WIZARD_STEPS } from '../lib/types';
-import { fetchDashboard, saveDashboard, executeAction, recordHotkey } from '../lib/api';
+import { fetchDashboard, saveDashboard, executeAction, recordHotkey, sendHotkeyCombo } from '../lib/api';
 
 const WIDGET_CATALOG: { type: WidgetType; label: string; icon: string; description: string; defaultColSpan: number; defaultRowSpan: number }[] = [
   { type: 'system-monitor', label: 'System Monitor', icon: '%', description: 'CPU, Memory, Load, Uptime', defaultColSpan: 1, defaultRowSpan: 1 },
@@ -690,7 +690,8 @@ function SendHotkeyWidget({ settings }: { settings: Record<string, any> }) {
     setExecuting(true);
     setResult(null);
     try {
-      const res = await executeAction('Send Hotkey');
+      const combo = settings.keys || '';
+      const res = combo ? await sendHotkeyCombo(combo) : await executeAction('Send Hotkey');
       setResult(res);
     } catch (e) {
       setResult('Error');

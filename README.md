@@ -21,7 +21,7 @@ streamdeck/
 ├── plugins/
 │   ├── plugin-timer/       Timer/countdown plugin
 │   ├── plugin-system-monitor/  System resource monitoring
-│   ── plugin-hotkey/      Hotkey management
+│   └── plugin-key-simulator/  Key simulation plugin
 └── web/                    Preact web UI
 ```
 
@@ -36,7 +36,7 @@ cargo build
 ### 2. Build plugins
 
 ```bash
-cargo build --release -p plugin-timer -p plugin-system-monitor -p plugin-hotkey
+cargo build --release -p plugin-timer -p plugin-system-monitor -p plugin-key-simulator
 ```
 
 ### 3. Copy plugins

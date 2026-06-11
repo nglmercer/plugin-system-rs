@@ -1,5 +1,5 @@
-use sd_types::{DeviceInfo, DeviceId};
 use sd_events::{EventBus, StreamEvent};
+use sd_types::{DeviceId, DeviceInfo};
 use std::sync::{Arc, RwLock};
 use tokio::sync::RwLock as AsyncRwLock;
 
@@ -92,7 +92,8 @@ impl DeviceManager {
         let info = device.device_info();
         let mut devices = self.devices.write().await;
         devices.push(device);
-        self.events.emit(StreamEvent::DeviceConnected { device: info.id });
+        self.events
+            .emit(StreamEvent::DeviceConnected { device: info.id });
     }
 
     pub async fn list_devices(&self) -> Vec<DeviceInfo> {

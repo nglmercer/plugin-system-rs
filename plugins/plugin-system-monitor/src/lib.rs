@@ -71,7 +71,8 @@ impl SystemMonitorPlugin {
             .ok()
             .and_then(|content| {
                 let line = content.lines().next()?;
-                let parts: Vec<u64> = line.split_whitespace()
+                let parts: Vec<u64> = line
+                    .split_whitespace()
                     .skip(1)
                     .filter_map(|s| s.parse().ok())
                     .collect();
@@ -134,7 +135,8 @@ impl SystemMonitorPlugin {
         std::fs::read_to_string("/proc/uptime")
             .ok()
             .and_then(|content| {
-                content.split_whitespace()
+                content
+                    .split_whitespace()
                     .next()
                     .and_then(|s| s.parse::<f64>().ok())
                     .map(|v| v as u64)
@@ -147,7 +149,11 @@ impl SystemMonitorPlugin {
             .map(|entries| {
                 entries
                     .filter_map(|e| e.ok())
-                    .filter(|e| e.file_name().to_str().map_or(false, |s| s.chars().all(|c| c.is_ascii_digit())))
+                    .filter(|e| {
+                        e.file_name()
+                            .to_str()
+                            .map_or(false, |s| s.chars().all(|c| c.is_ascii_digit()))
+                    })
                     .count()
             })
             .unwrap_or(0)
