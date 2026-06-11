@@ -1266,3 +1266,72 @@
 .obsinput-mute-btn.muted {
     background: #f44336;
 }
+
+/* Mobile: Tablet */
+@media (max-width: 768px) {
+    .sysmon-bar,
+    .vol-slider,
+    .obsinput-slider {
+        height: 8px;
+    }
+    .sysmon-bar::-webkit-slider-thumb,
+    .vol-slider::-webkit-slider-thumb,
+    .obsinput-slider::-webkit-slider-thumb {
+        width: 14px;
+        height: 14px;
+    }
+    .mute-btn,
+    .obsinput-mute-btn,
+    .obsscene-btn,
+    .obssource-btn {
+        min-height: 36px;
+        padding: 0.3rem 0.6rem;
+    }
+}
+
+/* Mobile: Phone */
+@media (max-width: 480px) {
+    .sysmon-minimal,
+    .sysmon-compact,
+    .sysmon-detailed {
+        font-size: 0.8rem;
+    }
+    .clock-simple {
+        font-size: 1.5rem;
+    }
+    .clock-digital,
+    .clock-detailed {
+        font-size: 0.9rem;
+    }
+    .vol-slider,
+    .sysmon-bar,
+    .obsinput-slider {
+        height: 10px;
+    }
+    .vol-slider::-webkit-slider-thumb,
+    .sysmon-bar::-webkit-slider-thumb,
+    .obsinput-slider::-webkit-slider-thumb {
+        width: 18px;
+        height: 18px;
+    }
+    .mute-btn,
+    .obsinput-mute-btn {
+        min-height: 44px;
+        padding: 0.4rem 0.8rem;
+        font-size: 0.8rem;
+    }
+    .obsscene-btn,
+    .obssource-btn {
+        min-height: 44px;
+        padding: 0.5rem 0.8rem;
+        font-size: 0.85rem;
+    }
+    .obs-scene-item,
+    .obs-input-item {
+        padding: 0.4rem;
+    }
+    .obs-ctrl-row {
+        flex-wrap: wrap;
+        gap: 0.3rem;
+    }
+}

@@ -10,6 +10,7 @@ members = [
     "crates/sd-api",
     "crates/sd-plugins",
     "crates/sd-core",
+    "crates/plugin-cli",
     "plugins/plugin-timer",
     "plugins/plugin-system-monitor",
     "plugins/plugin-key-simulator",

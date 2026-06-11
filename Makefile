@@ -24,6 +24,8 @@ help:
 		'Build targets:' \
 		'  make build                  Build for the current host' \
 		'  make build-web              Build web frontend (Preact + Vite)' \
+		'  make build-plugins          Build all plugins using sd-plugins CLI' \
+		'  make build-plugins-release  Build all plugins in release mode' \
 		'  make build-linux-x64        Build Linux x86_64' \
 		'  make build-linux-arm64      Build Linux ARM64 (requires aarch64 sysroot with X11 libs)' \
 		'  make build-windows-x64      Cross-build Windows x86_64 with cargo-zigbuild' \
@@ -31,6 +33,9 @@ help:
 		'  make build-macos-x64        Build macOS x86_64 on a macOS host' \
 		'  make build-macos-arm64      Build macOS ARM64 on a macOS host' \
 		'  make build-multiplatform    Build supported local targets for this host' \
+		'  make plugins-list           List discovered plugins' \
+		'  make plugins-check          Validate plugin configurations' \
+		'  make plugins-clean          Clean plugin build artifacts' \
 		'' \
 		'Tray icon system dependencies:' \
 		'  Arch Linux: pacman -S gtk3 xdotool libappindicator-gtk3' \
@@ -45,6 +50,31 @@ build:
 .PHONY: build-web
 build-web:
 	cd web && npm install && npm run build
+
+.PHONY: build-plugins
+build-plugins:
+	$(CARGO) build -p sd-plugins-cli
+	./target/debug/sd-plugins build
+
+.PHONY: build-plugins-release
+build-plugins-release:
+	$(CARGO) build --release -p sd-plugins-cli
+	./target/release/sd-plugins build --release
+
+.PHONY: plugins-list
+plugins-list:
+	$(CARGO) build -p sd-plugins-cli 2>/dev/null
+	./target/debug/sd-plugins list
+
+.PHONY: plugins-check
+plugins-check:
+	$(CARGO) build -p sd-plugins-cli 2>/dev/null
+	./target/debug/sd-plugins check
+
+.PHONY: plugins-clean
+plugins-clean:
+	$(CARGO) build -p sd-plugins-cli 2>/dev/null
+	./target/debug/sd-plugins clean
 
 .PHONY: ensure-linux-x64-target
 ensure-linux-x64-target:

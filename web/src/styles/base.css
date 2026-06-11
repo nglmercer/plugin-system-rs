@@ -146,3 +146,70 @@
 ::-webkit-scrollbar-track { background: #1a1a1a; }
 ::-webkit-scrollbar-thumb { background: #404040; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #505050; }
+
+/* Mobile: Tablet (768px) */
+@media (max-width: 768px) {
+  .nav {
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+  }
+  .nav h1 { font-size: 1.2rem; }
+  .nav-links {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .nav-links button {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+  }
+  .main {
+    padding: 1rem;
+  }
+  .qr-modal {
+    width: 95%;
+    min-width: unset;
+    padding: 1.5rem;
+  }
+}
+
+/* Mobile: Phone (480px) */
+@media (max-width: 480px) {
+  .nav {
+    padding: 0.5rem 0.75rem;
+  }
+  .nav h1 { font-size: 1rem; }
+  .nav-links {
+    gap: 0.5rem;
+  }
+  .nav-links button {
+    padding: 0.5rem 0.6rem;
+    font-size: 0.8rem;
+    min-height: 44px;
+    min-width: 44px;
+  }
+  .main {
+    padding: 0.75rem;
+  }
+  .qr-modal {
+    width: 100%;
+    max-width: 100%;
+    border-radius: 0;
+    height: 100%;
+    max-height: 100%;
+    padding: 1rem;
+  }
+  .qr-image {
+    width: 200px;
+    height: 200px;
+  }
+  .qr-url {
+    font-size: 0.75rem;
+    padding: 0.4rem 0.6rem;
+  }
+  .qr-copy-btn {
+    padding: 0.5rem 0.8rem;
+    min-height: 44px;
+  }
+}

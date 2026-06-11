@@ -98,3 +98,53 @@
   text-align: center;
   padding: 1rem;
 }
+
+/* Mobile: Tablet */
+@media (max-width: 768px) {
+  .dashboard-header {
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: flex-start;
+  }
+  .add-widget-btn {
+    width: 100%;
+    text-align: center;
+    padding: 0.6rem;
+  }
+  .dashboard-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+  .widget-controls {
+    opacity: 1;
+  }
+  .widget-control-btn {
+    padding: 0.3rem 0.6rem;
+    min-height: 36px;
+    min-width: 36px;
+  }
+}
+
+/* Mobile: Phone */
+@media (max-width: 480px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+  .dashboard-widget {
+    min-height: 140px;
+  }
+  .widget-header {
+    padding: 0.5rem 0.75rem;
+  }
+  .widget-title {
+    font-size: 0.8rem;
+  }
+  .widget-content {
+    padding: 0.75rem;
+  }
+  .widget-control-btn {
+    padding: 0.4rem 0.7rem;
+    min-height: 44px;
+    min-width: 44px;
+    font-size: 0.8rem;
+  }
+}
