@@ -28,6 +28,7 @@ jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
@@ -44,9 +45,13 @@ jobs:
         run: cd web && npm ci && npm run build
       - name: Build
         run: cargo build --release --workspace
-      - name: Verify plugins
-        run: |
-          ls target/release/libplugin_*.so 2>/dev/null || \
-          ls target/release/plugin_*.dll 2>/dev/null || \
-          ls target/release/libplugin_*.dylib 2>/dev/null || \
-          echo "No plugins found"
+      - name: List built artifacts
+        if: runner.os == 'Linux'
+        run: ls -la target/release/libplugin_*.so target/release/sd-core 2>/dev/null || echo "No artifacts"
+      - name: List built artifacts
+        if: runner.os == 'Windows'
+        run: dir target\release\sd-core.exe target\release\plugin_*.dll 2>nul || echo "No artifacts"
+        shell: cmd
+      - name: List built artifacts
+        if: runner.os == 'macOS'
+        run: ls -la target/release/libplugin_*.dylib target/release/sd-core 2>/dev/null || echo "No artifacts"
