@@ -1,6 +1,32 @@
-target/
-node_modules/
-dist/
+# Build outputs
+/target/
+/dist/
+/releases/
+web/dist/
 web/package-lock.json
-web/src/**/*.js
-data/dashboard.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# Node
+node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Coverage
+coverage/
+*.gcda
+*.gcno

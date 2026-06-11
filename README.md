@@ -2,6 +2,32 @@
 
 A plugin-based StreamDeck control system with web UI, built in Rust. Control OBS, system volume, keyboard shortcuts, and more from a browser-based dashboard.
 
+## Download
+
+Pre-built releases are available on the [Releases page](https://github.com/yourusername/streamdeck-core/releases):
+
+| Platform | Architecture | Format |
+|----------|--------------|--------|
+| Linux | x86_64 | `.tar.gz` |
+| Linux | ARM64 | `.tar.gz` |
+| Windows | x86_64 | `.zip` |
+| Windows | ARM64 | `.zip` |
+| macOS | x86_64 (Intel) | `.tar.gz` |
+| macOS | ARM64 (Apple Silicon) | `.tar.gz` |
+
+### Quick Install
+
+```bash
+# Download and extract
+tar xzf streamdeck-linux-x64.tar.gz
+cd streamdeck-linux-x64
+
+# Run
+./sd-core
+```
+
+The server starts on `http://localhost:3000`. Open your browser or scan the QR code from your phone.
+
 ## Features
 
 ### System Tray
@@ -408,6 +434,79 @@ A:
 4. Or manually enter `http://<your-computer-ip>:3000` in your phone's browser
 
 Make sure your phone and computer are on the same WiFi network. The QR code shows the local network IP automatically.
+
+## Building from Source
+
+### Prerequisites
+
+**Rust** (1.70+):
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+**Node.js** (18+):
+```bash
+# Via nvm
+nvm install 20
+```
+
+**Platform dependencies**:
+
+| Platform | Command |
+|----------|---------|
+| Arch Linux | `pacman -S gtk3 xdotool libappindicator-gtk3` |
+| Debian/Ubuntu | `apt install libgtk-3-dev libxdo-dev libappindicator3-dev` |
+| Windows | None required |
+| macOS | None required |
+
+### Build
+
+```bash
+# Clone
+git clone https://github.com/yourusername/streamdeck-core.git
+cd streamdeck-core
+
+# Build web frontend
+cd web && npm ci && npm run build && cd ..
+
+# Build Rust (debug)
+cargo build
+
+# Build Rust (release)
+cargo build --release
+
+# Run
+cargo run
+```
+
+### Create Release
+
+To build all platforms locally:
+
+```bash
+# Tag the release
+git tag v1.0.0
+
+# Run release script (builds for current platform + cross-compiles where possible)
+./scripts/release.sh v1.0.0
+
+# Check releases/
+ls releases/v1.0.0/
+```
+
+### GitHub Actions
+
+Releases are automatically built and published when you push a tag:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+This triggers the `.github/workflows/release.yml` workflow which:
+1. Builds for all 6 platforms (Linux/Windows/macOS × x64/ARM64)
+2. Packages each with web UI + plugins
+3. Creates a GitHub Release with all artifacts
 
 ## License
 

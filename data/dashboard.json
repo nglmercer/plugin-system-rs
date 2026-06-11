@@ -1,0 +1,96 @@
+{
+  "widgets": [
+    {
+      "id": "i0prl3g9",
+      "type": "system-monitor",
+      "title": "System Monitor",
+      "colSpan": 1,
+      "rowSpan": 1,
+      "settings": {
+        "refreshInterval": 2000,
+        "variant": "compact"
+      }
+    },
+    {
+      "id": "rxto3566",
+      "type": "clock",
+      "title": "Clock",
+      "colSpan": 1,
+      "rowSpan": 1,
+      "settings": {
+        "format": "digital",
+        "variant": "detailed"
+      }
+    },
+    {
+      "id": "4xlybow7",
+      "type": "send-hotkey",
+      "title": "a",
+      "colSpan": 1,
+      "rowSpan": 1,
+      "settings": {
+        "keys": "win+v",
+        "variant": "compact"
+      }
+    },
+    {
+      "id": "ddc9rpft",
+      "type": "volume-master",
+      "title": "Volume Control",
+      "colSpan": 1,
+      "rowSpan": 1,
+      "settings": {
+        "refreshInterval": 2000,
+        "variant": "detailed"
+      }
+    },
+    {
+      "id": "89vtxejb",
+      "type": "volume-apps",
+      "title": "App Volume",
+      "colSpan": 1,
+      "rowSpan": 1,
+      "settings": {
+        "refreshInterval": 2000,
+        "variant": "detailed"
+      }
+    },
+    {
+      "id": "03lxnb90",
+      "type": "obs-scenes",
+      "title": "OBS Scenes",
+      "colSpan": 1,
+      "rowSpan": 1,
+      "settings": {
+        "refreshInterval": 2000,
+        "variant": "detailed"
+      }
+    },
+    {
+      "id": "lnkn4c0t",
+      "type": "obs-control",
+      "title": "OBS Control",
+      "colSpan": 1,
+      "rowSpan": 1,
+      "settings": {
+        "host": "127.0.0.1",
+        "password": "",
+        "port": 4455,
+        "refreshInterval": 2000,
+        "variant": "compact"
+      }
+    },
+    {
+      "id": "ktdulyjz",
+      "type": "obs-inputs",
+      "title": "OBS Inputs",
+      "colSpan": 1,
+      "rowSpan": 1,
+      "settings": {
+        "refreshInterval": 2000,
+        "variant": "detailed"
+      }
+    }
+  ],
+  "columns": 3
+}
