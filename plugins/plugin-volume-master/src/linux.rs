@@ -48,15 +48,19 @@ fn parse_volume(s: &str) -> Option<f32> {
     None
 }
 
-fn parse_name(s: &str) -> Option<String> {
-    for line in s.lines() {
-        if line.contains("Name:") || line.contains("Description:") {
-            if let Some(val) = line.split(':').nth(1) {
-                return Some(val.trim().to_string());
+fn get_default_sink_name() -> Option<String> {
+    Command::new("pactl")
+        .args(["get-default-sink"])
+        .output()
+        .ok()
+        .and_then(|o| {
+            if o.status.success() {
+                let name = String::from_utf8_lossy(&o.stdout).trim().to_string();
+                if name.is_empty() { None } else { Some(name) }
+            } else {
+                None
             }
-        }
-    }
-    None
+        })
 }
 
 impl VolumeControl for PulseController {
@@ -65,10 +69,10 @@ impl VolumeControl for PulseController {
         let volume = parse_volume(&output).unwrap_or(0.0);
 
         let mute_output = run_pactl(&["get-sink-mute", "@DEFAULT_SINK@"])?;
-        let muted = mute_output.contains("yes") || mute_output.contains("Mute: yes");
+        let muted = mute_output.contains("yes");
 
-        let info_output = run_pactl(&["list", "sinks"])?;
-        let device_name = parse_name(&info_output).unwrap_or_else(|| "Default".to_string());
+        let device_name = get_default_sink_name()
+            .unwrap_or_else(|| "Default".to_string());
 
         let state = VolumeState {
             master_volume: volume,

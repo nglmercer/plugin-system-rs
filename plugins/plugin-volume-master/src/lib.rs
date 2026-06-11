@@ -156,4 +156,44 @@ impl Plugin for VolumeMasterPlugin {
     fn interface_data(&self) -> Option<serde_json::Value> {
         serde_json::to_value(&self.data).ok()
     }
+
+    fn handle_command(&mut self, method: &str, args: serde_json::Value) -> Option<serde_json::Value> {
+        match method {
+            "refresh" => {
+                self.refresh();
+                Some(serde_json::json!({"ok": true}))
+            }
+            "set_volume" => {
+                let volume = args.get("volume").and_then(|v| v.as_f64()).unwrap_or(50.0) as f32;
+                match self.set_volume(volume) {
+                    Ok(()) => Some(serde_json::json!({"ok": true})),
+                    Err(e) => Some(serde_json::json!({"ok": false, "error": e})),
+                }
+            }
+            "set_mute" => {
+                let muted = args.get("muted").and_then(|v| v.as_bool()).unwrap_or(false);
+                match self.set_muted(muted) {
+                    Ok(()) => Some(serde_json::json!({"ok": true})),
+                    Err(e) => Some(serde_json::json!({"ok": false, "error": e})),
+                }
+            }
+            "set_app_volume" => {
+                let app_name = args.get("app_name").and_then(|v| v.as_str()).unwrap_or("");
+                let volume = args.get("volume").and_then(|v| v.as_f64()).unwrap_or(50.0) as f32;
+                match self.set_app_volume(app_name, volume) {
+                    Ok(()) => Some(serde_json::json!({"ok": true})),
+                    Err(e) => Some(serde_json::json!({"ok": false, "error": e})),
+                }
+            }
+            "set_app_mute" => {
+                let app_name = args.get("app_name").and_then(|v| v.as_str()).unwrap_or("");
+                let muted = args.get("muted").and_then(|v| v.as_bool()).unwrap_or(false);
+                match self.set_app_muted(app_name, muted) {
+                    Ok(()) => Some(serde_json::json!({"ok": true})),
+                    Err(e) => Some(serde_json::json!({"ok": false, "error": e})),
+                }
+            }
+            _ => None,
+        }
+    }
 }

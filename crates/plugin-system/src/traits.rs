@@ -40,6 +40,10 @@ pub trait Plugin: Any + Send + Sync {
         None
     }
 
+    fn handle_command(&mut self, _method: &str, _args: serde_json::Value) -> Option<serde_json::Value> {
+        None
+    }
+
     fn simulate_keys(&mut self, _keys: &[String]) -> Result<()> {
         Err(crate::error::PluginError::PluginNotFound {
             name: "simulate_keys not supported".to_string(),

@@ -27,30 +27,26 @@ export function VolumeWidget({ settings }: { settings: Record<string, any> }) {
       const res = await fetch("/api/volume");
       const data = await res.json();
       if (data.success && data.data) {
-        setState(data.data);
-      }
-    } catch (e) {}
-  }, []);
-
-  const loadApps = useCallback(async () => {
-    try {
-      const res = await fetch("/api/volume/apps");
-      const data = await res.json();
-      if (data.success && data.data) {
-        setApps(data.data);
+        const d = data.data;
+        setState({
+          master_volume: d.state?.master_volume ?? 0,
+          muted: d.state?.muted ?? false,
+          default_device_name: d.state?.default_device_name ?? "",
+          platform_supported: d.state?.platform_supported ?? false,
+          per_app_supported: d.state?.per_app_supported ?? false,
+        });
+        if (d.apps) setApps(d.apps);
       }
     } catch (e) {}
   }, []);
 
   useEffect(() => {
     loadVolume();
-    loadApps();
     const interval = setInterval(() => {
       loadVolume();
-      if (showApps) loadApps();
     }, settings.refreshInterval || 2000);
     return () => clearInterval(interval);
-  }, [showApps]);
+  }, []);
 
   const setVolume = async (vol: number) => {
     try {
@@ -81,7 +77,7 @@ export function VolumeWidget({ settings }: { settings: Record<string, any> }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ app_name: appName, volume: vol }),
       });
-      loadApps();
+      loadVolume();
     } catch (e) {}
   };
 
@@ -92,7 +88,7 @@ export function VolumeWidget({ settings }: { settings: Record<string, any> }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ app_name: appName, muted }),
       });
-      loadApps();
+      loadVolume();
     } catch (e) {}
   };
 
