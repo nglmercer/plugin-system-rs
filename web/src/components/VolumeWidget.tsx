@@ -6,20 +6,10 @@ interface VolumeState {
   muted: boolean;
   default_device_name: string;
   platform_supported: boolean;
-  per_app_supported: boolean;
-}
-
-interface AppVolume {
-  name: string;
-  volume: number;
-  muted: boolean;
-  pid: number | null;
 }
 
 export function VolumeWidget({ settings }: { settings: Record<string, any> }) {
   const [state, setState] = useState<VolumeState | null>(null);
-  const [apps, setApps] = useState<AppVolume[]>([]);
-  const [showApps, setShowApps] = useState(false);
   const variant = (settings.variant || "compact") as string;
 
   const loadVolume = useCallback(async () => {
@@ -33,9 +23,7 @@ export function VolumeWidget({ settings }: { settings: Record<string, any> }) {
           muted: d.state?.muted ?? false,
           default_device_name: d.state?.default_device_name ?? "",
           platform_supported: d.state?.platform_supported ?? false,
-          per_app_supported: d.state?.per_app_supported ?? false,
         });
-        if (d.apps) setApps(d.apps);
       }
     } catch (e) {}
   }, []);
@@ -65,28 +53,6 @@ export function VolumeWidget({ settings }: { settings: Record<string, any> }) {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ muted }),
-      });
-      loadVolume();
-    } catch (e) {}
-  };
-
-  const setAppVolume = async (appName: string, vol: number) => {
-    try {
-      await fetch("/api/volume/app/volume", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ app_name: appName, volume: vol }),
-      });
-      loadVolume();
-    } catch (e) {}
-  };
-
-  const setAppMute = async (appName: string, muted: boolean) => {
-    try {
-      await fetch("/api/volume/app/mute", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ app_name: appName, muted }),
       });
       loadVolume();
     } catch (e) {}
@@ -133,30 +99,6 @@ export function VolumeWidget({ settings }: { settings: Record<string, any> }) {
         }),
         h("span", { class: "vol-value", style: { color: volColor } }, `${state.master_volume.toFixed(0)}%`),
       ),
-      state.per_app_supported && apps.length > 0 && h("button", {
-        class: "vol-apps-toggle",
-        onClick: () => setShowApps(!showApps)
-      }, showApps ? "Hide Apps" : `Apps (${apps.length})`),
-      showApps && state.per_app_supported && h("div", { class: "vol-apps-list" },
-        apps.map(app => h("div", { class: "vol-app-item", key: app.name },
-          h("div", { class: "vol-app-header" },
-            h("span", { class: "vol-app-name" }, app.name.substring(0, 20)),
-            h("button", {
-              class: "vol-app-mute",
-              onClick: () => setAppMute(app.name, !app.muted)
-            }, app.muted ? "M" : "V"),
-          ),
-          h("input", {
-            type: "range",
-            min: 0,
-            max: 100,
-            value: app.volume,
-            onInput: (e: Event) => setAppVolume(app.name, parseFloat((e.target as HTMLInputElement).value)),
-            class: "vol-slider vol-app-slider",
-            style: { "--vol-pct": `${app.volume}%` } as any,
-          }),
-        ))
-      ),
     );
   }
 
@@ -184,34 +126,6 @@ export function VolumeWidget({ settings }: { settings: Record<string, any> }) {
         class: "vol-slider",
         style: { "--vol-pct": `${state.master_volume}%`, "--vol-color": volColor } as any,
       }),
-    ),
-    state.per_app_supported && h("div", { class: "vol-apps-section" },
-      h("div", { class: "vol-section-title" }, `Applications (${apps.length})`),
-      apps.length === 0
-        ? h("div", { class: "vol-no-apps" }, "No active audio streams")
-        : apps.map(app => h("div", { class: "vol-app-item-detailed", key: app.name },
-            h("div", { class: "vol-app-header" },
-              h("span", { class: "vol-app-name" }, app.name),
-              app.pid && h("span", { class: "vol-app-pid" }, `PID: ${app.pid}`),
-              h("button", {
-                class: "vol-app-mute-btn",
-                onClick: () => setAppMute(app.name, !app.muted),
-                style: { background: app.muted ? "#f44336" : "#666" }
-              }, app.muted ? "MUTED" : "MUTE"),
-            ),
-            h("div", { class: "vol-app-slider-row" },
-              h("input", {
-                type: "range",
-                min: 0,
-                max: 100,
-                value: app.volume,
-                onInput: (e: Event) => setAppVolume(app.name, parseFloat((e.target as HTMLInputElement).value)),
-                class: "vol-slider vol-app-slider",
-                style: { "--vol-pct": `${app.volume}%` } as any,
-              }),
-              h("span", { class: "vol-app-value" }, `${app.volume.toFixed(0)}%`),
-            ),
-          ))
     ),
   );
 }
