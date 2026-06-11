@@ -6,6 +6,7 @@ import { QuickActionsWidget } from "./QuickActionsWidget";
 import { SendHotkeyWidget } from "./SendHotkeyWidget";
 import { OpenUrlWidget } from "./OpenUrlWidget";
 import { TypeTextWidget } from "./TypeTextWidget";
+import { VolumeWidget } from "./VolumeWidget";
 
 export function WidgetContent({ widget }: { widget: WidgetConfig }) {
   switch (widget.type) {
@@ -15,6 +16,7 @@ export function WidgetContent({ widget }: { widget: WidgetConfig }) {
     case "send-hotkey": return h(SendHotkeyWidget, { settings: widget.settings });
     case "open-url": return h(OpenUrlWidget, { settings: widget.settings });
     case "type-text": return h(TypeTextWidget, { settings: widget.settings });
+    case "volume-master": return h(VolumeWidget, { settings: widget.settings });
     default: return h("div", { class: "widget-unknown" }, "Unknown widget");
   }
 }

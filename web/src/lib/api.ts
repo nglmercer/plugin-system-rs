@@ -129,3 +129,55 @@ export async function recordHotkey(timeoutMs: number = 3000): Promise<string> {
 export async function resetHotkeyRecording(): Promise<void> {
   await fetch(`${API_BASE}/hotkey/record/reset`, { method: "POST" });
 }
+
+export async function fetchVolumeState() {
+  const res = await fetch(`${API_BASE}/volume`);
+  const data = await res.json();
+  return data.data;
+}
+
+export async function setMasterVolume(volume: number) {
+  const res = await fetch(`${API_BASE}/volume/master`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ volume }),
+  });
+  const data = await res.json();
+  return data.success;
+}
+
+export async function setMasterMute(muted: boolean) {
+  const res = await fetch(`${API_BASE}/volume/mute`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ muted }),
+  });
+  const data = await res.json();
+  return data.success;
+}
+
+export async function fetchAppVolumes() {
+  const res = await fetch(`${API_BASE}/volume/apps`);
+  const data = await res.json();
+  return data.data || [];
+}
+
+export async function setAppVolume(appName: string, volume: number) {
+  const res = await fetch(`${API_BASE}/volume/app/volume`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ app_name: appName, volume }),
+  });
+  const data = await res.json();
+  return data.success;
+}
+
+export async function setAppMute(appName: string, muted: boolean) {
+  const res = await fetch(`${API_BASE}/volume/app/mute`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ app_name: appName, muted }),
+  });
+  const data = await res.json();
+  return data.success;
+}

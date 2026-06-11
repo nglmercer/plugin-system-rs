@@ -14,6 +14,7 @@ export const WIDGET_CATALOG: {
   { type: "send-hotkey", label: "Send Hotkey", icon: "H", description: "Trigger keyboard hotkey", defaultColSpan: 1, defaultRowSpan: 1 },
   { type: "open-url", label: "Open URL", icon: "U", description: "Open a URL in browser", defaultColSpan: 1, defaultRowSpan: 1 },
   { type: "type-text", label: "Type Text", icon: "A", description: "Type text string", defaultColSpan: 1, defaultRowSpan: 1 },
+  { type: "volume-master", label: "Volume Control", icon: "V", description: "Master & per-app volume", defaultColSpan: 1, defaultRowSpan: 1 },
 ];
 
 export function generateId(): string {
@@ -28,6 +29,7 @@ export function getDefaultVariant(type: WidgetType): string {
     "send-hotkey": "compact",
     "open-url": "compact",
     "type-text": "compact",
+    "volume-master": "compact",
   };
   return variants[type] || "compact";
 }
@@ -39,6 +41,7 @@ export function getDefaultSettings(type: WidgetType): Record<string, any> {
     case "send-hotkey": settings.keys = "ctrl+c"; break;
     case "open-url": settings.url = "https://example.com"; break;
     case "type-text": settings.text = "Hello!"; break;
+    case "volume-master": settings.refreshInterval = 2000; break;
   }
   return settings;
 }

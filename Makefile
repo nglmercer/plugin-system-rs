@@ -9,8 +9,12 @@ PROFILE_FLAG := $(if $(filter release,$(PROFILE)),--release,)
 LINUX_X64_TARGET := x86_64-unknown-linux-gnu
 LINUX_ARM64_TARGET := aarch64-unknown-linux-gnu
 WINDOWS_X64_TARGET := x86_64-pc-windows-gnu
+WINDOWS_ARM64_TARGET := aarch64-pc-windows-gnullvm
 MACOS_X64_TARGET := x86_64-apple-darwin
 MACOS_ARM64_TARGET := aarch64-apple-darwin
+
+AARCH64_SYSROOT := /usr/aarch64-linux-gnu
+AARCH64_PKG_CONFIG_LIBDIR := $(AARCH64_SYSROOT)/usr/lib/pkgconfig:$(AARCH64_SYSROOT)/usr/share/pkgconfig
 
 UNAME_S := $(shell uname -s)
 
@@ -20,8 +24,9 @@ help:
 		'Local build targets:' \
 		'  make build                  Build for the current host' \
 		'  make build-linux-x64        Build Linux x86_64' \
-		'  make build-linux-arm64      Build Linux ARM64; excludes plugin-key-simulator because rdev needs X11 sysroots' \
+		'  make build-linux-arm64      Build Linux ARM64 (requires aarch64 sysroot with X11 libs)' \
 		'  make build-windows-x64      Cross-build Windows x86_64 with cargo-zigbuild' \
+		'  make build-windows-arm64    Cross-build Windows ARM64 with cargo-zigbuild' \
 		'  make build-macos-x64        Build macOS x86_64 on a macOS host' \
 		'  make build-macos-arm64      Build macOS ARM64 on a macOS host' \
 		'  make build-multiplatform    Build supported local targets for this host'
@@ -48,6 +53,12 @@ ensure-windows-x64-target:
 		rustup target add '$(WINDOWS_X64_TARGET)'; \
 	fi
 
+.PHONY: ensure-windows-arm64-target
+ensure-windows-arm64-target:
+	@if ! rustup target list --installed | grep -qx '$(WINDOWS_ARM64_TARGET)'; then \
+		rustup target add '$(WINDOWS_ARM64_TARGET)'; \
+	fi
+
 .PHONY: ensure-macos-x64-target
 ensure-macos-x64-target:
 	@if ! rustup target list --installed | grep -qx '$(MACOS_X64_TARGET)'; then \
@@ -66,11 +77,18 @@ build-linux-x64: ensure-linux-x64-target
 
 .PHONY: build-linux-arm64
 build-linux-arm64: ensure-linux-arm64-target
-	PKG_CONFIG_ALLOW_CROSS=1 $(ZIGBUILD) --target $(LINUX_ARM64_TARGET) --workspace --exclude plugin-key-simulator $(CARGO_FLAGS) $(PROFILE_FLAG)
+	PKG_CONFIG_ALLOW_CROSS=1 \
+	PKG_CONFIG_SYSROOT_DIR=$(AARCH64_SYSROOT) \
+	PKG_CONFIG_LIBDIR=$(AARCH64_PKG_CONFIG_LIBDIR) \
+	$(ZIGBUILD) --target $(LINUX_ARM64_TARGET) --workspace $(CARGO_FLAGS) $(PROFILE_FLAG)
 
 .PHONY: build-windows-x64
 build-windows-x64: ensure-windows-x64-target
 	PKG_CONFIG_ALLOW_CROSS=1 $(ZIGBUILD) --target $(WINDOWS_X64_TARGET) --workspace $(CARGO_FLAGS) $(PROFILE_FLAG)
+
+.PHONY: build-windows-arm64
+build-windows-arm64: ensure-windows-arm64-target
+	$(ZIGBUILD) --target $(WINDOWS_ARM64_TARGET) --workspace $(CARGO_FLAGS) $(PROFILE_FLAG)
 
 .PHONY: require-macos-host
 require-macos-host:
@@ -88,7 +106,7 @@ build-macos-arm64: require-macos-host ensure-macos-arm64-target
 	$(CARGO) build --workspace --target $(MACOS_ARM64_TARGET) $(CARGO_FLAGS) $(PROFILE_FLAG)
 
 .PHONY: build-multiplatform
-build-multiplatform: build-linux-x64 build-linux-arm64 build-windows-x64
+build-multiplatform: build-linux-x64 build-linux-arm64 build-windows-x64 build-windows-arm64
 	@if [ '$(UNAME_S)' = 'Darwin' ]; then \
 		$(MAKE) build-macos-x64 build-macos-arm64; \
 	else \

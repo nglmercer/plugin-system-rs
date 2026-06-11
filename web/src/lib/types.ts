@@ -55,7 +55,8 @@ export type WidgetType =
   | 'quick-actions'
   | 'send-hotkey'
   | 'open-url'
-  | 'type-text';
+  | 'type-text'
+  | 'volume-master';
 
 export interface WidgetConfig {
   id: string;
@@ -111,6 +112,14 @@ export const WIDGET_VARIANTS: { type: WidgetType; variants: { value: string; lab
     variants: [
       { value: 'compact', label: 'Mini', description: 'Small button with text preview' },
       { value: 'detailed', label: 'Full', description: 'Large button with full text' },
+    ],
+  },
+  {
+    type: 'volume-master',
+    variants: [
+      { value: 'minimal', label: 'Minimal', description: 'Just volume % and mute button' },
+      { value: 'compact', label: 'Compact', description: 'Slider with device name and app list' },
+      { value: 'detailed', label: 'Detailed', description: 'Full controls with per-app volume' },
     ],
   },
 ];

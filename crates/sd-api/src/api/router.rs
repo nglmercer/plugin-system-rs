@@ -1,6 +1,6 @@
 use axum::{
     response::Html,
-    routing::{get, post},
+    routing::{get, post, put},
     Router,
 };
 use tower_http::cors::{Any, CorsLayer};
@@ -8,7 +8,9 @@ use tower_http::services::ServeDir;
 use tower_http::trace::TraceLayer;
 
 use crate::{
-    api::{actions, dashboard_handlers, devices, hotkeys, plugins, profiles, system, websocket},
+    api::{
+        actions, dashboard_handlers, devices, hotkeys, plugins, profiles, system, volume, websocket,
+    },
     state::AppState,
 };
 
@@ -51,6 +53,12 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/plugins/reload", post(plugins::reload_plugins))
         .route("/api/plugins/:plugin_name", get(plugins::get_plugin_data))
         .route("/api/system-stats", get(system::get_system_stats))
+        .route("/api/volume", get(volume::get_volume_state))
+        .route("/api/volume/master", put(volume::set_master_volume))
+        .route("/api/volume/mute", put(volume::set_master_mute))
+        .route("/api/volume/apps", get(volume::get_app_volumes))
+        .route("/api/volume/app/volume", put(volume::set_app_volume))
+        .route("/api/volume/app/mute", put(volume::set_app_mute))
         .route(
             "/api/dashboard",
             get(dashboard_handlers::get_dashboard).put(dashboard_handlers::save_dashboard),

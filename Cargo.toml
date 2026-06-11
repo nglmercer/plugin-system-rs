@@ -13,5 +13,6 @@ members = [
     "plugins/plugin-timer",
     "plugins/plugin-system-monitor",
     "plugins/plugin-key-simulator",
+    "plugins/plugin-volume-master",
 ]
 resolver = "2"

@@ -7,6 +7,7 @@ pub(crate) mod plugins;
 pub(crate) mod profiles;
 pub(crate) mod router;
 pub(crate) mod system;
+pub(crate) mod volume;
 pub(crate) mod websocket;
 
 pub use dashboard::{load_dashboard_config, DashboardLayout, DashboardWidget};
