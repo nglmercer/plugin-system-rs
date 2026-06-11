@@ -3,3 +3,4 @@ node_modules/
 dist/
 web/package-lock.json
 web/src/**/*.js
+data/dashboard.json

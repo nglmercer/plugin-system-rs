@@ -97,3 +97,53 @@ export async function executeAction(actionName: string): Promise<string> {
   const data = await res.json();
   return data.data || data.error || 'Unknown result';
 }
+
+export async function recordHotkey(timeoutMs: number = 5000): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => {
+      controller.abort();
+      reject(new Error('Hotkey recording timed out'));
+    }, timeoutMs);
+
+    const keys = new Set<string>();
+    let resolved = false;
+
+    function onKeyDown(e: KeyboardEvent) {
+      e.preventDefault();
+      e.stopPropagation();
+      const key = e.key === 'Control' ? 'Ctrl' :
+                  e.key === 'Shift' ? 'Shift' :
+                  e.key === 'Alt' ? 'Alt' :
+                  e.key === 'Meta' ? 'Win' :
+                  e.key;
+      if (key === 'Ctrl' || key === 'Shift' || key === 'Alt' || key === 'Win') {
+        keys.add(key);
+      } else {
+        keys.add(key);
+        finish();
+      }
+    }
+
+    function onKeyUp(e: KeyboardEvent) {
+      e.preventDefault();
+      e.stopPropagation();
+      finish();
+    }
+
+    function finish() {
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(timeout);
+      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('keyup', onKeyUp);
+      const modifiers = ['Ctrl', 'Shift', 'Alt', 'Win'];
+      const mods = modifiers.filter(m => keys.has(m)).sort();
+      const main = [...keys].filter(k => !modifiers.includes(k));
+      resolve([...mods, ...main].join('+').toLowerCase() || 'unknown');
+    }
+
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('keyup', onKeyUp);
+  });
+}

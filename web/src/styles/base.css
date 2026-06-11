@@ -1,0 +1,44 @@
+/* Layout & Nav */
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+.nav {
+  background: #2d2d2d;
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #404040;
+}
+.nav h1 { font-size: 1.5rem; color: #00d4ff; }
+.nav-links { display: flex; gap: 1rem; }
+.nav-links button {
+  background: transparent;
+  border: 1px solid #404040;
+  color: #fff;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.nav-links button:hover { background: #404040; }
+.nav-links button.active {
+  background: #00d4ff;
+  color: #000;
+  border-color: #00d4ff;
+}
+.main {
+  flex: 1;
+  padding: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #1a1a1a; }
+::-webkit-scrollbar-thumb { background: #404040; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #505050; }

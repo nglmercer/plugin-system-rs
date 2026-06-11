@@ -1,0 +1,100 @@
+/* Dashboard */
+.dashboard-root {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.dashboard-header h2 { color: #fff; margin: 0; }
+.add-widget-btn {
+  background: #00d4ff;
+  color: #000;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: opacity 0.2s;
+}
+.add-widget-btn:hover { opacity: 0.8; }
+.dashboard-loading {
+  color: #888;
+  text-align: center;
+  padding: 4rem;
+}
+.dashboard-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6rem 2rem;
+  border: 2px dashed #404040;
+  border-radius: 12px;
+  gap: 0.75rem;
+}
+.empty-icon { font-size: 3rem; color: #505050; }
+.empty-text { color: #aaa; font-size: 1.1rem; }
+.empty-sub { color: #666; font-size: 0.875rem; }
+
+/* Dashboard Grid */
+.dashboard-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+/* Widget Cards */
+.dashboard-widget {
+  background: #2d2d2d;
+  border: 1px solid #404040;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  min-height: 180px;
+  transition: border-color 0.2s;
+}
+.dashboard-widget:hover { border-color: #505050; }
+.widget-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #404040;
+}
+.widget-title {
+  color: #00d4ff;
+  font-weight: bold;
+  font-size: 0.875rem;
+}
+.widget-controls {
+  display: flex;
+  gap: 0.25rem;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.dashboard-widget:hover .widget-controls { opacity: 1; }
+.widget-control-btn {
+  background: transparent;
+  border: 1px solid #404040;
+  color: #aaa;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  transition: all 0.2s;
+}
+.widget-control-btn.edit:hover { color: #00d4ff; border-color: #00d4ff; }
+.widget-control-btn.remove:hover { color: #ff4444; border-color: #ff4444; }
+.widget-content {
+  flex: 1;
+  padding: 1rem;
+  overflow: auto;
+}
+.widget-unknown {
+  color: #888;
+  text-align: center;
+  padding: 1rem;
+}

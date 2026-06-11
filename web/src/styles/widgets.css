@@ -1,0 +1,160 @@
+/* System Monitor Widget */
+.sysmon-loading { color: #888; text-align: center; padding: 1rem; }
+.sysmon-cpu-model {
+  color: #888;
+  font-size: 0.7rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sysmon-bar-group { display: flex; flex-direction: column; gap: 0.15rem; }
+.sysmon-bar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.sysmon-bar-label { color: #aaa; font-size: 0.75rem; }
+.sysmon-bar-value { font-size: 0.8rem; font-weight: bold; }
+.sysmon-bar-track {
+  height: 6px;
+  background: #404040;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.sysmon-bar-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+  border-radius: 3px;
+}
+.sysmon-bar-detail { color: #666; font-size: 0.65rem; }
+.sysmon-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+}
+.sysmon-info-item { display: flex; flex-direction: column; gap: 0.1rem; }
+.sysmon-info-label { color: #666; font-size: 0.65rem; text-transform: uppercase; }
+.sysmon-info-value { color: #ccc; font-size: 0.75rem; font-family: monospace; }
+.sysmon-load-row {
+  display: flex;
+  justify-content: space-between;
+  color: #888;
+  font-size: 0.65rem;
+}
+
+/* Sysmon Variants */
+.sysmon-variant.minimal {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  height: 100%;
+}
+.sysmon-big { font-size: 1.8rem; font-weight: bold; }
+.sysmon-variant.compact { display: flex; flex-direction: column; gap: 0.4rem; }
+.sysmon-variant.detailed { display: flex; flex-direction: column; gap: 0.5rem; }
+
+/* Clock Widget */
+.clock-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+}
+.clock-time {
+  color: #fff;
+  font-size: 2rem;
+  font-weight: bold;
+  font-family: monospace;
+}
+.clock-seconds { color: #888; font-size: 1rem; font-family: monospace; }
+.clock-date { color: #888; font-size: 0.875rem; }
+
+/* Clock Variants */
+.clock-variant.simple {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+.clock-variant.simple .clock-time { font-size: 2.5rem; }
+.clock-variant.digital {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+.clock-variant.detailed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+}
+.clock-variant.detailed .clock-time { font-size: 1.8rem; }
+.clock-variant.detailed .clock-date { font-size: 0.8rem; color: #888; }
+
+/* Quick Actions Widget */
+.quick-actions-widget { display: flex; flex-direction: column; gap: 0.4rem; }
+.action-result {
+  background: #1a3a1a;
+  border: 1px solid #4caf50;
+  color: #4caf50;
+  padding: 0.4rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  text-align: center;
+}
+.action-btn {
+  background: #1a1a1a;
+  border: 1px solid #404040;
+  color: #fff;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.2s;
+}
+.action-btn:hover:not(:disabled) { border-color: #00d4ff; background: #333; }
+.action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.action-btn.executing { border-color: #ff9800; }
+.action-btn-name { font-size: 0.8rem; }
+.action-btn-cat { font-size: 0.65rem; color: #888; }
+
+/* Single Action Widgets */
+.action-single-widget {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  text-align: center;
+  height: 100%;
+}
+.action-single-keys,
+.action-single-url,
+.action-single-text {
+  color: #00d4ff;
+  font-size: 0.9rem;
+  font-weight: bold;
+  word-break: break-all;
+  max-height: 3em;
+  overflow: hidden;
+}
+.action-single-btn {
+  background: #00d4ff;
+  color: #000;
+  border: none;
+  padding: 0.4rem 1.2rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 0.8rem;
+  transition: opacity 0.2s;
+}
+.action-single-btn:hover:not(:disabled) { opacity: 0.8; }
+.action-single-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.action-single-btn.executing { background: #ff9800; }
+.action-single-widget.detailed { gap: 0.3rem; }
+.action-single-desc { color: #888; font-size: 0.65rem; }

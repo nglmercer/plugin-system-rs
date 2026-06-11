@@ -66,6 +66,68 @@ export interface WidgetConfig {
   settings: Record<string, any>;
 }
 
+export type WidgetVariant = string;
+
+export const WIDGET_VARIANTS: { type: WidgetType; variants: { value: string; label: string; description: string }[] }[] = [
+  {
+    type: 'system-monitor',
+    variants: [
+      { value: 'minimal', label: 'Minimal', description: 'Just CPU% and RAM% numbers' },
+      { value: 'compact', label: 'Compact', description: 'CPU + RAM bars with load' },
+      { value: 'detailed', label: 'Detailed', description: 'Full stats with swap, cores, uptime' },
+    ],
+  },
+  {
+    type: 'clock',
+    variants: [
+      { value: 'simple', label: 'Simple', description: 'Just HH:MM, no seconds' },
+      { value: 'digital', label: 'Digital', description: 'HH:MM + seconds + date' },
+      { value: 'detailed', label: 'Detailed', description: 'Full date with day name' },
+    ],
+  },
+  {
+    type: 'quick-actions',
+    variants: [
+      { value: 'compact', label: 'List', description: 'Compact action list' },
+      { value: 'detailed', label: 'Grid', description: 'Larger action buttons with category badges' },
+    ],
+  },
+  {
+    type: 'send-hotkey',
+    variants: [
+      { value: 'compact', label: 'Mini', description: 'Small button with hotkey display' },
+      { value: 'detailed', label: 'Full', description: 'Large button with hotkey + description' },
+    ],
+  },
+  {
+    type: 'open-url',
+    variants: [
+      { value: 'compact', label: 'Mini', description: 'Small button with URL' },
+      { value: 'detailed', label: 'Full', description: 'Large button with URL preview' },
+    ],
+  },
+  {
+    type: 'type-text',
+    variants: [
+      { value: 'compact', label: 'Mini', description: 'Small button with text preview' },
+      { value: 'detailed', label: 'Full', description: 'Large button with full text' },
+    ],
+  },
+];
+
+export interface WizardStep {
+  id: string;
+  label: string;
+  icon: string;
+}
+
+export const WIZARD_STEPS: WizardStep[] = [
+  { id: 'general', label: 'General', icon: 'G' },
+  { id: 'config', label: 'Config', icon: 'C' },
+  { id: 'style', label: 'Style', icon: 'S' },
+  { id: 'confirm', label: 'Apply', icon: '✓' },
+];
+
 export interface DashboardLayout {
   widgets: WidgetConfig[];
   columns: number;
