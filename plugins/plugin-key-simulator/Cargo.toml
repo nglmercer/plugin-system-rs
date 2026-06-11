@@ -10,4 +10,3 @@ crate-type = ["cdylib", "lib"]
 plugin-system = { path = "../../crates/plugin-system" }
 log = "0.4"
 rdev = "0.5"
-once_cell = "1"

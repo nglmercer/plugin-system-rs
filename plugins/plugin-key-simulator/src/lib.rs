@@ -1,57 +1,14 @@
 use plugin_system::{Plugin, PluginContext, PluginMetadata};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
-use std::collections::HashMap;
 
 pub trait KeySimulator: Send + Sync {
     fn simulate_keys(&self, keys: &[String]) -> Result<(), String>;
 }
 
-pub struct RecordSession {
-    pub current_combo: Arc<Mutex<String>>,
-    pub cancel: Arc<AtomicBool>,
-    pub done: Arc<AtomicBool>,
-    pub result: Arc<Mutex<Option<String>>>,
-}
-
-impl RecordSession {
-    pub fn current(&self) -> String {
-        self.current_combo.lock().unwrap_or_else(|e| e.into_inner()).clone()
-    }
-
-    pub fn cancel(&self) {
-        self.cancel.store(true, Ordering::SeqCst);
-    }
-
-    pub fn is_done(&self) -> bool {
-        self.done.load(Ordering::SeqCst)
-    }
-
-    pub fn wait_for_result(&self, timeout: Duration) -> Result<String, String> {
-        let start = std::time::Instant::now();
-        loop {
-            if start.elapsed() > timeout {
-                self.cancel();
-                return Err("Recording timed out".to_string());
-            }
-            {
-                let guard = self.result.lock().unwrap_or_else(|e| e.into_inner());
-                if let Some(ref combo) = *guard {
-                    return Ok(combo.clone());
-                }
-            }
-            if self.cancel.load(Ordering::SeqCst) {
-                return Err("Cancelled".to_string());
-            }
-            thread::sleep(Duration::from_millis(50));
-        }
-    }
-}
-
-static SESSIONS: once_cell::sync::Lazy<Mutex<HashMap<String, Arc<RecordSession>>>> =
-    once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
 static LISTENING: AtomicBool = AtomicBool::new(false);
 
 pub struct KeySimulatorPlugin;
@@ -63,44 +20,25 @@ impl Default for KeySimulatorPlugin {
 impl KeySimulatorPlugin {
     pub fn new() -> Self { Self }
 
-    pub fn generate_session_id() -> String {
-        use std::time::{SystemTime, UNIX_EPOCH};
-        let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos();
-        format!("rec_{:x}", ts)
-    }
-
-    pub fn start_recording(timeout_ms: u64) -> String {
-        // Cancel any existing recording first (rdev can only listen on one at a time)
-        if LISTENING.load(Ordering::SeqCst) {
-            if let Ok(sessions) = SESSIONS.lock() {
-                for (id, s) in sessions.iter() {
-                    s.cancel();
-                    log::info!("[KeySimulator] Cancelling previous session: {}", id);
-                }
-            }
+    pub fn listen_for_combo(timeout_ms: u64) -> Result<String, String> {
+        if LISTENING.swap(true, Ordering::SeqCst) {
+            return Err("Already recording".to_string());
         }
-        LISTENING.store(true, Ordering::SeqCst);
 
-        let session_id = Self::generate_session_id();
-        let session = Arc::new(RecordSession {
-            current_combo: Arc::new(Mutex::new(String::new())),
-            cancel: Arc::new(AtomicBool::new(false)),
-            done: Arc::new(AtomicBool::new(false)),
-            result: Arc::new(Mutex::new(None)),
-        });
-
-        let session_clone = Arc::clone(&session);
-        let timeout_clone = timeout_ms;
+        let (tx, rx) = mpsc::channel();
+        let cancel = Arc::new(AtomicBool::new(false));
+        let cancel_clone = Arc::clone(&cancel);
 
         thread::spawn(move || {
             let start = std::time::Instant::now();
             let mut pressed: Vec<String> = Vec::new();
-            let session = session_clone;
+            let cancel = cancel_clone;
 
             let _ = rdev::listen(move |event| {
-                if session.cancel.load(Ordering::SeqCst) { return; }
-                if start.elapsed() > Duration::from_millis(timeout_clone) {
-                    session.cancel.store(true, Ordering::SeqCst);
+                if cancel.load(Ordering::SeqCst) { return; }
+                if start.elapsed() > Duration::from_millis(timeout_ms) {
+                    let _ = tx.send(Err("Timed out".to_string()));
+                    cancel.store(true, Ordering::SeqCst);
                     return;
                 }
 
@@ -110,93 +48,98 @@ impl KeySimulatorPlugin {
                         if !pressed.contains(&name) {
                             pressed.push(name);
                         }
-                        let combo = KeySimulatorPlugin::build_combo(&pressed);
-                        *session.current_combo.lock().unwrap_or_else(|e| e.into_inner()) = combo;
                     }
                     rdev::EventType::KeyRelease(key) => {
                         let name = rdev_key_to_string(&key);
 
                         if !is_rdev_mod(&key) {
-                            let combo = KeySimulatorPlugin::build_combo(&pressed);
+                            let combo = build_combo_from(&pressed, &name);
                             if !combo.is_empty() {
-                                let lower = combo.to_lowercase();
-                                *session.result.lock().unwrap_or_else(|e| e.into_inner()) = Some(lower.clone());
-                                *session.current_combo.lock().unwrap_or_else(|e| e.into_inner()) = lower;
-                                session.done.store(true, Ordering::SeqCst);
+                                let _ = tx.send(Ok(combo.to_lowercase()));
+                                cancel.store(true, Ordering::SeqCst);
+                                return;
                             }
                         }
 
                         pressed.retain(|k| k != &name);
-                        let combo = KeySimulatorPlugin::build_combo(&pressed);
-                        *session.current_combo.lock().unwrap_or_else(|e| e.into_inner()) = combo;
                     }
                     _ => {}
                 }
             });
         });
 
-        if let Ok(mut sessions) = SESSIONS.lock() {
-            sessions.insert(session_id.clone(), session);
-        }
+        let result = rx.recv_timeout(Duration::from_millis(timeout_ms + 2000))
+            .unwrap_or(Err("Recording timed out".to_string()));
 
-        session_id
-    }
-
-    pub fn get_session(session_id: &str) -> Option<Arc<RecordSession>> {
-        SESSIONS.lock().ok().and_then(|s| s.get(session_id).cloned())
-    }
-
-    pub fn remove_session(session_id: &str) {
-        if let Ok(mut sessions) = SESSIONS.lock() {
-            sessions.remove(session_id);
-        }
         LISTENING.store(false, Ordering::SeqCst);
+        result
     }
+}
 
-    pub fn build_combo(pressed: &[String]) -> String {
-        let mods: Vec<&String> = pressed.iter().filter(|k| is_mod_str(k)).collect();
-        let mains: Vec<&String> = pressed.iter().filter(|k| !is_mod_str(k)).collect();
+fn build_combo_from(pressed: &[String], released: &str) -> String {
+    let mods: Vec<&String> = pressed.iter().filter(|k| is_mod_str(k)).collect();
+    let mod_str = mods.iter().map(|s| (*s).clone()).collect::<Vec<_>>().join("+");
 
-        let mod_str = mods.iter().map(|s| (*s).clone()).collect::<Vec<_>>().join("+");
-        let main_str = mains.iter().map(|s| (*s).clone()).collect::<Vec<_>>().join("+");
+    let main_str = if is_mod_str(released) {
+        String::new()
+    } else {
+        released.to_lowercase()
+    };
 
-        if main_str.is_empty() {
-            mod_str
-        } else if mod_str.is_empty() {
-            main_str
-        } else {
-            format!("{}+{}", mod_str, main_str)
-        }
+    if main_str.is_empty() {
+        mod_str.to_lowercase()
+    } else if mod_str.is_empty() {
+        main_str
+    } else {
+        format!("{}+{}", mod_str.to_lowercase(), main_str)
     }
+}
 
-    pub fn list_input_devices() -> Vec<(String, String)> {
-        let mut devices = Vec::new();
-        if let Ok(content) = std::fs::read_to_string("/proc/bus/input/devices") {
-        let mut current_name = String::new();
-        for line in content.lines() {
-                if line.starts_with("N: Name=") {
-                    current_name = line.trim_start_matches("N: Name=\"").trim_end_matches('"').to_string();
-                }
-                if line.starts_with("H: Handlers=") {
-                    if let Some(pos) = line.find("event") {
-                        let event_num = line[pos..].split_whitespace().next().unwrap_or("");
-                        if !current_name.is_empty() && !event_num.is_empty() {
-                            devices.push((
-                                format!("/dev/input/{}", event_num),
-                                current_name.clone(),
-                            ));
-                        }
-                    }
-                    current_name.clear();
-                }
-            }
+impl KeySimulator for KeySimulatorPlugin {
+    fn simulate_keys(&self, keys: &[String]) -> Result<(), String> {
+        let rdev_keys: Vec<rdev::Key> = keys.iter().filter_map(|k| map_key_to_rdev(k)).collect();
+
+        if rdev_keys.is_empty() {
+            return Err("No mappable keys".to_string());
         }
-        if devices.is_empty() {
-            devices.push(("/dev/input/by-path/platform-i8042-serio-0-event-kbd".to_string(), "PS/2 Keyboard".to_string()));
-            devices.push(("/dev/input/by-path/platform-i8042-serio-1-event-kbd".to_string(), "PS/2 Mouse".to_string()));
+
+        fn is_mod(k: &rdev::Key) -> bool { is_rdev_mod(k) }
+        let mods: Vec<&rdev::Key> = rdev_keys.iter().filter(|k| is_mod(k)).collect();
+        let mains: Vec<&rdev::Key> = rdev_keys.iter().filter(|k| !is_mod(k)).collect();
+
+        for m in &mods {
+            rdev::simulate(&rdev::EventType::KeyPress(*(*m)))
+                .map_err(|e| format!("Modifier press failed: {}", e))?;
         }
-        devices
+
+        for k in &mains {
+            rdev::simulate(&rdev::EventType::KeyPress(*(*k)))
+                .map_err(|e| format!("Key press failed: {}", e))?;
+            thread::sleep(Duration::from_millis(10));
+            rdev::simulate(&rdev::EventType::KeyRelease(*(*k)))
+                .map_err(|e| format!("Key release failed: {}", e))?;
+        }
+
+        for m in mods.iter().rev() {
+            rdev::simulate(&rdev::EventType::KeyRelease(*(*m)))
+                .map_err(|e| format!("Modifier release failed: {}", e))?;
+        }
+
+        Ok(())
     }
+}
+
+fn is_rdev_mod(key: &rdev::Key) -> bool {
+    matches!(key,
+        rdev::Key::ControlLeft | rdev::Key::ControlRight |
+        rdev::Key::ShiftLeft | rdev::Key::ShiftRight |
+        rdev::Key::Alt | rdev::Key::AltGr |
+        rdev::Key::MetaLeft | rdev::Key::MetaRight
+    )
+}
+
+fn is_mod_str(key: &str) -> bool {
+    matches!(key, "Ctrl" | "Shift" | "Alt" | "AltGr" | "Win")
 }
 
 fn rdev_key_to_string(key: &rdev::Key) -> String {
@@ -221,65 +164,13 @@ fn rdev_key_to_string(key: &rdev::Key) -> String {
         Key::DownArrow => "Down".to_string(),
         Key::LeftArrow => "Left".to_string(),
         Key::RightArrow => "Right".to_string(),
-        Key::F1 => "F1".to_string(),
-        Key::F2 => "F2".to_string(),
-        Key::F3 => "F3".to_string(),
-        Key::F4 => "F4".to_string(),
-        Key::F5 => "F5".to_string(),
-        Key::F6 => "F6".to_string(),
-        Key::F7 => "F7".to_string(),
-        Key::F8 => "F8".to_string(),
-        Key::F9 => "F9".to_string(),
-        Key::F10 => "F10".to_string(),
-        Key::F11 => "F11".to_string(),
-        Key::F12 => "F12".to_string(),
+        Key::F1 => "F1".to_string(), Key::F2 => "F2".to_string(),
+        Key::F3 => "F3".to_string(), Key::F4 => "F4".to_string(),
+        Key::F5 => "F5".to_string(), Key::F6 => "F6".to_string(),
+        Key::F7 => "F7".to_string(), Key::F8 => "F8".to_string(),
+        Key::F9 => "F9".to_string(), Key::F10 => "F10".to_string(),
+        Key::F11 => "F11".to_string(), Key::F12 => "F12".to_string(),
         _ => format!("{:?}", key).replace("Key", ""),
-    }
-}
-
-fn is_rdev_mod(key: &rdev::Key) -> bool {
-    matches!(key,
-        rdev::Key::ControlLeft | rdev::Key::ControlRight |
-        rdev::Key::ShiftLeft | rdev::Key::ShiftRight |
-        rdev::Key::Alt | rdev::Key::AltGr |
-        rdev::Key::MetaLeft | rdev::Key::MetaRight
-    )
-}
-
-fn is_mod_str(key: &str) -> bool {
-    matches!(key, "Ctrl" | "Shift" | "Alt" | "AltGr" | "Win")
-}
-
-impl KeySimulator for KeySimulatorPlugin {
-    fn simulate_keys(&self, keys: &[String]) -> Result<(), String> {
-        let rdev_keys: Vec<rdev::Key> = keys.iter().filter_map(|k| map_key_to_rdev(k)).collect();
-
-        if rdev_keys.is_empty() {
-            return Err("No mappable keys".to_string());
-        }
-
-        let mods: Vec<&rdev::Key> = rdev_keys.iter().filter(|k| is_rdev_mod(k)).collect();
-        let mains: Vec<&rdev::Key> = rdev_keys.iter().filter(|k| !is_rdev_mod(k)).collect();
-
-        for m in &mods {
-            rdev::simulate(&rdev::EventType::KeyPress(*(*m)))
-                .map_err(|e| format!("Modifier press failed: {}", e))?;
-        }
-
-        for k in &mains {
-            rdev::simulate(&rdev::EventType::KeyPress(*(*k)))
-                .map_err(|e| format!("Key press failed: {}", e))?;
-            thread::sleep(Duration::from_millis(10));
-            rdev::simulate(&rdev::EventType::KeyRelease(*(*k)))
-                .map_err(|e| format!("Key release failed: {}", e))?;
-        }
-
-        for m in mods.iter().rev() {
-            rdev::simulate(&rdev::EventType::KeyRelease(*(*m)))
-                .map_err(|e| format!("Modifier release failed: {}", e))?;
-        }
-
-        Ok(())
     }
 }
 
@@ -297,14 +188,10 @@ fn map_key_to_rdev(key: &str) -> Option<rdev::Key> {
         "escape" | "esc" => Key::Escape,
         "backspace" => Key::Backspace,
         "delete" | "del" => Key::Delete,
-        "home" => Key::Home,
-        "end" => Key::End,
-        "pageup" => Key::PageUp,
-        "pagedown" => Key::PageDown,
-        "up" => Key::UpArrow,
-        "down" => Key::DownArrow,
-        "left" => Key::LeftArrow,
-        "right" => Key::RightArrow,
+        "home" => Key::Home, "end" => Key::End,
+        "pageup" => Key::PageUp, "pagedown" => Key::PageDown,
+        "up" => Key::UpArrow, "down" => Key::DownArrow,
+        "left" => Key::LeftArrow, "right" => Key::RightArrow,
         "f1" => Key::F1, "f2" => Key::F2, "f3" => Key::F3,
         "f4" => Key::F4, "f5" => Key::F5, "f6" => Key::F6,
         "f7" => Key::F7, "f8" => Key::F8, "f9" => Key::F9,
@@ -344,7 +231,7 @@ impl Plugin for KeySimulatorPlugin {
     }
 
     fn on_load(&mut self, _ctx: &PluginContext) {
-        log::info!("KeySimulatorPlugin loaded (rdev key simulation + recording)");
+        log::info!("KeySimulatorPlugin loaded");
     }
 
     fn on_unload(&mut self) {
