@@ -4,6 +4,19 @@ A plugin-based StreamDeck control system with web UI, built in Rust. Control OBS
 
 ## Features
 
+### System Tray
+- **System tray icon** with context menu (multiplatform: Linux/Windows/macOS)
+- **Open in Browser** - Launch the web UI in your default browser
+- **Show QR Code** - Display QR code in terminal for mobile access
+- **Copy URL** - Copy the local network URL to clipboard
+- **Exit** - Clean shutdown from tray
+
+### QR Code (Web UI)
+- **QR button** in the navigation bar
+- **Scan to connect** - Shows QR code for mobile access
+- **Copy URL** - One-click copy of the dashboard URL
+- Works on any device with a browser
+
 ### Plugins
 - **System Monitor** - CPU, memory, load, uptime monitoring
 - **Volume Control** - Master volume + per-app volume (Linux/Windows/macOS)
@@ -62,26 +75,40 @@ streamdeck/
 
 ## Quick Start
 
-### 1. Build the backend
+### 1. Install system dependencies (Linux only)
+
+The system tray requires GTK and libappindicator:
+
+```bash
+# Arch Linux / Manjaro
+pacman -S gtk3 xdotool libappindicator-gtk3
+
+# Debian / Ubuntu
+sudo apt install libgtk-3-dev libxdo-dev libappindicator3-dev
+
+# Windows / macOS: No extra dependencies needed
+```
+
+### 2. Build the backend
 
 ```bash
 cargo build
 ```
 
-### 2. Build all plugins
+### 3. Build all plugins
 
 ```bash
 cargo build --release -p plugin-timer -p plugin-system-monitor -p plugin-key-simulator -p plugin-volume-master -p plugin-obs
 ```
 
-### 3. Copy plugins
+### 4. Copy plugins
 
 ```bash
 mkdir -p plugins
 cp target/release/libplugin_*.so plugins/
 ```
 
-### 4. Build the web UI
+### 5. Build the web UI
 
 ```bash
 cd web
@@ -90,13 +117,23 @@ npm run build
 cd ..
 ```
 
-### 5. Run the core
+Or use the Makefile:
+
+```bash
+make build-web
+```
+
+### 6. Run the core
 
 ```bash
 cargo run
 ```
 
-The server starts on `http://localhost:3000`.
+The server starts on `http://localhost:3000`. A system tray icon will appear in your system tray. Right-click it for options:
+- **Open in Browser** - Launch the web UI
+- **Show QR Code** - Display QR code for mobile access
+- **Copy URL** - Copy the local network URL
+- **Exit** - Shutdown the server
 
 ### Development Mode
 
@@ -352,6 +389,29 @@ A:
 **Q: The volume slider shows old values.**
 
 A: The widget polls every 2 seconds by default. You can change this in the widget settings (Config > Refresh Interval). Lower values increase CPU usage.
+
+### Tray icon doesn't appear?
+
+**Q: I don't see a tray icon after starting the server.**
+
+A: On Linux, make sure you have the required packages:
+- `libappindicator-gtk3` or `libayatana-appindicator`
+- `gtk3`
+- `xdotool`
+
+On some desktop environments (like Wayland), you may need a tray indicator extension.
+
+### How to access from mobile?
+
+**Q: How do I control StreamDeck from my phone?**
+
+A: 
+1. Start the server on your computer
+2. Click the **QR** button in the web UI navigation bar
+3. Scan the QR code with your phone camera
+4. Or manually enter `http://<your-computer-ip>:3000` in your phone's browser
+
+Make sure your phone and computer are on the same WiFi network. The QR code shows the local network IP automatically.
 
 ## License
 

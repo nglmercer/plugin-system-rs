@@ -3,6 +3,7 @@ import { useState } from 'preact/hooks';
 import { Dashboard } from './routes/Dashboard';
 import { Profiles } from './routes/Profiles';
 import { Plugins } from './routes/Plugins';
+import { QrButton } from './components/QrModal';
 
 export function App() {
   const [currentPage, setCurrentPage] = useState<'dashboard' | 'profiles' | 'plugins'>('dashboard');
@@ -23,6 +24,7 @@ export function App() {
           class: currentPage === 'plugins' ? 'active' : '',
           onClick: () => setCurrentPage('plugins')
         }, 'Plugins'),
+        h(QrButton, null)
       )
     ),
     h('main', { class: 'main' },
