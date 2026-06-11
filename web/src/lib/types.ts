@@ -50,14 +50,13 @@ export interface PluginData {
 }
 
 export type WidgetType =
-  | 'system-monitor'
-  | 'clock'
-  | 'quick-actions'
-  | 'send-hotkey'
-  | 'open-url'
-  | 'type-text'
-  | 'volume-master'
-  | 'volume-apps';
+  | "system-monitor"
+  | "clock"
+  | "send-hotkey"
+  | "open-url"
+  | "type-text"
+  | "volume-master"
+  | "volume-apps";
 
 export interface WidgetConfig {
   id: string;
@@ -70,65 +69,126 @@ export interface WidgetConfig {
 
 export type WidgetVariant = string;
 
-export const WIDGET_VARIANTS: { type: WidgetType; variants: { value: string; label: string; description: string }[] }[] = [
+export const WIDGET_VARIANTS: {
+  type: WidgetType;
+  variants: { value: string; label: string; description: string }[];
+}[] = [
   {
-    type: 'system-monitor',
+    type: "system-monitor",
     variants: [
-      { value: 'minimal', label: 'Minimal', description: 'Just CPU% and RAM% numbers' },
-      { value: 'compact', label: 'Compact', description: 'CPU + RAM bars with load' },
-      { value: 'detailed', label: 'Detailed', description: 'Full stats with swap, cores, uptime' },
+      {
+        value: "minimal",
+        label: "Minimal",
+        description: "Just CPU% and RAM% numbers",
+      },
+      {
+        value: "compact",
+        label: "Compact",
+        description: "CPU + RAM bars with load",
+      },
+      {
+        value: "detailed",
+        label: "Detailed",
+        description: "Full stats with swap, cores, uptime",
+      },
     ],
   },
   {
-    type: 'clock',
+    type: "clock",
     variants: [
-      { value: 'simple', label: 'Simple', description: 'Just HH:MM, no seconds' },
-      { value: 'digital', label: 'Digital', description: 'HH:MM + seconds + date' },
-      { value: 'detailed', label: 'Detailed', description: 'Full date with day name' },
+      {
+        value: "simple",
+        label: "Simple",
+        description: "Just HH:MM, no seconds",
+      },
+      {
+        value: "digital",
+        label: "Digital",
+        description: "HH:MM + seconds + date",
+      },
+      {
+        value: "detailed",
+        label: "Detailed",
+        description: "Full date with day name",
+      },
+    ],
+  },
+
+  {
+    type: "send-hotkey",
+    variants: [
+      {
+        value: "compact",
+        label: "Mini",
+        description: "Small button with hotkey display",
+      },
+      {
+        value: "detailed",
+        label: "Full",
+        description: "Large button with hotkey + description",
+      },
     ],
   },
   {
-    type: 'quick-actions',
+    type: "open-url",
     variants: [
-      { value: 'compact', label: 'List', description: 'Compact action list' },
-      { value: 'detailed', label: 'Grid', description: 'Larger action buttons with category badges' },
+      { value: "compact", label: "Mini", description: "Small button with URL" },
+      {
+        value: "detailed",
+        label: "Full",
+        description: "Large button with URL preview",
+      },
     ],
   },
   {
-    type: 'send-hotkey',
+    type: "type-text",
     variants: [
-      { value: 'compact', label: 'Mini', description: 'Small button with hotkey display' },
-      { value: 'detailed', label: 'Full', description: 'Large button with hotkey + description' },
+      {
+        value: "compact",
+        label: "Mini",
+        description: "Small button with text preview",
+      },
+      {
+        value: "detailed",
+        label: "Full",
+        description: "Large button with full text",
+      },
     ],
   },
   {
-    type: 'open-url',
+    type: "volume-master",
     variants: [
-      { value: 'compact', label: 'Mini', description: 'Small button with URL' },
-      { value: 'detailed', label: 'Full', description: 'Large button with URL preview' },
+      {
+        value: "minimal",
+        label: "Minimal",
+        description: "Just volume % and mute button",
+      },
+      {
+        value: "compact",
+        label: "Compact",
+        description: "Slider with device name and app list",
+      },
+      {
+        value: "detailed",
+        label: "Detailed",
+        description: "Full controls with per-app volume",
+      },
     ],
   },
   {
-    type: 'type-text',
+    type: "volume-apps",
     variants: [
-      { value: 'compact', label: 'Mini', description: 'Small button with text preview' },
-      { value: 'detailed', label: 'Full', description: 'Large button with full text' },
-    ],
-  },
-  {
-    type: 'volume-master',
-    variants: [
-      { value: 'minimal', label: 'Minimal', description: 'Just volume % and mute button' },
-      { value: 'compact', label: 'Compact', description: 'Slider with device name and app list' },
-      { value: 'detailed', label: 'Detailed', description: 'Full controls with per-app volume' },
-    ],
-  },
-  {
-    type: 'volume-apps',
-    variants: [
-      { value: 'minimal', label: 'Minimal', description: 'App count + mini list' },
-      { value: 'compact', label: 'Compact', description: 'List with sliders' },
-      { value: 'detailed', label: 'Detailed', description: 'Full per-app controls' },
+      {
+        value: "minimal",
+        label: "Minimal",
+        description: "App count + mini list",
+      },
+      { value: "compact", label: "Compact", description: "List with sliders" },
+      {
+        value: "detailed",
+        label: "Detailed",
+        description: "Full per-app controls",
+      },
     ],
   },
 ];
@@ -140,10 +200,10 @@ export interface WizardStep {
 }
 
 export const WIZARD_STEPS: WizardStep[] = [
-  { id: 'general', label: 'General', icon: 'G' },
-  { id: 'config', label: 'Config', icon: 'C' },
-  { id: 'style', label: 'Style', icon: 'S' },
-  { id: 'confirm', label: 'Apply', icon: '✓' },
+  { id: "general", label: "General", icon: "G" },
+  { id: "config", label: "Config", icon: "C" },
+  { id: "style", label: "Style", icon: "S" },
+  { id: "confirm", label: "Apply", icon: "✓" },
 ];
 
 export interface DashboardLayout {

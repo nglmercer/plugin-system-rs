@@ -8,14 +8,62 @@ export const WIDGET_CATALOG: {
   defaultColSpan: number;
   defaultRowSpan: number;
 }[] = [
-  { type: "system-monitor", label: "System Monitor", icon: "%", description: "CPU, Memory, Load, Uptime", defaultColSpan: 1, defaultRowSpan: 1 },
-  { type: "clock", label: "Clock", icon: "T", description: "Current time & date", defaultColSpan: 1, defaultRowSpan: 1 },
-  { type: "quick-actions", label: "Quick Actions", icon: "*", description: "All actions list", defaultColSpan: 1, defaultRowSpan: 1 },
-  { type: "send-hotkey", label: "Send Hotkey", icon: "H", description: "Trigger keyboard hotkey", defaultColSpan: 1, defaultRowSpan: 1 },
-  { type: "open-url", label: "Open URL", icon: "U", description: "Open a URL in browser", defaultColSpan: 1, defaultRowSpan: 1 },
-  { type: "type-text", label: "Type Text", icon: "A", description: "Type text string", defaultColSpan: 1, defaultRowSpan: 1 },
-  { type: "volume-master", label: "Volume Control", icon: "V", description: "Master volume slider", defaultColSpan: 1, defaultRowSpan: 1 },
-  { type: "volume-apps", label: "App Volume", icon: "A", description: "Per-app volume control", defaultColSpan: 1, defaultRowSpan: 1 },
+  {
+    type: "system-monitor",
+    label: "System Monitor",
+    icon: "%",
+    description: "CPU, Memory, Load, Uptime",
+    defaultColSpan: 1,
+    defaultRowSpan: 1,
+  },
+  {
+    type: "clock",
+    label: "Clock",
+    icon: "T",
+    description: "Current time & date",
+    defaultColSpan: 1,
+    defaultRowSpan: 1,
+  },
+  {
+    type: "send-hotkey",
+    label: "Send Hotkey",
+    icon: "H",
+    description: "Trigger keyboard hotkey",
+    defaultColSpan: 1,
+    defaultRowSpan: 1,
+  },
+  {
+    type: "open-url",
+    label: "Open URL",
+    icon: "U",
+    description: "Open a URL in browser",
+    defaultColSpan: 1,
+    defaultRowSpan: 1,
+  },
+  {
+    type: "type-text",
+    label: "Type Text",
+    icon: "A",
+    description: "Type text string",
+    defaultColSpan: 1,
+    defaultRowSpan: 1,
+  },
+  {
+    type: "volume-master",
+    label: "Volume Control",
+    icon: "V",
+    description: "Master volume slider",
+    defaultColSpan: 1,
+    defaultRowSpan: 1,
+  },
+  {
+    type: "volume-apps",
+    label: "App Volume",
+    icon: "A",
+    description: "Per-app volume control",
+    defaultColSpan: 1,
+    defaultRowSpan: 1,
+  },
 ];
 
 export function generateId(): string {
@@ -25,8 +73,7 @@ export function generateId(): string {
 export function getDefaultVariant(type: WidgetType): string {
   const variants: Record<string, string> = {
     "system-monitor": "compact",
-    "clock": "digital",
-    "quick-actions": "compact",
+    clock: "digital",
     "send-hotkey": "compact",
     "open-url": "compact",
     "type-text": "compact",
@@ -39,12 +86,24 @@ export function getDefaultVariant(type: WidgetType): string {
 export function getDefaultSettings(type: WidgetType): Record<string, any> {
   const settings: Record<string, any> = { variant: getDefaultVariant(type) };
   switch (type) {
-    case "system-monitor": settings.refreshInterval = 2000; break;
-    case "send-hotkey": settings.keys = "ctrl+c"; break;
-    case "open-url": settings.url = "https://example.com"; break;
-    case "type-text": settings.text = "Hello!"; break;
-    case "volume-master": settings.refreshInterval = 2000; break;
-    case "volume-apps": settings.refreshInterval = 2000; break;
+    case "system-monitor":
+      settings.refreshInterval = 2000;
+      break;
+    case "send-hotkey":
+      settings.keys = "ctrl+c";
+      break;
+    case "open-url":
+      settings.url = "https://example.com";
+      break;
+    case "type-text":
+      settings.text = "Hello!";
+      break;
+    case "volume-master":
+      settings.refreshInterval = 2000;
+      break;
+    case "volume-apps":
+      settings.refreshInterval = 2000;
+      break;
   }
   return settings;
 }
