@@ -228,7 +228,7 @@ fn encode_qr(data: &str) -> Vec<Vec<bool>> {
     let mut col = size - 1;
     let mut going_up = true;
 
-    while col > 0 {
+    while col >= 2 {
         if col == 6 {
             col -= 1;
             continue;
@@ -263,7 +263,7 @@ fn encode_qr(data: &str) -> Vec<Vec<bool>> {
         }
 
         going_up = !going_up;
-        col -= 2;
+        col = col.saturating_sub(2);
     }
 
     modules
