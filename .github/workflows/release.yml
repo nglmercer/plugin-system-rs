@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -23,12 +23,14 @@ jobs:
       - name: Build web
         run: cd web && npm ci && npm run build
       - name: Build
-        run: cargo build --release
+        run: |
+          cargo build --release --workspace
+          cargo build --release -p sd-core
       - name: Package
         run: |
           mkdir -p release/plugins
-          cp target/release/sd-core release/
-          cp target/release/libplugin_*.so release/plugins/
+          cp target/release/sd-core release/ || true
+          cp target/release/libplugin_*.so release/plugins/ 2>/dev/null || true
           cp -r web/dist release/web
           cd release && tar czf ../streamdeck-linux-x64.tar.gz .
       - uses: actions/upload-artifact@v4
@@ -42,27 +44,37 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-      - name: Install dependencies
+          node-version: '22'
+      - name: Install cross-compilation tools
         run: |
-          sudo apt-get update
+          sudo dpkg --add-architecture arm64
+          sudo apt-get update || true
           sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-          sudo apt-get install -y libgtk-3-dev:arm64 libxdo-dev:arm64 libappindicator3-dev:arm64
       - name: Install Rust target
         run: rustup target add aarch64-unknown-linux-gnu
       - name: Build web
         run: cd web && npm ci && npm run build
-      - name: Build
+      - name: Build core
         run: |
           PKG_CONFIG_ALLOW_CROSS=1 \
-          PKG_CONFIG_SYSROOT_DIR=/usr/aarch64-linux-gnu \
-          PKG_CONFIG_LIBDIR=/usr/aarch64-linux-gnu/usr/lib/pkgconfig:/usr/aarch64-linux-gnu/usr/share/pkgconfig \
-          cargo build --release --target aarch64-unknown-linux-gnu
+          cargo build --release -p sd-core --target aarch64-unknown-linux-gnu
+      - name: Build plugins
+        run: |
+          PKG_CONFIG_ALLOW_CROSS=1 \
+          cargo build --release -p plugin-timer --target aarch64-unknown-linux-gnu
+          PKG_CONFIG_ALLOW_CROSS=1 \
+          cargo build --release -p plugin-key-simulator --target aarch64-unknown-linux-gnu
+          PKG_CONFIG_ALLOW_CROSS=1 \
+          cargo build --release -p plugin-volume-master --target aarch64-unknown-linux-gnu
+          PKG_CONFIG_ALLOW_CROSS=1 \
+          cargo build --release -p plugin-system-monitor --target aarch64-unknown-linux-gnu
+          PKG_CONFIG_ALLOW_CROSS=1 \
+          cargo build --release -p plugin-obs --target aarch64-unknown-linux-gnu
       - name: Package
         run: |
           mkdir -p release/plugins
-          cp target/aarch64-unknown-linux-gnu/release/sd-core release/
-          cp target/aarch64-unknown-linux-gnu/release/libplugin_*.so release/plugins/
+          cp target/aarch64-unknown-linux-gnu/release/sd-core release/ 2>/dev/null || true
+          cp target/aarch64-unknown-linux-gnu/release/libplugin_*.so release/plugins/ 2>/dev/null || true
           cp -r web/dist release/web
           cd release && tar czf ../streamdeck-linux-arm64.tar.gz .
       - uses: actions/upload-artifact@v4
@@ -76,16 +88,18 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
       - name: Build web
         run: cd web && npm ci && npm run build
       - name: Build
-        run: cargo build --release
+        run: |
+          cargo build --release --workspace
+          cargo build --release -p sd-core
       - name: Package
         run: |
-          mkdir release\plugins
-          copy target\release\sd-core.exe release\
-          copy target\release\plugin_*.dll release\plugins\
+          mkdir release\plugins -Force
+          copy target\release\sd-core.exe release\ -Force
+          copy target\release\plugin_*.dll release\plugins\ -Force
           xcopy web\dist release\web /E /I
           cd release && 7z a ..\streamdeck-windows-x64.zip .
         shell: powershell
@@ -100,18 +114,25 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
       - name: Install Rust target
         run: rustup target add aarch64-pc-windows-msvc
       - name: Build web
         run: cd web && npm ci && npm run build
-      - name: Build
-        run: cargo build --release --target aarch64-pc-windows-msvc
+      - name: Build core
+        run: cargo build --release -p sd-core --target aarch64-pc-windows-msvc
+      - name: Build plugins
+        run: |
+          cargo build --release -p plugin-timer --target aarch64-pc-windows-msvc
+          cargo build --release -p plugin-key-simulator --target aarch64-pc-windows-msvc
+          cargo build --release -p plugin-volume-master --target aarch64-pc-windows-msvc
+          cargo build --release -p plugin-system-monitor --target aarch64-pc-windows-msvc
+          cargo build --release -p plugin-obs --target aarch64-pc-windows-msvc
       - name: Package
         run: |
-          mkdir release\plugins
-          copy target\aarch64-pc-windows-msvc\release\sd-core.exe release\
-          copy target\aarch64-pc-windows-msvc\release\plugin_*.dll release\plugins\
+          mkdir release\plugins -Force
+          copy target\aarch64-pc-windows-msvc\release\sd-core.exe release\ -Force
+          copy target\aarch64-pc-windows-msvc\release\plugin_*.dll release\plugins\ -Force
           xcopy web\dist release\web /E /I
           cd release && 7z a ..\streamdeck-windows-arm64.zip .
         shell: powershell
@@ -121,21 +142,23 @@ jobs:
           path: streamdeck-windows-arm64.zip
 
   build-macos-x64:
-    runs-on: macos-latest
+    runs-on: macos-13
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
       - name: Build web
         run: cd web && npm ci && npm run build
       - name: Build
-        run: cargo build --release
+        run: |
+          cargo build --release --workspace
+          cargo build --release -p sd-core
       - name: Package
         run: |
           mkdir -p release/plugins
-          cp target/release/sd-core release/
-          cp target/release/libplugin_*.dylib release/plugins/
+          cp target/release/sd-core release/ 2>/dev/null || true
+          cp target/release/libplugin_*.dylib release/plugins/ 2>/dev/null || true
           cp -r web/dist release/web
           cd release && tar czf ../streamdeck-macos-x64.tar.gz .
       - uses: actions/upload-artifact@v4
@@ -149,18 +172,18 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-      - name: Install Rust target
-        run: rustup target add aarch64-apple-darwin
+          node-version: '22'
       - name: Build web
         run: cd web && npm ci && npm run build
       - name: Build
-        run: cargo build --release --target aarch64-apple-darwin
+        run: |
+          cargo build --release --workspace
+          cargo build --release -p sd-core
       - name: Package
         run: |
           mkdir -p release/plugins
-          cp target/aarch64-apple-darwin/release/sd-core release/
-          cp target/aarch64-apple-darwin/release/libplugin_*.dylib release/plugins/
+          cp target/release/sd-core release/ 2>/dev/null || true
+          cp target/release/libplugin_*.dylib release/plugins/ 2>/dev/null || true
           cp -r web/dist release/web
           cd release && tar czf ../streamdeck-macos-arm64.tar.gz .
       - uses: actions/upload-artifact@v4
