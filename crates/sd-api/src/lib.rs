@@ -431,28 +431,76 @@ struct RecordHotkeyRequest {
     timeout_ms: u64,
 }
 
-fn default_timeout() -> u64 { 10000 }
+fn default_timeout() -> u64 { 20000 }
 
 #[derive(Serialize)]
 struct RecordHotkeyResponse {
-    combo: String,
+    session_id: String,
+    current_combo: String,
 }
 
-async fn record_hotkey(
+#[derive(Serialize)]
+struct RecordStatusResponse {
+    session_id: String,
+    status: String,
+    current_combo: String,
+    result: Option<String>,
+}
+
+async fn record_hotkey_start(
     Json(req): Json<RecordHotkeyRequest>,
 ) -> Json<ApiResponse<RecordHotkeyResponse>> {
-    let result = tokio::task::spawn_blocking(move || {
-        plugin_key_simulator::KeySimulatorPlugin::listen_for_combo(req.timeout_ms)
-    })
-    .await
-    .unwrap_or(Err("Blocking task failed".to_string()));
+    let session_id = plugin_key_simulator::KeySimulatorPlugin::start_recording(req.timeout_ms);
+    let current = plugin_key_simulator::KeySimulatorPlugin::get_session(&session_id)
+        .map(|s| s.current())
+        .unwrap_or_default();
 
-    match result {
-        Ok(combo) => {
-            log::info!("[Hotkey] Recorded combo: {}", combo);
-            Json(ApiResponse::success(RecordHotkeyResponse { combo }))
+    log::info!("[Hotkey] Recording started: session={}", session_id);
+    Json(ApiResponse::success(RecordHotkeyResponse {
+        session_id,
+        current_combo: current,
+    }))
+}
+
+async fn record_hotkey_status(
+    Path(session_id): Path<String>,
+) -> Json<ApiResponse<RecordStatusResponse>> {
+    match plugin_key_simulator::KeySimulatorPlugin::get_session(&session_id) {
+        Some(session) => {
+            let current = session.current();
+            let done = session.is_done();
+            let result = session.result.lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .clone();
+
+            let status = if done { "completed" } else { "recording" };
+
+            Json(ApiResponse::success(RecordStatusResponse {
+                session_id,
+                status: status.to_string(),
+                current_combo: current,
+                result,
+            }))
         }
-        Err(e) => Json(ApiResponse::error(e)),
+        None => Json(ApiResponse::error("Session not found")),
+    }
+}
+
+async fn record_hotkey_cancel(
+    Path(session_id): Path<String>,
+) -> Json<ApiResponse<String>> {
+    match plugin_key_simulator::KeySimulatorPlugin::get_session(&session_id) {
+        Some(session) => {
+            session.cancel();
+            plugin_key_simulator::KeySimulatorPlugin::remove_session(&session_id);
+            log::info!("[Hotkey] Recording cancelled: session={}", session_id);
+            Json(ApiResponse::success("Cancelled".to_string()))
+        }
+        None => {
+            // Force clear listening flag even if session unknown
+            plugin_key_simulator::KeySimulatorPlugin::remove_session(&session_id);
+            Json(ApiResponse::success("Cleaned up".to_string()))
+        }
     }
 }
 
@@ -676,7 +724,9 @@ pub fn create_router(state: AppState) -> Router {
         )
         .route("/api/actions", get(list_actions).post(execute_action))
         .route("/api/hotkey/send", post(send_hotkey))
-        .route("/api/hotkey/record", post(record_hotkey))
+        .route("/api/hotkey/record", post(record_hotkey_start))
+        .route("/api/hotkey/record/:session_id", get(record_hotkey_status))
+        .route("/api/hotkey/record/:session_id/cancel", post(record_hotkey_cancel))
         .route("/api/hotkey/devices", get(list_input_devices))
         .route("/api/plugins", get(list_plugins))
         .route("/api/plugins/reload", post(reload_plugins))

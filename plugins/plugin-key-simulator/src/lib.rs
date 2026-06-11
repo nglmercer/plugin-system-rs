@@ -1,13 +1,58 @@
 use plugin_system::{Plugin, PluginContext, PluginMetadata};
-use std::sync::mpsc;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
+use std::collections::HashMap;
 
 pub trait KeySimulator: Send + Sync {
     fn simulate_keys(&self, keys: &[String]) -> Result<(), String>;
 }
+
+pub struct RecordSession {
+    pub current_combo: Arc<Mutex<String>>,
+    pub cancel: Arc<AtomicBool>,
+    pub done: Arc<AtomicBool>,
+    pub result: Arc<Mutex<Option<String>>>,
+}
+
+impl RecordSession {
+    pub fn current(&self) -> String {
+        self.current_combo.lock().unwrap_or_else(|e| e.into_inner()).clone()
+    }
+
+    pub fn cancel(&self) {
+        self.cancel.store(true, Ordering::SeqCst);
+    }
+
+    pub fn is_done(&self) -> bool {
+        self.done.load(Ordering::SeqCst)
+    }
+
+    pub fn wait_for_result(&self, timeout: Duration) -> Result<String, String> {
+        let start = std::time::Instant::now();
+        loop {
+            if start.elapsed() > timeout {
+                self.cancel();
+                return Err("Recording timed out".to_string());
+            }
+            {
+                let guard = self.result.lock().unwrap_or_else(|e| e.into_inner());
+                if let Some(ref combo) = *guard {
+                    return Ok(combo.clone());
+                }
+            }
+            if self.cancel.load(Ordering::SeqCst) {
+                return Err("Cancelled".to_string());
+            }
+            thread::sleep(Duration::from_millis(50));
+        }
+    }
+}
+
+static SESSIONS: once_cell::sync::Lazy<Mutex<HashMap<String, Arc<RecordSession>>>> =
+    once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
+static LISTENING: AtomicBool = AtomicBool::new(false);
 
 pub struct KeySimulatorPlugin;
 
@@ -18,16 +63,46 @@ impl Default for KeySimulatorPlugin {
 impl KeySimulatorPlugin {
     pub fn new() -> Self { Self }
 
-    pub fn listen_for_combo(timeout_ms: u64) -> Result<String, String> {
-        let (tx, rx) = mpsc::channel();
-        let done = Arc::new(AtomicBool::new(false));
+    pub fn generate_session_id() -> String {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos();
+        format!("rec_{:x}", ts)
+    }
 
-        let _handle = thread::spawn(move || {
+    pub fn start_recording(timeout_ms: u64) -> String {
+        // Cancel any existing recording first (rdev can only listen on one at a time)
+        if LISTENING.load(Ordering::SeqCst) {
+            if let Ok(sessions) = SESSIONS.lock() {
+                for (id, s) in sessions.iter() {
+                    s.cancel();
+                    log::info!("[KeySimulator] Cancelling previous session: {}", id);
+                }
+            }
+        }
+        LISTENING.store(true, Ordering::SeqCst);
+
+        let session_id = Self::generate_session_id();
+        let session = Arc::new(RecordSession {
+            current_combo: Arc::new(Mutex::new(String::new())),
+            cancel: Arc::new(AtomicBool::new(false)),
+            done: Arc::new(AtomicBool::new(false)),
+            result: Arc::new(Mutex::new(None)),
+        });
+
+        let session_clone = Arc::clone(&session);
+        let timeout_clone = timeout_ms;
+
+        thread::spawn(move || {
+            let start = std::time::Instant::now();
             let mut pressed: Vec<String> = Vec::new();
-            let done_listener = Arc::clone(&done);
+            let session = session_clone;
 
             let _ = rdev::listen(move |event| {
-                if done_listener.load(Ordering::SeqCst) { return; }
+                if session.cancel.load(Ordering::SeqCst) { return; }
+                if start.elapsed() > Duration::from_millis(timeout_clone) {
+                    session.cancel.store(true, Ordering::SeqCst);
+                    return;
+                }
 
                 match event.event_type {
                     rdev::EventType::KeyPress(key) => {
@@ -35,38 +110,63 @@ impl KeySimulatorPlugin {
                         if !pressed.contains(&name) {
                             pressed.push(name);
                         }
+                        let combo = KeySimulatorPlugin::build_combo(&pressed);
+                        *session.current_combo.lock().unwrap_or_else(|e| e.into_inner()) = combo;
                     }
                     rdev::EventType::KeyRelease(key) => {
                         let name = rdev_key_to_string(&key);
-                        pressed.retain(|k| k != &name);
 
                         if !is_rdev_mod(&key) {
-                            let mods: Vec<String> = pressed.iter()
-                                .filter(|k| is_mod_str(k))
-                                .cloned().collect();
-                            let mains: Vec<String> = pressed.iter()
-                                .filter(|k| !is_mod_str(k))
-                                .cloned().collect();
-                            let combo = if mains.is_empty() { 
-                                mods.join("+") 
-                            } else {
-                                [mods.join("+"), mains.join("+")].iter()
-                                    .filter(|s| !s.is_empty())
-                                    .cloned().collect::<Vec<_>>()
-                                    .join("+")
-                            };
+                            let combo = KeySimulatorPlugin::build_combo(&pressed);
                             if !combo.is_empty() {
-                                let _ = tx.send(combo.to_lowercase());
+                                let lower = combo.to_lowercase();
+                                *session.result.lock().unwrap_or_else(|e| e.into_inner()) = Some(lower.clone());
+                                *session.current_combo.lock().unwrap_or_else(|e| e.into_inner()) = lower;
+                                session.done.store(true, Ordering::SeqCst);
                             }
                         }
+
+                        pressed.retain(|k| k != &name);
+                        let combo = KeySimulatorPlugin::build_combo(&pressed);
+                        *session.current_combo.lock().unwrap_or_else(|e| e.into_inner()) = combo;
                     }
                     _ => {}
                 }
             });
         });
 
-        rx.recv_timeout(Duration::from_millis(timeout_ms))
-            .map_err(|_| "Recording timed out".to_string())
+        if let Ok(mut sessions) = SESSIONS.lock() {
+            sessions.insert(session_id.clone(), session);
+        }
+
+        session_id
+    }
+
+    pub fn get_session(session_id: &str) -> Option<Arc<RecordSession>> {
+        SESSIONS.lock().ok().and_then(|s| s.get(session_id).cloned())
+    }
+
+    pub fn remove_session(session_id: &str) {
+        if let Ok(mut sessions) = SESSIONS.lock() {
+            sessions.remove(session_id);
+        }
+        LISTENING.store(false, Ordering::SeqCst);
+    }
+
+    pub fn build_combo(pressed: &[String]) -> String {
+        let mods: Vec<&String> = pressed.iter().filter(|k| is_mod_str(k)).collect();
+        let mains: Vec<&String> = pressed.iter().filter(|k| !is_mod_str(k)).collect();
+
+        let mod_str = mods.iter().map(|s| (*s).clone()).collect::<Vec<_>>().join("+");
+        let main_str = mains.iter().map(|s| (*s).clone()).collect::<Vec<_>>().join("+");
+
+        if main_str.is_empty() {
+            mod_str
+        } else if mod_str.is_empty() {
+            main_str
+        } else {
+            format!("{}+{}", mod_str, main_str)
+        }
     }
 
     pub fn list_input_devices() -> Vec<(String, String)> {

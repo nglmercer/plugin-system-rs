@@ -188,6 +188,18 @@
   animation: pulse 1s infinite;
 }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+.hotkey-keys.listening {
+  border-color: #00d4ff;
+  box-shadow: 0 0 8px rgba(0, 212, 255, 0.3);
+  animation: pulse-border 1s infinite;
+}
+
+@keyframes pulse-border {
+  0%, 100% { border-color: #00d4ff; box-shadow: 0 0 8px rgba(0, 212, 255, 0.3); }
+  50% { border-color: #ff9800; box-shadow: 0 0 12px rgba(255, 152, 0, 0.5); }
+}
+
 .hotkey-pending {
   display: flex;
   align-items: center;

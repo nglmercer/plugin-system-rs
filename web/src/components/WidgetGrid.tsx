@@ -1,7 +1,7 @@
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import { WidgetConfig, WidgetType, WidgetVariant, DashboardLayout, SystemStats, WIDGET_VARIANTS, WIZARD_STEPS } from '../lib/types';
-import { fetchDashboard, saveDashboard, executeAction, sendHotkeyCombo, recordHotkeyBackend, fetchInputDevices } from '../lib/api';
+import { fetchDashboard, saveDashboard, executeAction, sendHotkeyCombo, recordHotkeyStart, recordHotkeyStatus, recordHotkeyCancel, fetchInputDevices } from '../lib/api';
 
 const WIDGET_CATALOG: { type: WidgetType; label: string; icon: string; description: string; defaultColSpan: number; defaultRowSpan: number }[] = [
   { type: 'system-monitor', label: 'System Monitor', icon: '%', description: 'CPU, Memory, Load, Uptime', defaultColSpan: 1, defaultRowSpan: 1 },
@@ -330,6 +330,8 @@ function WizardConfig({ widget, settings, onChange }: {
 function HotkeyRecorder({ currentKeys, onChange }: { currentKeys: string; onChange: (keys: string) => void }) {
   const [recording, setRecording] = useState(false);
   const [pending, setPending] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string>('');
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [devices, setDevices] = useState<{ path: string; name: string }[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<string>('');
 
@@ -340,28 +342,59 @@ function HotkeyRecorder({ currentKeys, onChange }: { currentKeys: string; onChan
     }).catch(() => {});
   }, []);
 
+  useEffect(() => {
+    if (!recording || !sessionId) return;
+    const interval = setInterval(async () => {
+      try {
+        const status = await recordHotkeyStatus(sessionId);
+        setPreview(status.current_combo);
+        if (status.status === 'completed' && status.result) {
+          setPending(status.result);
+          setRecording(false);
+          clearInterval(interval);
+        }
+      } catch {
+        setRecording(false);
+        clearInterval(interval);
+      }
+    }, 150);
+    return () => clearInterval(interval);
+  }, [recording, sessionId]);
+
   async function startRecording() {
     setRecording(true);
     setPending(null);
+    setPreview('Listening...');
     try {
-      const device = selectedDevice || undefined;
-      const combo = await recordHotkeyBackend(device, 10000);
-      setPending(combo);
+      const data = await recordHotkeyStart(20000);
+      setSessionId(data.session_id);
+      setPreview(data.current_combo || 'Press a key combo...');
     } catch {
-      setPending('Timeout');
+      setPreview('Failed to start');
+      setRecording(false);
+    }
+  }
+
+  async function handleCancel() {
+    if (sessionId) {
+      await recordHotkeyCancel(sessionId);
+      setSessionId(null);
     }
     setRecording(false);
+    setPreview('');
   }
 
   function confirmCombo() {
     if (pending) {
       onChange(pending);
       setPending(null);
+      setSessionId(null);
     }
   }
 
   function cancelPending() {
     setPending(null);
+    setSessionId(null);
   }
 
   return h('div', { class: 'wizard-field' },
@@ -381,12 +414,14 @@ function HotkeyRecorder({ currentKeys, onChange }: { currentKeys: string; onChan
     ),
 
     !pending && h('div', { class: 'hotkey-display' },
-      h('span', { class: 'hotkey-keys' }, recording ? 'Listening (press a key combo)...' : (currentKeys || 'Not set')),
-      h('button', {
-        class: `hotkey-record-btn ${recording ? 'recording' : ''}`,
-        onClick: startRecording,
-        disabled: recording,
-      }, recording ? '...' : 'Record'),
+      h('span', { class: `hotkey-keys ${recording ? 'listening' : ''}` }, recording ? preview : (currentKeys || 'Not set')),
+      recording
+        ? h('button', { class: 'hotkey-record-btn recording', onClick: handleCancel }, 'Cancel')
+        : h('button', {
+            class: 'hotkey-record-btn',
+            onClick: startRecording,
+            disabled: recording,
+          }, 'Record'),
     ),
 
     pending && h('div', { class: 'hotkey-pending' },

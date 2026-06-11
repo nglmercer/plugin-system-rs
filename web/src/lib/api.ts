@@ -115,13 +115,24 @@ export async function fetchInputDevices(): Promise<{ path: string; name: string 
   return data.data || [];
 }
 
-export async function recordHotkeyBackend(device?: string, timeoutMs: number = 10000): Promise<string> {
+export async function recordHotkeyStart(timeoutMs: number = 20000): Promise<{ session_id: string; current_combo: string }> {
   const res = await fetch(`${API_BASE}/hotkey/record`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ device: device || null, timeout_ms: timeoutMs }),
+    body: JSON.stringify({ timeout_ms: timeoutMs }),
   });
   const data = await res.json();
-  if (!data.success) throw new Error(data.error || 'Recording failed');
-  return data.data?.combo || 'unknown';
+  if (!data.success) throw new Error(data.error || 'Failed to start recording');
+  return data.data;
+}
+
+export async function recordHotkeyStatus(sessionId: string): Promise<{ status: string; current_combo: string; result: string | null }> {
+  const res = await fetch(`${API_BASE}/hotkey/record/${sessionId}`);
+  const data = await res.json();
+  if (!data.success) throw new Error(data.error || 'Session not found');
+  return data.data;
+}
+
+export async function recordHotkeyCancel(sessionId: string): Promise<void> {
+  await fetch(`${API_BASE}/hotkey/record/${sessionId}/cancel`, { method: 'POST' });
 }
