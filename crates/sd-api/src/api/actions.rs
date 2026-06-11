@@ -44,3 +44,25 @@ pub(crate) async fn execute_action(
         None => Json(ApiResponse::error("Action not found")),
     }
 }
+
+#[derive(serde::Deserialize)]
+pub(crate) struct OpenUrlRequest {
+    url: String,
+}
+
+pub(crate) async fn open_url(
+    Json(req): Json<OpenUrlRequest>,
+) -> Json<ApiResponse<String>> {
+    if req.url.is_empty() {
+        return Json(ApiResponse::error("No URL provided"));
+    }
+
+    log::info!("[OpenUrl] Opening: {}", req.url);
+
+    if let Err(e) = open::that(&req.url) {
+        log::error!("[OpenUrl] Failed: {}", e);
+        return Json(ApiResponse::error(&format!("Failed to open: {}", e)));
+    }
+
+    Json(ApiResponse::success(format!("Opened: {}", req.url)))
+}

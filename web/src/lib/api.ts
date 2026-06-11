@@ -104,6 +104,16 @@ export async function executeAction(actionName: string): Promise<string> {
   return data.data || data.error || "Unknown result";
 }
 
+export async function openUrl(url: string): Promise<string> {
+  const res = await fetch(`${API_BASE}/actions/open-url`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+  const data = await res.json();
+  return data.data || data.error || "Unknown result";
+}
+
 export async function sendHotkeyCombo(combo: string): Promise<string> {
   const keys = combo.split("+").filter(Boolean);
   const res = await fetch(`${API_BASE}/hotkey/send`, {

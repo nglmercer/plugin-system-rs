@@ -43,6 +43,7 @@ pub fn create_router(state: AppState) -> Router {
             "/api/actions",
             get(actions::list_actions).post(actions::execute_action),
         )
+        .route("/api/actions/open-url", post(actions::open_url))
         .route("/api/hotkey/send", post(hotkeys::send_hotkey))
         .route("/api/hotkey/record", post(hotkeys::record_hotkey))
         .route(

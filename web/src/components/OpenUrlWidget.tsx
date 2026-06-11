@@ -1,6 +1,6 @@
 import { h } from "preact";
 import { useState } from "preact/hooks";
-import { executeAction } from "../lib/api";
+import { openUrl } from "../lib/api";
 
 export function OpenUrlWidget({ settings }: { settings: Record<string, any> }) {
   const [executing, setExecuting] = useState(false);
@@ -8,8 +8,10 @@ export function OpenUrlWidget({ settings }: { settings: Record<string, any> }) {
   const variant = (settings.variant || "compact") as string;
 
   async function handleExecute() {
+    const url = settings.url;
+    if (!url) { setResult("No URL set"); setTimeout(() => setResult(null), 3000); return; }
     setExecuting(true); setResult(null);
-    try { setResult(await executeAction("Open URL")); } catch { setResult("Error"); }
+    try { setResult(await openUrl(url)); } catch { setResult("Error"); }
     setExecuting(false);
     setTimeout(() => setResult(null), 3000);
   }

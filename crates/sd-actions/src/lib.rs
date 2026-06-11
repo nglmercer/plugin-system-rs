@@ -128,12 +128,13 @@ impl Action for OpenUrlAction {
     }
 
     fn execute(&self, ctx: &ActionContext) -> PluginResult {
-        println!(
-            "[OpenUrlAction] Opening: {} (device: {:?}, button: {})",
-            self.url, ctx.device_id, ctx.button_index
-        );
+        log::info!("[OpenUrlAction] Opening: {}", self.url);
 
-        // In real implementation, this would use open::that() or similar
+        if let Err(e) = open::that(&self.url) {
+            log::error!("[OpenUrlAction] Failed to open URL: {}", e);
+            return PluginResult::string(format!("Failed: {}", e));
+        }
+
         ctx.events.emit(sd_events::StreamEvent::ActionExecuted {
             action: self.action_id(),
             result: PluginResult::string(format!("Opened: {}", self.url)),
