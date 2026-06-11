@@ -8,6 +8,5 @@ sd-types = { path = "../sd-types" }
 sd-events = { path = "../sd-events" }
 sd-actions = { path = "../sd-actions" }
 plugin-system = { path = "../plugin-system" }
-plugin-interfaces = { path = "../plugin-interfaces" }
 tokio = { version = "1", features = ["sync"] }
 log = "0.4"

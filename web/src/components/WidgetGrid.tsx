@@ -1,7 +1,7 @@
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import { WidgetConfig, WidgetType, WidgetVariant, DashboardLayout, SystemStats, WIDGET_VARIANTS, WIZARD_STEPS } from '../lib/types';
-import { fetchDashboard, saveDashboard, executeAction, recordHotkey, sendHotkeyCombo } from '../lib/api';
+import { fetchDashboard, saveDashboard, executeAction, sendHotkeyCombo, recordHotkeyBackend, fetchInputDevices } from '../lib/api';
 
 const WIDGET_CATALOG: { type: WidgetType; label: string; icon: string; description: string; defaultColSpan: number; defaultRowSpan: number }[] = [
   { type: 'system-monitor', label: 'System Monitor', icon: '%', description: 'CPU, Memory, Load, Uptime', defaultColSpan: 1, defaultRowSpan: 1 },
@@ -330,15 +330,25 @@ function WizardConfig({ widget, settings, onChange }: {
 function HotkeyRecorder({ currentKeys, onChange }: { currentKeys: string; onChange: (keys: string) => void }) {
   const [recording, setRecording] = useState(false);
   const [pending, setPending] = useState<string | null>(null);
+  const [devices, setDevices] = useState<{ path: string; name: string }[]>([]);
+  const [selectedDevice, setSelectedDevice] = useState<string>('');
+
+  useEffect(() => {
+    fetchInputDevices().then(d => {
+      setDevices(d);
+      if (d.length > 0) setSelectedDevice(d[0].path);
+    }).catch(() => {});
+  }, []);
 
   async function startRecording() {
     setRecording(true);
     setPending(null);
     try {
-      const combo = await recordHotkey(5000);
+      const device = selectedDevice || undefined;
+      const combo = await recordHotkeyBackend(device, 10000);
       setPending(combo);
     } catch {
-      setPending(null);
+      setPending('Timeout');
     }
     setRecording(false);
   }
@@ -357,8 +367,21 @@ function HotkeyRecorder({ currentKeys, onChange }: { currentKeys: string; onChan
   return h('div', { class: 'wizard-field' },
     h('label', null, 'Hotkey Combination'),
 
+    devices.length > 0 && h('div', { class: 'wizard-field' },
+      h('label', null, 'Input Device'),
+      h('select', {
+        value: selectedDevice,
+        onChange: (e: Event) => setSelectedDevice((e.target as HTMLSelectElement).value),
+      },
+        h('option', { value: '' }, 'Global (all devices)'),
+        devices.map(d =>
+          h('option', { value: d.path, key: d.path }, d.name)
+        )
+      ),
+    ),
+
     !pending && h('div', { class: 'hotkey-display' },
-      h('span', { class: 'hotkey-keys' }, recording ? 'Listening...' : (currentKeys || 'Not set')),
+      h('span', { class: 'hotkey-keys' }, recording ? 'Listening (press a key combo)...' : (currentKeys || 'Not set')),
       h('button', {
         class: `hotkey-record-btn ${recording ? 'recording' : ''}`,
         onClick: startRecording,

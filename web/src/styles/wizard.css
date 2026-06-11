@@ -111,6 +111,16 @@
   font-size: 0.875rem;
 }
 .wizard-field textarea { min-height: 60px; resize: vertical; }
+.wizard-field select {
+  background: #1a1a1a;
+  border: 1px solid #404040;
+  color: #fff;
+  padding: 0.6rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.wizard-field select:focus { outline: none; border-color: #00d4ff; }
 .wizard-field input:focus,
 .wizard-field textarea:focus { outline: none; border-color: #00d4ff; }
 .wizard-field-hint { color: #666; font-size: 0.7rem; }

@@ -1,7 +1,0 @@
-[package]
-name = "plugin-interfaces"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-plugin-macros = { path = "../plugin-macros" }

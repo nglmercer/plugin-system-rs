@@ -846,18 +846,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19f132c84eca552bf34cab8ec81f1c1dcc229b811638f9d283dceabe58c5569e"
 
 [[package]]
-name = "plugin-interfaces"
-version = "0.1.0"
-dependencies = [
- "plugin-macros",
-]
-
-[[package]]
 name = "plugin-key-simulator"
 version = "0.1.0"
 dependencies = [
  "log",
- "plugin-interfaces",
  "plugin-system",
  "rdev",
 ]
@@ -891,7 +883,6 @@ name = "plugin-system-monitor"
 version = "0.1.0"
 dependencies = [
  "log",
- "plugin-interfaces",
  "plugin-system",
 ]
 
@@ -900,7 +891,6 @@ name = "plugin-timer"
 version = "0.1.0"
 dependencies = [
  "log",
- "plugin-interfaces",
  "plugin-system",
 ]
 
@@ -1101,7 +1091,6 @@ dependencies = [
  "axum",
  "futures-util",
  "log",
- "plugin-interfaces",
  "plugin-key-simulator",
  "sd-actions",
  "sd-devices",
@@ -1158,7 +1147,6 @@ name = "sd-plugins"
 version = "0.1.0"
 dependencies = [
  "log",
- "plugin-interfaces",
  "plugin-system",
  "sd-actions",
  "sd-events",

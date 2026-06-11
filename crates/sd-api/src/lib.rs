@@ -4,7 +4,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use plugin_interfaces::KeySimulator;
+use plugin_key_simulator::KeySimulator;
 use sd_actions::{ActionContext, ActionRegistry};
 use sd_devices::DeviceManager;
 use sd_events::{EventBus, StreamEvent};
@@ -422,6 +422,55 @@ async fn send_hotkey(
     }))
 }
 
+// Hotkey record endpoint
+#[derive(Deserialize)]
+struct RecordHotkeyRequest {
+    #[serde(default)]
+    _device: Option<String>,
+    #[serde(default = "default_timeout")]
+    timeout_ms: u64,
+}
+
+fn default_timeout() -> u64 { 10000 }
+
+#[derive(Serialize)]
+struct RecordHotkeyResponse {
+    combo: String,
+}
+
+async fn record_hotkey(
+    Json(req): Json<RecordHotkeyRequest>,
+) -> Json<ApiResponse<RecordHotkeyResponse>> {
+    let result = tokio::task::spawn_blocking(move || {
+        plugin_key_simulator::KeySimulatorPlugin::listen_for_combo(req.timeout_ms)
+    })
+    .await
+    .unwrap_or(Err("Blocking task failed".to_string()));
+
+    match result {
+        Ok(combo) => {
+            log::info!("[Hotkey] Recorded combo: {}", combo);
+            Json(ApiResponse::success(RecordHotkeyResponse { combo }))
+        }
+        Err(e) => Json(ApiResponse::error(e)),
+    }
+}
+
+// Hotkey input devices endpoint
+#[derive(Serialize)]
+struct InputDeviceInfo {
+    path: String,
+    name: String,
+}
+
+async fn list_input_devices() -> Json<ApiResponse<Vec<InputDeviceInfo>>> {
+    let devices = plugin_key_simulator::KeySimulatorPlugin::list_input_devices();
+    let info: Vec<InputDeviceInfo> = devices.into_iter()
+        .map(|(path, name)| InputDeviceInfo { path, name })
+        .collect();
+    Json(ApiResponse::success(info))
+}
+
 // Plugin endpoints
 async fn list_plugins(State(state): State<AppState>) -> Json<ApiResponse<Vec<String>>> {
     let plugins = state.plugin_manager.list_plugins().await;
@@ -627,6 +676,8 @@ pub fn create_router(state: AppState) -> Router {
         )
         .route("/api/actions", get(list_actions).post(execute_action))
         .route("/api/hotkey/send", post(send_hotkey))
+        .route("/api/hotkey/record", post(record_hotkey))
+        .route("/api/hotkey/devices", get(list_input_devices))
         .route("/api/plugins", get(list_plugins))
         .route("/api/plugins/reload", post(reload_plugins))
         .route("/api/plugins/:plugin_name", get(get_plugin_data))

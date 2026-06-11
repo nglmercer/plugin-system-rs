@@ -1,7 +1,6 @@
 [workspace]
 members = [
     "crates/plugin-system",
-    "crates/plugin-interfaces",
     "crates/plugin-macros",
     "crates/sd-types",
     "crates/sd-events",
