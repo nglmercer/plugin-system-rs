@@ -1,104 +1,107 @@
-use plugin_system::{PluginMetadata, PluginRegistry};
+use plugin_system::traits::{Plugin, PluginMetadata};
+use plugin_system::PluginRegistry;
+
+#[derive(Default)]
+struct DummyPlugin {
+    name: &'static str,
+    interfaces: Vec<&'static str>,
+}
+
+impl Plugin for DummyPlugin {
+    fn metadata(&self) -> PluginMetadata {
+        plugin_system::traits::PluginMetadata {
+            name: self.name.to_string(),
+            version: "0.1.0".to_string(),
+            authors: vec!["Test".to_string()],
+            dependencies: vec![],
+        }
+    }
+
+    fn on_load(&mut self, _ctx: &plugin_system::PluginContext) {}
+    fn on_unload(&mut self) {}
+    fn plugin_type_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
+    fn interface_ids(&self) -> Vec<&'static str> {
+        self.interfaces.clone()
+    }
+}
 
 #[test]
-fn test_registry_new() {
+fn test_registry_new_is_empty() {
     let registry = PluginRegistry::new();
     assert!(registry.is_empty());
     assert_eq!(registry.len(), 0);
+    assert!(registry.plugin_names().is_empty());
 }
 
 #[test]
-fn test_registry_default() {
-    let registry = PluginRegistry::default();
-    assert!(registry.is_empty());
-}
-
-#[test]
-fn test_plugin_metadata_creation() {
-    let metadata = PluginMetadata {
-        name: "test_plugin".to_string(),
-        version: "0.1.0".to_string(),
-        authors: vec!["Author".to_string()],
-        dependencies: vec!["dep1".to_string()],
+fn test_register_and_get_by_name() {
+    let mut registry = PluginRegistry::new();
+    let plugin = DummyPlugin {
+        name: "alpha",
+        interfaces: vec![],
     };
-
-    assert_eq!(metadata.name, "test_plugin");
-    assert_eq!(metadata.version, "0.1.0");
-    assert_eq!(metadata.authors.len(), 1);
-    assert_eq!(metadata.dependencies.len(), 1);
+    registry.register(Box::new(plugin));
+    assert!(!registry.is_empty());
+    assert_eq!(registry.len(), 1);
+    assert!(registry.contains("alpha"));
+    assert!(registry.get_by_name("alpha").is_some());
+    assert!(registry.get_by_name("missing").is_none());
 }
 
 #[test]
-fn test_plugin_metadata_serialization() {
-    let metadata = PluginMetadata {
-        name: "test_plugin".to_string(),
-        version: "0.2.0".to_string(),
-        authors: vec!["Author1".to_string(), "Author2".to_string()],
-        dependencies: vec![],
+fn test_get_by_interface() {
+    let mut registry = PluginRegistry::new();
+    let plugin_a = DummyPlugin {
+        name: "plugin_a",
+        interfaces: vec!["Timer"],
     };
-
-    let json = serde_json::to_string(&metadata).unwrap();
-    let deserialized: PluginMetadata = serde_json::from_str(&json).unwrap();
-
-    assert_eq!(metadata.name, deserialized.name);
-    assert_eq!(metadata.version, deserialized.version);
-    assert_eq!(metadata.authors, deserialized.authors);
-    assert_eq!(metadata.dependencies, deserialized.dependencies);
+    let plugin_b = DummyPlugin {
+        name: "plugin_b",
+        interfaces: vec!["KeySimulator"],
+    };
+    registry.register(Box::new(plugin_a));
+    registry.register(Box::new(plugin_b));
+    assert_eq!(registry.get_by_interface("Timer"), vec!["plugin_a"]);
+    assert_eq!(registry.get_by_interface("KeySimulator"), vec!["plugin_b"]);
+    assert!(registry.get_by_interface("Missing").is_empty());
 }
 
 #[test]
-fn test_plugin_metadata_clone() {
-    let metadata = PluginMetadata {
-        name: "test_plugin".to_string(),
-        version: "0.1.0".to_string(),
-        authors: vec!["Author".to_string()],
-        dependencies: vec!["dep1".to_string()],
+fn test_unregister() {
+    let mut registry = PluginRegistry::new();
+    let plugin = DummyPlugin {
+        name: "beta",
+        interfaces: vec![],
     };
-
-    let cloned = metadata.clone();
-    assert_eq!(metadata.name, cloned.name);
-    assert_eq!(metadata.version, cloned.version);
-    assert_eq!(metadata.authors, cloned.authors);
-    assert_eq!(metadata.dependencies, cloned.dependencies);
+    registry.register(Box::new(plugin));
+    assert!(registry.contains("beta"));
+    let removed = registry.unregister("beta");
+    assert!(removed.is_some());
+    assert!(!registry.contains("beta"));
+    assert!(registry.unregister("beta").is_none());
 }
 
 #[test]
-fn test_plugin_metadata_debug() {
-    let metadata = PluginMetadata {
-        name: "test_plugin".to_string(),
-        version: "0.1.0".to_string(),
-        authors: vec![],
-        dependencies: vec![],
+fn test_iter_plugins() {
+    let mut registry = PluginRegistry::new();
+    let plugin_a = DummyPlugin {
+        name: "p1",
+        interfaces: vec![],
     };
-
-    let debug_str = format!("{:?}", metadata);
-    assert!(debug_str.contains("test_plugin"));
-    assert!(debug_str.contains("0.1.0"));
-}
-
-#[test]
-fn test_plugin_metadata_empty_dependencies() {
-    let metadata = PluginMetadata {
-        name: "no_deps".to_string(),
-        version: "1.0.0".to_string(),
-        authors: vec![],
-        dependencies: vec![],
+    let plugin_b = DummyPlugin {
+        name: "p2",
+        interfaces: vec![],
     };
-
-    assert!(metadata.dependencies.is_empty());
-}
-
-#[test]
-fn test_plugin_metadata_multiple_dependencies() {
-    let metadata = PluginMetadata {
-        name: "multi_deps".to_string(),
-        version: "1.0.0".to_string(),
-        authors: vec![],
-        dependencies: vec!["dep1".to_string(), "dep2".to_string(), "dep3".to_string()],
-    };
-
-    assert_eq!(metadata.dependencies.len(), 3);
-    assert!(metadata.dependencies.contains(&"dep1".to_string()));
-    assert!(metadata.dependencies.contains(&"dep2".to_string()));
-    assert!(metadata.dependencies.contains(&"dep3".to_string()));
+    registry.register(Box::new(plugin_a));
+    registry.register(Box::new(plugin_b));
+    let names: Vec<_> = registry
+        .iter_plugins()
+        .map(|(name, _)| name.clone())
+        .collect();
+    assert_eq!(names.len(), 2);
+    assert!(names.contains(&"p1".to_string()));
+    assert!(names.contains(&"p2".to_string()));
+    assert_eq!(registry.iter_plugins().count(), 2);
 }

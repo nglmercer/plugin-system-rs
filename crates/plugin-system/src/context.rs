@@ -1,4 +1,5 @@
 use crate::registry::{PluginRegistry, SharedRegistry};
+use crate::traits::Plugin;
 use std::sync::Arc;
 
 pub struct PluginContext {
@@ -11,42 +12,52 @@ impl PluginContext {
     }
 
     pub fn registry(&self) -> std::sync::RwLockReadGuard<'_, PluginRegistry> {
-        self.registry.read().expect("PluginRegistry lock poisoned")
+        self.registry
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
     pub fn registry_mut(&self) -> std::sync::RwLockWriteGuard<'_, PluginRegistry> {
-        self.registry.write().expect("PluginRegistry lock poisoned")
+        self.registry
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
-    pub fn get_plugin<T: crate::traits::Plugin + 'static>(
-        &self,
-        name: &str,
-    ) -> Option<Arc<std::sync::RwLock<Box<dyn crate::traits::Plugin>>>> {
-        let registry = self.registry.read().expect("registry lock poisoned");
+    pub fn get_plugin(&self, name: &str) -> Option<Arc<std::sync::RwLock<Box<dyn Plugin>>>> {
+        let registry = self
+            .registry
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         registry.get_by_name(name)
     }
 
-    pub fn with_plugin<R>(
-        &self,
-        name: &str,
-        f: impl FnOnce(&dyn crate::traits::Plugin) -> R,
-    ) -> Option<R> {
-        let registry = self.registry.read().expect("registry lock poisoned");
+    pub fn with_plugin<R>(&self, name: &str, f: impl FnOnce(&dyn Plugin) -> R) -> Option<R> {
+        let registry = self
+            .registry
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let plugin_arc = registry.get_by_name(name)?;
-        let guard = plugin_arc.read().expect("plugin lock poisoned");
-        let plugin_ref: &dyn crate::traits::Plugin = &**guard;
+        let guard = plugin_arc
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let plugin_ref: &dyn Plugin = &**guard;
         Some(f(plugin_ref))
     }
 
     pub fn with_plugin_mut<R>(
         &self,
         name: &str,
-        f: impl FnOnce(&mut dyn crate::traits::Plugin) -> R,
+        f: impl FnOnce(&mut dyn Plugin) -> R,
     ) -> Option<R> {
-        let registry = self.registry.read().expect("registry lock poisoned");
+        let registry = self
+            .registry
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let plugin_arc = registry.get_by_name(name)?;
-        let mut guard = plugin_arc.write().expect("plugin lock poisoned");
-        let plugin_ref: &mut dyn crate::traits::Plugin = &mut **guard;
+        let mut guard = plugin_arc
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let plugin_ref: &mut dyn Plugin = &mut **guard;
         Some(f(plugin_ref))
     }
 }

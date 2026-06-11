@@ -123,7 +123,7 @@ impl KeySimulatorPlugin {
         LISTENING.store(false, Ordering::SeqCst);
     }
 
-    pub fn listen_for_combo(timeout_ms: u64) -> Result<String, String> {
+    pub fn listen_for_combo(&self, timeout_ms: u64) -> Result<String, String> {
         if LISTENING.swap(true, Ordering::SeqCst) {
             return Err("Already recording".to_string());
         }
@@ -428,5 +428,19 @@ impl Plugin for KeySimulatorPlugin {
 
     fn interface_ids(&self) -> Vec<&'static str> {
         vec!["KeySimulator"]
+    }
+
+    fn simulate_keys(&mut self, keys: &[String]) -> plugin_system::Result<()> {
+        KeySimulator::simulate_keys(self, keys)
+            .map_err(|e| plugin_system::PluginError::PluginNotFound { name: e })
+    }
+
+    fn listen_for_combo(&self, timeout_ms: u64) -> plugin_system::Result<String> {
+        self.listen_for_combo(timeout_ms)
+            .map_err(|e| plugin_system::PluginError::PluginNotFound { name: e })
+    }
+
+    fn reset_recording_state(&self) {
+        Self::reset_recording_state();
     }
 }

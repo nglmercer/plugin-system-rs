@@ -59,6 +59,28 @@ impl syn::parse::Parse for ExportArgs {
     }
 }
 
+fn metadata_exports(self_ty: &Type) -> proc_macro2::TokenStream {
+    quote! {
+        #[no_mangle]
+        pub extern "C" fn plugin_metadata_json() -> *mut std::ffi::c_char {
+            match plugin_system::serde_json::to_vec(&plugin_system::Plugin::metadata(&<#self_ty>::new())) {
+                Ok(json) => match std::ffi::CString::new(json) {
+                    Ok(c_string) => c_string.into_raw(),
+                    Err(_) => std::ptr::null_mut(),
+                },
+                Err(_) => std::ptr::null_mut(),
+            }
+        }
+
+        #[no_mangle]
+        pub unsafe extern "C" fn plugin_free_string(ptr: *mut std::ffi::c_char) {
+            if !ptr.is_null() {
+                drop(std::ffi::CString::from_raw(ptr));
+            }
+        }
+    }
+}
+
 fn generate_plugin_export(
     attr: TokenStream,
     input: ItemImpl,
@@ -85,7 +107,8 @@ fn generate_plugin_export(
     }
 
     let impl_items = &input.items;
-    let self_ty = &input.self_ty;
+    let self_ty = input.self_ty.as_ref();
+    let metadata_export_tokens = metadata_exports(self_ty);
 
     Ok(quote! {
         impl #trait_path for #self_ty {
@@ -107,10 +130,7 @@ fn generate_plugin_export(
             }
         }
 
-        #[no_mangle]
-        pub extern "C" fn plugin_metadata() -> plugin_system::PluginMetadata {
-            plugin_system::Plugin::metadata(&<#self_ty>::new())
-        }
+        #metadata_export_tokens
     })
 }
 
@@ -120,12 +140,13 @@ fn generate_plugin_export_all(
 ) -> syn::Result<proc_macro2::TokenStream> {
     let args: ExportArgs = syn::parse(attr)?;
 
-    let (_, trait_path, self_ty) = input.trait_.as_ref().ok_or_else(|| {
+    let (_, trait_path, _) = input.trait_.as_ref().ok_or_else(|| {
         syn::Error::new_spanned(
             &input.self_ty,
             "#[plugin_export_all] must be on a trait impl block",
         )
     })?;
+    let self_ty = input.self_ty.as_ref();
 
     let trait_last = trait_path
         .segments
@@ -310,6 +331,7 @@ fn generate_plugin_export_all(
         .collect();
 
     let _all_method_names = method_names;
+    let metadata_export_tokens = metadata_exports(self_ty);
 
     Ok(quote! {
         #(#impl_attrs)*
@@ -334,18 +356,18 @@ fn generate_plugin_export_all(
             }
         }
 
-        #[no_mangle]
-        pub extern "C" fn plugin_metadata() -> plugin_system::PluginMetadata {
-            plugin_system::Plugin::metadata(&<#self_ty>::new())
-        }
+        #metadata_export_tokens
     })
 }
 
 fn generate_define_plugin(struct_type: syn::TypePath) -> syn::Result<proc_macro2::TokenStream> {
+    let self_ty = syn::Type::Path(struct_type);
+    let metadata_export_tokens = metadata_exports(&self_ty);
+
     Ok(quote! {
         #[no_mangle]
         pub extern "C" fn plugin_create() -> *mut () {
-            let boxed: Box<dyn plugin_system::Plugin> = Box::new(<#struct_type>::new());
+            let boxed: Box<dyn plugin_system::Plugin> = Box::new(<#self_ty>::new());
             let outer = Box::new(boxed);
             Box::into_raw(outer) as *mut ()
         }
@@ -358,9 +380,6 @@ fn generate_define_plugin(struct_type: syn::TypePath) -> syn::Result<proc_macro2
             }
         }
 
-        #[no_mangle]
-        pub extern "C" fn plugin_metadata() -> plugin_system::PluginMetadata {
-            plugin_system::Plugin::metadata(&<#struct_type>::new())
-        }
+        #metadata_export_tokens
     })
 }

@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
-/// Errors that can occur during plugin system operations.
+use semver::Error as SemverError;
+
 #[derive(Debug, thiserror::Error)]
 pub enum PluginError {
     #[error("Failed to load library '{path}': {reason}")]
@@ -28,6 +29,9 @@ pub enum PluginError {
         found: String,
     },
 
+    #[error("Plugin '{name}' declared an invalid semver requirement: {reason}")]
+    InvalidSemverRequirement { name: String, reason: String },
+
     #[error("Plugin '{name}' panicked during on_load: {reason}")]
     OnLoadPanic { name: String, reason: String },
 
@@ -48,3 +52,19 @@ pub enum PluginError {
 }
 
 pub type Result<T> = std::result::Result<T, PluginError>;
+
+impl PluginError {
+    pub fn from_semver(name: &str, err: &SemverError) -> Self {
+        PluginError::InvalidSemverRequirement {
+            name: name.to_string(),
+            reason: err.to_string(),
+        }
+    }
+
+    pub fn from_lock_error(lock_name: &str, reason: &str) -> Self {
+        PluginError::UnloadFailed {
+            name: lock_name.to_string(),
+            reason: format!("lock poisoned: {}", reason),
+        }
+    }
+}

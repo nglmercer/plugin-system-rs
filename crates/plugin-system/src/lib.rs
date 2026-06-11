@@ -3,6 +3,7 @@ pub mod error;
 pub mod loader;
 pub mod macros;
 pub mod manager;
+pub mod manifest;
 pub mod platform;
 pub mod plugin_info;
 pub mod registry;
@@ -19,6 +20,7 @@ pub use platform::{
 };
 pub use plugin_info::{PluginInfo, PluginResult};
 pub use registry::{new_shared_registry, PluginRegistry, SharedRegistry};
-pub use traits::{Plugin, PluginMetadata};
+pub use serde_json;
+pub use traits::{Plugin, PluginDependency, PluginMetadata};
 
 pub use plugin_macros::{define_plugin, plugin_export, plugin_interface};
