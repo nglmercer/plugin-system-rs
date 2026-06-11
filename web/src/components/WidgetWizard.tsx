@@ -232,6 +232,23 @@ function WizardConfig({
             ),
         }),
       ),
+    widget.type === "volume-master" &&
+      h(
+        "div",
+        { class: "wizard-field" },
+        h("label", null, "Refresh Interval (ms)"),
+        h("input", {
+          type: "number",
+          min: "500",
+          step: "500",
+          value: String(settings.refreshInterval || 2000),
+          onInput: (e: Event) =>
+            set(
+              "refreshInterval",
+              parseInt((e.target as HTMLInputElement).value) || 2000,
+            ),
+        }),
+      ),
   );
 }
 
@@ -596,6 +613,45 @@ function VariantPreview({ type, variant }: { type: string; variant: string }) {
             { class: "variant-preview clock-detailed" },
             "14:30:15",
             h("div", { class: "mini-date" }, "Monday, Jun 10"),
+          );
+      }
+    case "volume-master":
+      switch (variant) {
+        case "minimal":
+          return h(
+            "div",
+            { class: "variant-preview vol-minimal" },
+            h("div", null, "75%"),
+            h("div", { class: "mini-btn" }, "MUTE"),
+          );
+        case "compact":
+          return h(
+            "div",
+            { class: "variant-preview vol-compact" },
+            h(
+              "div",
+              { class: "mini-bar" },
+              h("div", {
+                class: "mini-bar-fill",
+                style: { width: "75%", background: "#4caf50" },
+              }),
+            ),
+            h("div", null, "Speaker"),
+          );
+        case "detailed":
+          return h(
+            "div",
+            { class: "variant-preview vol-detailed" },
+            h("div", null, "75%"),
+            h(
+              "div",
+              { class: "mini-bar" },
+              h("div", {
+                class: "mini-bar-fill",
+                style: { width: "75%", background: "#4caf50" },
+              }),
+            ),
+            h("div", { class: "mini-apps" }, "Apps: 2"),
           );
       }
     default:
