@@ -152,7 +152,7 @@ impl SystemMonitorPlugin {
                     .filter(|e| {
                         e.file_name()
                             .to_str()
-                            .map_or(false, |s| s.chars().all(|c| c.is_ascii_digit()))
+                            .is_some_and(|s| s.chars().all(|c| c.is_ascii_digit()))
                     })
                     .count()
             })

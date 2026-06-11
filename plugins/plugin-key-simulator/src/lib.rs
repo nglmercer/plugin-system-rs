@@ -3,6 +3,12 @@ use plugin_system::{Plugin, PluginContext, PluginMetadata};
 
 pub struct KeySimulatorPlugin;
 
+impl Default for KeySimulatorPlugin {
+    fn default() -> Self {
+        Self
+    }
+}
+
 impl KeySimulatorPlugin {
     pub fn new() -> Self {
         Self
@@ -34,20 +40,20 @@ impl KeySimulator for KeySimulatorPlugin {
         let mains: Vec<&rdev::Key> = rdev_keys.iter().filter(|k| !is_mod(k)).collect();
 
         for m in &mods {
-            rdev::simulate(&rdev::EventType::KeyPress((*m).clone()))
+            rdev::simulate(&rdev::EventType::KeyPress(*(*m)))
                 .map_err(|e| format!("Modifier press failed: {}", e))?;
         }
 
         for k in &mains {
-            rdev::simulate(&rdev::EventType::KeyPress((*k).clone()))
+            rdev::simulate(&rdev::EventType::KeyPress(*(*k)))
                 .map_err(|e| format!("Key press failed: {}", e))?;
             std::thread::sleep(std::time::Duration::from_millis(10));
-            rdev::simulate(&rdev::EventType::KeyRelease((*k).clone()))
+            rdev::simulate(&rdev::EventType::KeyRelease(*(*k)))
                 .map_err(|e| format!("Key release failed: {}", e))?;
         }
 
         for m in mods.iter().rev() {
-            rdev::simulate(&rdev::EventType::KeyRelease((*m).clone()))
+            rdev::simulate(&rdev::EventType::KeyRelease(*(*m)))
                 .map_err(|e| format!("Modifier release failed: {}", e))?;
         }
 
