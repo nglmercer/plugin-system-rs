@@ -1,0 +1,24 @@
+import { h } from "preact";
+import { useState } from "preact/hooks";
+import { sendHotkeyCombo, executeAction } from "../lib/api";
+
+export function SendHotkeyWidget({ settings }: { settings: Record<string, any> }) {
+  const [executing, setExecuting] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+  const variant = (settings.variant || "compact") as string;
+
+  async function handleExecute() {
+    setExecuting(true); setResult(null);
+    try { setResult(settings.keys ? await sendHotkeyCombo(settings.keys) : await executeAction("Send Hotkey")); } catch { setResult("Error"); }
+    setExecuting(false);
+    setTimeout(() => setResult(null), 3000);
+  }
+
+  return h("div", { class: `action-single-widget ${variant === "detailed" ? "detailed" : ""}` },
+    h("div", { class: "action-single-keys" }, settings.keys || "No key set"),
+    variant === "detailed" && h("div", { class: "action-single-desc" }, "Send keyboard hotkey"),
+    result && h("div", { class: "action-result" }, result),
+    h("button", { class: `action-single-btn ${executing ? "executing" : ""}`, onClick: handleExecute, disabled: executing },
+      executing ? "Sending..." : "Send"),
+  );
+}
