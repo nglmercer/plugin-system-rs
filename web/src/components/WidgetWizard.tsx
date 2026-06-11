@@ -243,83 +243,247 @@ function HotkeyRecorder({
   onChange: (keys: string) => void;
 }) {
   const [recording, setRecording] = useState(false);
-  const [pending, setPending] = useState<string | null>(null);
+  const [selectedKeys, setSelectedKeys] = useState<string[]>(
+    currentKeys ? currentKeys.split("+").filter(Boolean) : []
+  );
+  const [showPicker, setShowPicker] = useState(false);
+
+  const MODIFIERS = ["ctrl", "shift", "alt", "win"];
+  const MODIFIER_LABELS: Record<string, string> = {
+    ctrl: "Ctrl",
+    shift: "Shift",
+    alt: "Alt",
+    win: "Win",
+  };
+
+  const LETTER_KEYS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+  const NUMBER_KEYS = "0123456789".split("");
+  const FUNCTION_KEYS = Array.from({ length: 12 }, (_, i) => `f${i + 1}`);
+  const SPECIAL_KEYS = [
+    { key: "space", label: "Space" },
+    { key: "enter", label: "Enter" },
+    { key: "tab", label: "Tab" },
+    { key: "escape", label: "Esc" },
+    { key: "backspace", label: "Backspace" },
+    { key: "delete", label: "Del" },
+    { key: "home", label: "Home" },
+    { key: "end", label: "End" },
+    { key: "pageup", label: "PgUp" },
+    { key: "pagedown", label: "PgDn" },
+    { key: "up", label: "↑" },
+    { key: "down", label: "↓" },
+    { key: "left", label: "←" },
+    { key: "right", label: "→" },
+  ];
+
+  function toggleKey(key: string) {
+    const lower = key.toLowerCase();
+    setSelectedKeys((prev) => {
+      if (prev.includes(lower)) {
+        return prev.filter((k) => k !== lower);
+      }
+      return [...prev, lower];
+    });
+  }
+
+  function removeKey(key: string) {
+    setSelectedKeys((prev) => prev.filter((k) => k !== key));
+  }
+
+  function clearAll() {
+    setSelectedKeys([]);
+  }
+
+  function applySelection() {
+    if (selectedKeys.length > 0) {
+      onChange(selectedKeys.join("+"));
+      setShowPicker(false);
+    }
+  }
 
   async function startRecording() {
     setRecording(true);
-    setPending(null);
     try {
       const combo = await recordHotkey(2000);
-      setPending(combo);
+      if (combo) {
+        setSelectedKeys(combo.split("+").filter(Boolean));
+      }
     } catch (e) {
       if (e instanceof Error && e.message.includes("Already recording")) {
         await resetHotkeyRecording();
         try {
           const combo = await recordHotkey(2000);
-          setPending(combo);
-        } catch {
-          setPending(null);
-        }
-      } else {
-        setPending(null);
+          if (combo) {
+            setSelectedKeys(combo.split("+").filter(Boolean));
+          }
+        } catch {}
       }
     }
     setRecording(false);
   }
 
-  function confirmCombo() {
-    if (pending) {
-      onChange(pending);
-      setPending(null);
-    }
-  }
-  function cancelPending() {
-    setPending(null);
-  }
+  const combo = selectedKeys.join("+");
 
   return h(
     "div",
     { class: "wizard-field" },
     h("label", null, "Hotkey Combination"),
-    !pending &&
+
+    h(
+      "div",
+      { class: "hotkey-display" },
+      h(
+        "span",
+        { class: "hotkey-keys" },
+        combo || "Not set"
+      ),
+      h(
+        "button",
+        {
+          class: "hotkey-record-btn",
+          onClick: () => setShowPicker(!showPicker),
+        },
+        showPicker ? "Close" : "Select"
+      ),
+      h(
+        "button",
+        {
+          class: `hotkey-record-btn ${recording ? "recording" : ""}`,
+          onClick: recording ? () => {} : startRecording,
+        },
+        recording ? "..." : "Record"
+      )
+    ),
+
+    showPicker &&
       h(
         "div",
-        { class: "hotkey-display" },
-        h(
-          "span",
-          { class: `hotkey-keys ${recording ? "listening" : ""}` },
-          recording ? "Listening..." : currentKeys || "Not set",
+        { class: "key-picker" },
+
+        h("div", { class: "key-picker-section" },
+          h("div", { class: "key-picker-label" }, "Selected:"),
+          h(
+            "div",
+            { class: "key-picker-selected" },
+            selectedKeys.length === 0
+              ? h("span", { class: "key-picker-empty" }, "No keys selected")
+              : selectedKeys.map((key) =>
+                  h(
+                    "span",
+                    {
+                      class: "key-picker-chip",
+                      key,
+                      onClick: () => removeKey(key),
+                    },
+                    key,
+                    h("span", { class: "key-picker-chip-x" }, "×")
+                  )
+                )
+          ),
+          selectedKeys.length > 0 &&
+            h(
+              "div",
+              { class: "key-picker-actions" },
+              h("button", { class: "key-picker-clear", onClick: clearAll }, "Clear"),
+              h("button", { class: "key-picker-apply", onClick: applySelection }, "Apply")
+            )
         ),
-        h(
-          "button",
-          {
-            class: `hotkey-record-btn ${recording ? "recording" : ""}`,
-            onClick: recording ? () => {} : startRecording,
-          },
-          recording ? "..." : "Record",
+
+        h("div", { class: "key-picker-section" },
+          h("div", { class: "key-picker-label" }, "Modifiers:"),
+          h(
+            "div",
+            { class: "key-picker-modifiers" },
+            MODIFIERS.map((key) =>
+              h(
+                "button",
+                {
+                  key,
+                  class: `key-picker-mod ${selectedKeys.includes(key) ? "active" : ""}`,
+                  onClick: () => toggleKey(key),
+                },
+                MODIFIER_LABELS[key]
+              )
+            )
+          )
         ),
-      ),
-    pending &&
-      h(
-        "div",
-        { class: "hotkey-pending" },
-        h("span", { class: "hotkey-pending-combo" }, pending),
-        h(
-          "button",
-          { class: "hotkey-confirm-btn", onClick: confirmCombo },
-          "Confirm",
+
+        h("div", { class: "key-picker-section" },
+          h("div", { class: "key-picker-label" }, "Letters:"),
+          h(
+            "div",
+            { class: "key-picker-grid key-picker-letters" },
+            LETTER_KEYS.map((key) =>
+              h(
+                "button",
+                {
+                  key,
+                  class: `key-picker-key ${selectedKeys.includes(key.toLowerCase()) ? "active" : ""}`,
+                  onClick: () => toggleKey(key),
+                },
+                key
+              )
+            )
+          )
         ),
-        h(
-          "button",
-          { class: "hotkey-retry-btn", onClick: startRecording },
-          "Retry",
+
+        h("div", { class: "key-picker-section" },
+          h("div", { class: "key-picker-label" }, "Numbers:"),
+          h(
+            "div",
+            { class: "key-picker-grid key-picker-numbers" },
+            NUMBER_KEYS.map((key) =>
+              h(
+                "button",
+                {
+                  key,
+                  class: `key-picker-key ${selectedKeys.includes(key) ? "active" : ""}`,
+                  onClick: () => toggleKey(key),
+                },
+                key
+              )
+            )
+          )
         ),
-        h(
-          "button",
-          { class: "hotkey-cancel-btn", onClick: cancelPending },
-          "Cancel",
+
+        h("div", { class: "key-picker-section" },
+          h("div", { class: "key-picker-label" }, "Function Keys:"),
+          h(
+            "div",
+            { class: "key-picker-grid key-picker-functions" },
+            FUNCTION_KEYS.map((key) =>
+              h(
+                "button",
+                {
+                  key,
+                  class: `key-picker-key ${selectedKeys.includes(key) ? "active" : ""}`,
+                  onClick: () => toggleKey(key),
+                },
+                key.toUpperCase()
+              )
+            )
+          )
         ),
-      ),
+
+        h("div", { class: "key-picker-section" },
+          h("div", { class: "key-picker-label" }, "Special Keys:"),
+          h(
+            "div",
+            { class: "key-picker-grid key-picker-special" },
+            SPECIAL_KEYS.map(({ key, label }) =>
+              h(
+                "button",
+                {
+                  key,
+                  class: `key-picker-key ${selectedKeys.includes(key) ? "active" : ""}`,
+                  onClick: () => toggleKey(key),
+                },
+                label
+              )
+            )
+          )
+        )
+      )
   );
 }
 

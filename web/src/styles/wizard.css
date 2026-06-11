@@ -374,3 +374,153 @@
   font-weight: bold;
 }
 .wizard-remove-btn:hover { background: #ff6666; }
+
+/* Key Picker */
+.key-picker {
+  background: #1a1a1a;
+  border: 1px solid #404040;
+  border-radius: 6px;
+  padding: 0.75rem;
+  margin-top: 0.5rem;
+  max-height: 400px;
+  overflow-y: auto;
+}
+.key-picker-section {
+  margin-bottom: 0.75rem;
+}
+.key-picker-section:last-child {
+  margin-bottom: 0;
+}
+.key-picker-label {
+  color: #888;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  margin-bottom: 0.4rem;
+}
+.key-picker-selected {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  min-height: 28px;
+  align-items: center;
+}
+.key-picker-empty {
+  color: #555;
+  font-size: 0.75rem;
+  font-style: italic;
+}
+.key-picker-chip {
+  background: #00d4ff;
+  color: #000;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  transition: all 0.15s;
+}
+.key-picker-chip:hover {
+  background: #ff4444;
+  color: #fff;
+}
+.key-picker-chip-x {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+.key-picker-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.key-picker-clear {
+  background: transparent;
+  border: 1px solid #404040;
+  color: #aaa;
+  padding: 0.35rem 0.7rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.7rem;
+}
+.key-picker-clear:hover {
+  border-color: #ff4444;
+  color: #ff4444;
+}
+.key-picker-apply {
+  background: #4caf50;
+  border: none;
+  color: #fff;
+  padding: 0.35rem 0.9rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: bold;
+}
+.key-picker-apply:hover {
+  opacity: 0.85;
+}
+.key-picker-modifiers {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.key-picker-mod {
+  background: #2d2d2d;
+  border: 1px solid #404040;
+  color: #aaa;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: bold;
+  transition: all 0.15s;
+}
+.key-picker-mod:hover {
+  border-color: #00d4ff;
+  color: #00d4ff;
+}
+.key-picker-mod.active {
+  background: #00d4ff;
+  border-color: #00d4ff;
+  color: #000;
+}
+.key-picker-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.key-picker-key {
+  background: #2d2d2d;
+  border: 1px solid #404040;
+  color: #ccc;
+  padding: 0.35rem 0.55rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 500;
+  min-width: 28px;
+  text-align: center;
+  transition: all 0.15s;
+}
+.key-picker-key:hover {
+  border-color: #00d4ff;
+  color: #00d4ff;
+}
+.key-picker-key.active {
+  background: #00d4ff;
+  border-color: #00d4ff;
+  color: #000;
+}
+.key-picker-letters .key-picker-key {
+  min-width: 26px;
+}
+.key-picker-functions .key-picker-key {
+  min-width: 32px;
+  font-size: 0.65rem;
+}
+.key-picker-special .key-picker-key {
+  min-width: 40px;
+  font-size: 0.65rem;
+}
