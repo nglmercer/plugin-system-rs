@@ -56,6 +56,28 @@ Multiplatform volume control.
   - `muted` (bool): Mute status
   - `pid` (Option<u32>): Process ID
 
+## Widgets
+
+### Volume Control Widget (`volume-master`)
+
+Master volume slider with device name.
+
+| Variant | Description |
+|---------|-------------|
+| `minimal` | Just volume % and mute button |
+| `compact` | Slider with device name and mute toggle |
+| `detailed` | Full controls with per-app section |
+
+### App Volume Widget (`volume-apps`)
+
+Per-app volume control for active audio streams.
+
+| Variant | Description |
+|---------|-------------|
+| `minimal` | App count + mini list |
+| `compact` | List with individual sliders |
+| `detailed` | Full per-app controls with PID |
+
 ## Building
 
 ```bash
@@ -71,7 +93,7 @@ cp target/release/libplugin_*.so plugins/
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/volume` | Get master volume state |
+| GET | `/api/volume` | Get master volume state + apps |
 | PUT | `/api/volume/master` | Set master volume |
 | PUT | `/api/volume/mute` | Set master mute |
 | GET | `/api/volume/apps` | List per-app volumes |
@@ -81,6 +103,41 @@ cp target/release/libplugin_*.so plugins/
 | POST | `/api/plugins/reload` | Reload all plugins |
 | GET | `/api/plugins/:name` | Get plugin data |
 | GET | `/api/system-stats` | Get system stats |
+
+## Testing
+
+### Unit Tests
+
+```bash
+# Run volume plugin tests
+cargo test -p plugin-volume-master
+```
+
+Tests cover:
+- Volume parsing from pactl output
+- Sink-input parsing (single, multiple, empty)
+- Edge cases (missing props, unknown apps)
+
+### Manual Test Script
+
+```bash
+./scripts/test-volume.sh
+```
+
+Tests:
+- pactl commands work
+- API endpoints return valid JSON
+- Volume set/mute operations
+
+### E2E Test
+
+1. Start server: `cargo run`
+2. Open `http://localhost:3000`
+3. Add Volume Control widget
+4. Add App Volume widget
+5. Play audio (e.g., YouTube)
+6. Verify apps appear in App Volume widget
+7. Test slider and mute controls
 
 ## Creating System Plugins
 
@@ -152,6 +209,13 @@ To create a new system plugin:
        fn interface_data(&self) -> Option<serde_json::Value> {
            None
        }
+
+       fn handle_command(&mut self, method: &str, args: serde_json::Value) -> Option<serde_json::Value> {
+           match method {
+               "my_command" => Some(serde_json::json!({"ok": true})),
+               _ => None,
+           }
+       }
    }
    ```
 
@@ -170,6 +234,7 @@ To add a widget for your plugin in the web UI:
 3. Add widget catalog entry to `web/src/components/widgetHelpers.ts`
 4. Register in `web/src/components/WidgetContent.tsx`
 5. Add CSS styles to `web/src/styles/widgets.css`
+6. Add wizard config in `web/src/components/WidgetWizard.tsx`
 
 ## Platform Support
 
@@ -186,3 +251,4 @@ To add a widget for your plugin in the web UI:
 - Plugin `.so` files are loaded from the `plugins/` directory at startup
 - Use `POST /api/plugins/reload` to hot-reload plugins without restarting
 - Plugin data is accessible via `GET /api/plugins/:name`
+- Commands are dispatched via `handle_command()` trait method

@@ -381,3 +381,184 @@
   min-width: 2.5em;
   text-align: right;
 }
+
+/* Volume Apps Widget */
+.volapps-empty, .volapps-unsupported {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 100%;
+  color: #666;
+}
+.volapps-empty-icon {
+  font-size: 2rem;
+  color: #444;
+}
+.volapps-empty-text {
+  font-size: 0.8rem;
+}
+
+.volapps-variant.minimal {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.volapps-count {
+  color: #888;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  margin-bottom: 0.2rem;
+}
+.volapps-mini-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.volapps-mini-name {
+  color: #ccc;
+  font-size: 0.7rem;
+}
+.volapps-mini-vol {
+  font-size: 0.7rem;
+  font-weight: bold;
+}
+.volapps-mini-more {
+  color: #666;
+  font-size: 0.65rem;
+}
+
+.volapps-variant.compact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.volapps-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.volapps-title {
+  color: #888;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+.volapps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.volapps-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.3rem;
+  background: #1a1a1a;
+  border-radius: 4px;
+}
+.volapps-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.volapps-item-name {
+  color: #ccc;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+.volapps-mute-btn {
+  background: #404040;
+  border: 1px solid #555;
+  color: #fff;
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.65rem;
+  font-weight: bold;
+}
+.volapps-mute-btn:hover { background: #555; }
+.volapps-mute-btn.muted { background: #f44336; border-color: #f44336; }
+.volapps-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.volapps-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: linear-gradient(to right, #4caf50 0%, #4caf50 var(--vol-pct, 50%), #404040 var(--vol-pct, 50%), #404040 100%);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+.volapps-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  background: #fff;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.volapps-slider::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  background: #fff;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+.volapps-value {
+  color: #ccc;
+  font-size: 0.7rem;
+  min-width: 2.5em;
+  text-align: right;
+}
+
+.volapps-variant.detailed {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.volapps-list.detailed {
+  max-height: 300px;
+}
+.volapps-item-detailed {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.4rem;
+  background: #1a1a1a;
+  border-radius: 4px;
+}
+.volapps-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  flex: 1;
+}
+.volapps-item-pid {
+  color: #666;
+  font-size: 0.6rem;
+  font-family: monospace;
+}
+.volapps-mute-btn-detailed {
+  border: none;
+  color: #fff;
+  padding: 0.2rem 0.6rem;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.65rem;
+  font-weight: bold;
+  background: #4caf50;
+}
+.volapps-mute-btn-detailed:hover { opacity: 0.8; }
+.volapps-mute-btn-detailed.muted { background: #f44336; }

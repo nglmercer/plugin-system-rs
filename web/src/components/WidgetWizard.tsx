@@ -249,6 +249,23 @@ function WizardConfig({
             ),
         }),
       ),
+    widget.type === "volume-apps" &&
+      h(
+        "div",
+        { class: "wizard-field" },
+        h("label", null, "Refresh Interval (ms)"),
+        h("input", {
+          type: "number",
+          min: "500",
+          step: "500",
+          value: String(settings.refreshInterval || 2000),
+          onInput: (e: Event) =>
+            set(
+              "refreshInterval",
+              parseInt((e.target as HTMLInputElement).value) || 2000,
+            ),
+        }),
+      ),
   );
 }
 
@@ -652,6 +669,45 @@ function VariantPreview({ type, variant }: { type: string; variant: string }) {
               }),
             ),
             h("div", { class: "mini-apps" }, "Apps: 2"),
+          );
+      }
+    case "volume-apps":
+      switch (variant) {
+        case "minimal":
+          return h(
+            "div",
+            { class: "variant-preview volapps-minimal" },
+            h("div", null, "3 apps"),
+            h("div", { class: "mini-list" }, "Firefox, Spotify"),
+          );
+        case "compact":
+          return h(
+            "div",
+            { class: "variant-preview volapps-compact" },
+            h("div", null, "Firefox"),
+            h(
+              "div",
+              { class: "mini-bar" },
+              h("div", {
+                class: "mini-bar-fill",
+                style: { width: "60%", background: "#4caf50" },
+              }),
+            ),
+          );
+        case "detailed":
+          return h(
+            "div",
+            { class: "variant-preview volapps-detailed" },
+            h("div", null, "Firefox (PID: 1234)"),
+            h(
+              "div",
+              { class: "mini-bar" },
+              h("div", {
+                class: "mini-bar-fill",
+                style: { width: "60%", background: "#4caf50" },
+              }),
+            ),
+            h("div", null, "60%"),
           );
       }
     default:
