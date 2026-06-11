@@ -227,6 +227,21 @@
   border-color: #00d4ff;
 }
 
+.edit-remove-btn {
+  background: #ff4444;
+  color: #fff;
+  border: none;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  margin-top: 0.5rem;
+}
+
+.edit-remove-btn:hover {
+  background: #ff6666;
+}
+
 /* Widget Library Modal */
 .widget-library-overlay {
   position: fixed;
@@ -319,45 +334,95 @@
 }
 
 /* System Monitor Widget */
-.sysmon-slot {
+.sysmon-loading {
+  color: #888;
+  text-align: center;
+  padding: 1rem;
+}
+
+.sysmon-detail {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.75rem;
   width: 100%;
 }
 
-.sysmon-row {
-  display: flex;
-  gap: 1rem;
+.sysmon-cpu-model {
+  color: #888;
+  font-size: 0.7rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.sysmon-item {
-  flex: 1;
+.sysmon-bars {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.5rem;
 }
 
-.sysmon-val {
-  font-size: 1.25rem;
+.sysmon-bar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.sysmon-bar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sysmon-bar-label {
+  color: #aaa;
+  font-size: 0.75rem;
+}
+
+.sysmon-bar-value {
+  font-size: 0.8rem;
   font-weight: bold;
 }
 
-.sysmon-bar {
-  height: 4px;
+.sysmon-bar-track {
+  height: 6px;
   background: #404040;
-  border-radius: 2px;
+  border-radius: 3px;
   overflow: hidden;
 }
 
 .sysmon-bar-fill {
   height: 100%;
   transition: width 0.3s ease;
+  border-radius: 3px;
 }
 
-.sysmon-lbl {
-  color: #888;
+.sysmon-bar-detail {
+  color: #666;
+  font-size: 0.65rem;
+}
+
+.sysmon-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+}
+
+.sysmon-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.sysmon-info-label {
+  color: #666;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+}
+
+.sysmon-info-value {
+  color: #ccc;
   font-size: 0.75rem;
+  font-family: monospace;
 }
 
 /* Clock Widget */
@@ -387,34 +452,104 @@
   font-size: 0.875rem;
 }
 
-/* Actions Widget */
-.actions-slot {
+/* Quick Actions Widget */
+.quick-actions-widget {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
 
-.actions-empty {
-  color: #888;
+.action-result {
+  background: #1a3a1a;
+  border: 1px solid #4caf50;
+  color: #4caf50;
+  padding: 0.4rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
   text-align: center;
-  padding: 1rem;
 }
 
-.actions-slot-btn {
+.action-btn {
   background: #1a1a1a;
   border: 1px solid #404040;
   color: #fff;
   padding: 0.5rem 0.75rem;
   border-radius: 4px;
   cursor: pointer;
-  text-align: left;
-  font-size: 0.875rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   transition: all 0.2s;
 }
 
-.actions-slot-btn:hover {
+.action-btn:hover:not(:disabled) {
   border-color: #00d4ff;
   background: #333;
+}
+
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.action-btn.executing {
+  border-color: #ff9800;
+}
+
+.action-btn-name {
+  font-size: 0.8rem;
+}
+
+.action-btn-cat {
+  font-size: 0.65rem;
+  color: #888;
+}
+
+/* Single Action Widgets (Send Hotkey, Open URL, Type Text) */
+.action-single-widget {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  text-align: center;
+  height: 100%;
+}
+
+.action-single-keys,
+.action-single-url,
+.action-single-text {
+  color: #00d4ff;
+  font-size: 0.9rem;
+  font-weight: bold;
+  word-break: break-all;
+  max-height: 3em;
+  overflow: hidden;
+}
+
+.action-single-btn {
+  background: #00d4ff;
+  color: #000;
+  border: none;
+  padding: 0.4rem 1.2rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 0.8rem;
+  transition: opacity 0.2s;
+}
+
+.action-single-btn:hover:not(:disabled) {
+  opacity: 0.8;
+}
+
+.action-single-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.action-single-btn.executing {
+  background: #ff9800;
 }
 
 .widget-unknown {

@@ -29,6 +29,8 @@ export interface StreamEvent {
 
 export interface SystemStats {
   cpu_usage: number;
+  cpu_model: string;
+  cpu_cores: number;
   memory_total: number;
   memory_used: number;
   memory_usage: number;
@@ -37,6 +39,7 @@ export interface SystemStats {
   load_avg: [number, number, number];
   uptime: number;
   process_count: number;
+  thread_count: number;
 }
 
 export interface PluginData {
@@ -46,7 +49,13 @@ export interface PluginData {
   data: Record<string, any>;
 }
 
-export type WidgetType = 'system-monitor' | 'clock' | 'actions';
+export type WidgetType =
+  | 'system-monitor'
+  | 'clock'
+  | 'quick-actions'
+  | 'send-hotkey'
+  | 'open-url'
+  | 'type-text';
 
 export interface WidgetConfig {
   id: string;

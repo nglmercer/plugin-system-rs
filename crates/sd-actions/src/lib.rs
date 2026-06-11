@@ -172,6 +172,10 @@ impl ActionRegistry {
         }
         by_category
     }
+
+    pub fn find_by_name(&self, name: &str) -> Option<&Arc<dyn Action>> {
+        self.actions.values().find(|a| a.action_name() == name)
+    }
 }
 
 impl Default for ActionRegistry {

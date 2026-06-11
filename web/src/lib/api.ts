@@ -87,3 +87,13 @@ export async function saveDashboard(layout: DashboardLayout): Promise<boolean> {
   const data = await res.json();
   return data.success;
 }
+
+export async function executeAction(actionName: string): Promise<string> {
+  const res = await fetch(`${API_BASE}/actions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action_name: actionName }),
+  });
+  const data = await res.json();
+  return data.data || data.error || 'Unknown result';
+}

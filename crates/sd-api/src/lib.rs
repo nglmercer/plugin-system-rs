@@ -6,7 +6,7 @@ use axum::{
 };
 use sd_types::*;
 use sd_events::{EventBus, StreamEvent};
-use sd_actions::ActionRegistry;
+use sd_actions::{ActionRegistry, ActionContext};
 use sd_profiles::ProfileManager;
 use sd_devices::DeviceManager;
 use sd_plugins::SdPluginManager;
@@ -68,6 +68,8 @@ fn save_dashboard_config(layout: &DashboardLayout) -> bool {
 #[derive(Serialize)]
 struct SystemStats {
     cpu_usage: f64,
+    cpu_model: String,
+    cpu_cores: usize,
     memory_total: u64,
     memory_used: u64,
     memory_usage: f64,
@@ -76,6 +78,7 @@ struct SystemStats {
     load_avg: [f64; 3],
     uptime: u64,
     process_count: usize,
+    thread_count: usize,
 }
 
 #[derive(Serialize)]
@@ -86,24 +89,66 @@ struct PluginDataResponse {
     data: serde_json::Value,
 }
 
-fn read_cpu_usage() -> f64 {
-    std::fs::read_to_string("/proc/stat")
+struct CpuTimes {
+    idle: u64,
+    total: u64,
+}
+
+fn read_cpu_times() -> Option<CpuTimes> {
+    let content = std::fs::read_to_string("/proc/stat").ok()?;
+    let line = content.lines().next()?;
+    let parts: Vec<u64> = line.split_whitespace()
+        .skip(1)
+        .filter_map(|s| s.parse().ok())
+        .collect();
+    if parts.len() >= 4 {
+        let idle = parts[3];
+        let total: u64 = parts.iter().sum();
+        Some(CpuTimes { idle, total })
+    } else {
+        None
+    }
+}
+
+fn read_cpu_usage_sample() -> f64 {
+    let first = read_cpu_times();
+    std::thread::sleep(std::time::Duration::from_millis(100));
+    let second = read_cpu_times();
+    match (first, second) {
+        (Some(a), Some(b)) => {
+            let total_delta = b.total.saturating_sub(a.total);
+            let idle_delta = b.idle.saturating_sub(a.idle);
+            if total_delta > 0 {
+                ((total_delta - idle_delta) as f64 / total_delta as f64 * 100.0).min(100.0)
+            } else {
+                0.0
+            }
+        }
+        _ => 0.0,
+    }
+}
+
+fn read_cpu_model() -> String {
+    std::fs::read_to_string("/proc/cpuinfo")
         .ok()
         .and_then(|content| {
-            let line = content.lines().next()?;
-            let parts: Vec<u64> = line.split_whitespace()
-                .skip(1)
-                .filter_map(|s| s.parse().ok())
-                .collect();
-            if parts.len() >= 4 {
-                let idle = parts[3];
-                let total: u64 = parts.iter().sum();
-                Some((total - idle) as f64 / total as f64 * 100.0)
-            } else {
-                None
-            }
+            content.lines()
+                .find(|l| l.starts_with("model name"))
+                .and_then(|l| l.split(':').nth(1))
+                .map(|s| s.trim().to_string())
         })
-        .unwrap_or(0.0)
+        .unwrap_or_else(|| "Unknown CPU".to_string())
+}
+
+fn read_cpu_cores() -> usize {
+    std::fs::read_to_string("/proc/cpuinfo")
+        .ok()
+        .map(|content| {
+            content.lines()
+                .filter(|l| l.starts_with("processor"))
+                .count()
+        })
+        .unwrap_or(1)
 }
 
 fn read_memory_info() -> (u64, u64, u64, u64) {
@@ -162,15 +207,24 @@ fn read_uptime() -> u64 {
         .unwrap_or(0)
 }
 
-fn read_process_count() -> usize {
-    std::fs::read_dir("/proc")
-        .map(|entries| {
-            entries
-                .filter_map(|e| e.ok())
-                .filter(|e| e.file_name().to_str().map_or(false, |s| s.chars().all(|c| c.is_ascii_digit())))
-                .count()
-        })
-        .unwrap_or(0)
+fn read_process_count() -> (usize, usize) {
+    let mut processes = 0usize;
+    let mut threads = 0usize;
+    if let Ok(entries) = std::fs::read_dir("/proc") {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            if let Some(s) = name.to_str() {
+                if s.chars().all(|c| c.is_ascii_digit()) {
+                    processes += 1;
+                    // Count threads in /proc/<pid>/task
+                    if let Ok(task_dir) = std::fs::read_dir(entry.path().join("task")) {
+                        threads += task_dir.flatten().count();
+                    }
+                }
+            }
+        }
+    }
+    (processes, threads)
 }
 
 #[derive(Clone)]
@@ -280,6 +334,32 @@ async fn list_actions(State(state): State<AppState>) -> Json<ApiResponse<Vec<Str
     Json(ApiResponse::success(actions))
 }
 
+#[derive(Deserialize)]
+struct ExecuteActionRequest {
+    action_name: String,
+}
+
+async fn execute_action(
+    State(state): State<AppState>,
+    Json(req): Json<ExecuteActionRequest>,
+) -> Json<ApiResponse<String>> {
+    let registry = state.action_registry.read().await;
+    match registry.find_by_name(&req.action_name) {
+        Some(action) => {
+            let ctx = ActionContext {
+                device_id: DeviceId("web".to_string()),
+                button_index: 0,
+                profile_id: ProfileId(uuid::Uuid::nil()),
+                state: Arc::new(RwLock::new(std::collections::HashMap::new())),
+                events: state.events.clone(),
+            };
+            let result = action.execute(&ctx);
+            Json(ApiResponse::success(result.to_string()))
+        }
+        None => Json(ApiResponse::error("Action not found")),
+    }
+}
+
 // Plugin endpoints
 async fn list_plugins(State(state): State<AppState>) -> Json<ApiResponse<Vec<String>>> {
     let plugins = state.plugin_manager.list_plugins().await;
@@ -304,7 +384,7 @@ async fn get_plugin_data(
         Ok(info) => {
             let data = match plugin_name.as_str() {
                 "system-monitor" => {
-                    let cpu = read_cpu_usage();
+                    let cpu = read_cpu_usage_sample();
                     let (mem_total, mem_used, swap_total, swap_used) = read_memory_info();
                     let load = read_load_avg();
                     serde_json::json!({
@@ -333,11 +413,13 @@ async fn get_plugin_data(
 
 // System stats endpoint
 async fn get_system_stats() -> Json<ApiResponse<SystemStats>> {
-    let cpu_usage = read_cpu_usage();
+    let cpu_usage = read_cpu_usage_sample();
+    let cpu_model = read_cpu_model();
+    let cpu_cores = read_cpu_cores();
     let (mem_total, mem_used, swap_total, swap_used) = read_memory_info();
     let load_avg = read_load_avg();
     let uptime = read_uptime();
-    let process_count = read_process_count();
+    let (process_count, thread_count) = read_process_count();
 
     let memory_usage = if mem_total > 0 {
         mem_used as f64 / mem_total as f64 * 100.0
@@ -347,6 +429,8 @@ async fn get_system_stats() -> Json<ApiResponse<SystemStats>> {
 
     Json(ApiResponse::success(SystemStats {
         cpu_usage,
+        cpu_model,
+        cpu_cores,
         memory_total: mem_total,
         memory_used: mem_used,
         memory_usage,
@@ -355,6 +439,7 @@ async fn get_system_stats() -> Json<ApiResponse<SystemStats>> {
         load_avg,
         uptime,
         process_count,
+        thread_count,
     }))
 }
 
@@ -466,7 +551,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/devices/:device_id/press/:button_index", post(simulate_button_press))
         .route("/api/profiles", get(list_profiles).post(create_profile))
         .route("/api/profiles/:profile_id", get(get_profile).delete(delete_profile))
-        .route("/api/actions", get(list_actions))
+        .route("/api/actions", get(list_actions).post(execute_action))
         .route("/api/plugins", get(list_plugins))
         .route("/api/plugins/reload", post(reload_plugins))
         .route("/api/plugins/:plugin_name", get(get_plugin_data))
