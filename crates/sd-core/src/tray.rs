@@ -21,7 +21,7 @@ fn create_icon_rgba() -> tray_icon::Icon {
             let dist = (cx * cx + cy * cy).sqrt();
 
             if dist < size as f32 / 2.0 - 1.0 {
-                if x >= 6 && x <= 25 && y >= 6 && y <= 25 {
+                if (6..=25).contains(&x) && (6..=25).contains(&y) {
                     rgba[idx] = 0;
                     rgba[idx + 1] = 212;
                     rgba[idx + 2] = 255;
@@ -60,7 +60,7 @@ pub fn spawn_tray(shutdown: Arc<AtomicBool>) {
         let url = format!("http://{}:{}", local_ip, PORT);
 
         let open_item = MenuItem::with_id("open", "Open in Browser", true, None);
-        let status_item = MenuItem::with_id("status", &format!("Server: {}", url), false, None);
+        let status_item = MenuItem::with_id("status", format!("Server: {}", url), false, None);
         let exit_item = MenuItem::with_id("exit", "Exit", true, None);
 
         tray_menu.append(&status_item).unwrap();
@@ -92,23 +92,20 @@ pub fn spawn_tray(shutdown: Arc<AtomicBool>) {
                 return;
             }
 
-            loop {
-                match menu_channel.try_recv() {
-                    Ok(event) => match event.id().0.as_str() {
-                        "open" => {
-                            let url = format!("http://localhost:{}", PORT);
-                            println!("Opening browser: {}", url);
-                            let _ = open::that(&url);
-                        }
-                        "exit" => {
-                            println!("Exit requested from tray");
-                            shutdown.store(true, Ordering::Relaxed);
-                            *control_flow = ControlFlow::Exit;
-                            std::process::exit(0);
-                        }
-                        _ => {}
-                    },
-                    Err(_) => break,
+            while let Ok(event) = menu_channel.try_recv() {
+                match event.id().0.as_str() {
+                    "open" => {
+                        let url = format!("http://localhost:{}", PORT);
+                        println!("Opening browser: {}", url);
+                        let _ = open::that(&url);
+                    }
+                    "exit" => {
+                        println!("Exit requested from tray");
+                        shutdown.store(true, Ordering::Relaxed);
+                        *control_flow = ControlFlow::Exit;
+                        std::process::exit(0);
+                    }
+                    _ => {}
                 }
             }
 

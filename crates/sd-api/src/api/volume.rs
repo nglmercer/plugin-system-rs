@@ -82,8 +82,8 @@ fn parse_volume_data(data: serde_json::Value) -> Option<VolumeDataResponse> {
         },
         apps: apps
             .into_iter()
-            .filter_map(|a| {
-                Some(AppVolumeResponse {
+            .map(|a| {
+                AppVolumeResponse {
                     name: a
                         .get("name")
                         .and_then(|v| v.as_str())
@@ -92,7 +92,7 @@ fn parse_volume_data(data: serde_json::Value) -> Option<VolumeDataResponse> {
                     volume: a.get("volume").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
                     muted: a.get("muted").and_then(|v| v.as_bool()).unwrap_or(false),
                     pid: a.get("pid").and_then(|v| v.as_u64()).map(|p| p as u32),
-                })
+                }
             })
             .collect(),
     })
@@ -133,8 +133,8 @@ pub(crate) async fn get_app_volumes(
                     .and_then(|a| a.as_array())
                     .map(|arr| {
                         arr.iter()
-                            .filter_map(|a| {
-                                Some(AppVolumeResponse {
+                            .map(|a| {
+                                AppVolumeResponse {
                                     name: a
                                         .get("name")
                                         .and_then(|v| v.as_str())
@@ -147,7 +147,7 @@ pub(crate) async fn get_app_volumes(
                                         .and_then(|v| v.as_bool())
                                         .unwrap_or(false),
                                     pid: a.get("pid").and_then(|v| v.as_u64()).map(|p| p as u32),
-                                })
+                                }
                             })
                             .collect()
                     })

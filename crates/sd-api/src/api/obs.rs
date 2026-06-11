@@ -204,7 +204,7 @@ pub(crate) async fn disconnect_obs(State(state): State<AppState>) -> Json<ApiRes
         let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
         if plugin.has_interface("ObsControl") {
             let args = serde_json::json!({});
-            if let Some(_) = plugin.handle_command("disconnect", args) {
+            if plugin.handle_command("disconnect", args).is_some() {
                 return Json(ApiResponse::success("Disconnected from OBS".to_string()));
             }
         }
@@ -361,8 +361,8 @@ pub(crate) async fn get_scenes(
                     .and_then(|s| s.as_array())
                     .map(|arr| {
                         arr.iter()
-                            .filter_map(|s| {
-                                Some(ObsSceneResponse {
+                            .map(|s| {
+                                ObsSceneResponse {
                                     name: s
                                         .get("name")
                                         .and_then(|v| v.as_str())
@@ -370,7 +370,7 @@ pub(crate) async fn get_scenes(
                                         .to_string(),
                                     index: s.get("index").and_then(|v| v.as_i64()).unwrap_or(0)
                                         as i32,
-                                })
+                                }
                             })
                             .collect()
                     })
@@ -430,8 +430,8 @@ pub(crate) async fn get_inputs(
                     .and_then(|s| s.as_array())
                     .map(|arr| {
                         arr.iter()
-                            .filter_map(|i| {
-                                Some(ObsInputResponse {
+                            .map(|i| {
+                                ObsInputResponse {
                                     name: i
                                         .get("name")
                                         .and_then(|v| v.as_str())
@@ -452,7 +452,7 @@ pub(crate) async fn get_inputs(
                                         .and_then(|v| v.as_bool())
                                         .unwrap_or(false),
                                     volume: i.get("volume").and_then(|v| v.as_f64()).unwrap_or(0.0),
-                                })
+                                }
                             })
                             .collect()
                     })
@@ -587,8 +587,8 @@ pub(crate) async fn get_transitions(
                     .and_then(|s| s.as_array())
                     .map(|arr| {
                         arr.iter()
-                            .filter_map(|t| {
-                                Some(ObsTransitionResponse {
+                            .map(|t| {
+                                ObsTransitionResponse {
                                     name: t
                                         .get("name")
                                         .and_then(|v| v.as_str())
@@ -604,7 +604,7 @@ pub(crate) async fn get_transitions(
                                         .and_then(|v| v.as_u64())
                                         .unwrap_or(0)
                                         as u32,
-                                })
+                                }
                             })
                             .collect()
                     })
@@ -663,8 +663,8 @@ pub(crate) async fn get_scene_items(
                     .and_then(|s| s.as_array())
                     .map(|arr| {
                         arr.iter()
-                            .filter_map(|i| {
-                                Some(ObsSceneItemResponse {
+                            .map(|i| {
+                                ObsSceneItemResponse {
                                     id: i.get("id").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
                                     name: i
                                         .get("name")
@@ -675,7 +675,7 @@ pub(crate) async fn get_scene_items(
                                         .get("enabled")
                                         .and_then(|v| v.as_bool())
                                         .unwrap_or(false),
-                                })
+                                }
                             })
                             .collect()
                     })

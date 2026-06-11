@@ -59,7 +59,7 @@ pub(crate) async fn open_url(Json(req): Json<OpenUrlRequest>) -> Json<ApiRespons
 
     if let Err(e) = open::that(&req.url) {
         log::error!("[OpenUrl] Failed: {}", e);
-        return Json(ApiResponse::error(&format!("Failed to open: {}", e)));
+        return Json(ApiResponse::error(format!("Failed to open: {}", e)));
     }
 
     Json(ApiResponse::success(format!("Opened: {}", req.url)))
