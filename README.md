@@ -87,7 +87,8 @@ streamdeck/
 │   ├── sd-devices/         Device abstraction (virtual devices)
 │   ├── sd-api/             axum HTTP + WebSocket server
 │   ├── sd-plugins/         Plugin manager integration
-│   └── sd-core/            Main binary
+│   ├── sd-core/            Main binary
+│   └── plugin-cli/         Build CLI tool (sd-plugins)
 ├── plugins/
 │   ├── plugin-timer/       Timer/countdown plugin
 │   ├── plugin-system-monitor/  System resource monitoring
@@ -113,44 +114,24 @@ sudo apt install libgtk-3-dev libxdo-dev libappindicator3-dev
 # Windows / macOS: No extra dependencies needed
 ```
 
-### 2. Build the backend
+### 2. Build everything (recommended)
 
 ```bash
-cargo build
+# Build CLI tool, plugins, web frontend, and core binary
+cargo build --release -p sd-plugins-cli
+./target/release/sd-plugins build --release --with-web --with-core
 ```
 
-### 3. Build all plugins
-
-```bash
-cargo build --release -p plugin-timer -p plugin-system-monitor -p plugin-key-simulator -p plugin-volume-master -p plugin-obs
-```
-
-### 4. Copy plugins
-
-```bash
-mkdir -p plugins
-cp target/release/libplugin_*.so plugins/
-```
-
-### 5. Build the web UI
-
-```bash
-cd web
-npm install
-npm run build
-cd ..
-```
-
-Or use the Makefile:
-
-```bash
-make build-web
-```
-
-### 6. Run the core
+### 3. Run
 
 ```bash
 cargo run
+```
+
+Or use the pre-built binary:
+
+```bash
+./target/release/sd-core
 ```
 
 The server starts on `http://localhost:3000`. A system tray icon will appear in your system tray. Right-click it for options:
@@ -197,6 +178,7 @@ The web UI starts on `http://localhost:5173` and proxies API requests to the bac
 | POST | `/api/plugins/reload` | Reload all plugins |
 | GET | `/api/plugins/:name` | Get plugin data |
 | GET | `/api/system-stats` | Get system stats |
+| GET | `/api/local-ip` | Get local network IP |
 | GET | `/api/dashboard` | Get dashboard layout |
 | PUT | `/api/dashboard` | Save dashboard layout |
 | WS | `/ws` | WebSocket for real-time events |
@@ -466,17 +448,53 @@ nvm install 20
 git clone https://github.com/yourusername/streamdeck-core.git
 cd streamdeck-core
 
-# Build web frontend
+# Build everything (CLI + plugins + web + core)
+cargo build --release -p sd-plugins-cli
+./target/release/sd-plugins build --release --with-web --with-core
+
+# Or build manually step by step:
 cd web && npm ci && npm run build && cd ..
-
-# Build Rust (debug)
-cargo build
-
-# Build Rust (release)
 cargo build --release
+```
 
-# Run
-cargo run
+### Plugin Build CLI
+
+The `sd-plugins` CLI tool auto-discovers and builds all plugins:
+
+```bash
+# Build CLI tool
+cargo build -p sd-plugins-cli
+
+# Build all plugins
+./target/debug/sd-plugins build
+
+# Build in release mode with web frontend and core binary
+./target/debug/sd-plugins build --release --with-web --with-core
+
+# Build specific plugin
+./target/debug/sd-plugins build -p plugin-obs
+
+# List discovered plugins
+./target/debug/sd-plugins list
+
+# Validate plugin configurations
+./target/debug/sd-plugins check
+
+# Package for release
+./target/debug/sd-plugins package --version 1.0.0
+
+# Clean build artifacts
+./target/debug/sd-plugins clean
+```
+
+Or use Make targets:
+
+```bash
+make build-plugins          # Build all plugins
+make build-plugins-release  # Build release mode
+make plugins-list           # List plugins
+make plugins-check          # Validate configs
+make plugins-clean          # Clean artifacts
 ```
 
 ### Create Release
