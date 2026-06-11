@@ -1,22 +1,32 @@
 import { h } from 'preact';
-import { useState, useEffect, useRef } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import QRCode from 'qrcode';
+import { fetchLocalIp } from '../lib/api';
 
 export function QrModal({ onClose }: { onClose: () => void }) {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [url, setUrl] = useState<string>('');
   const [copied, setCopied] = useState(false);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    const localUrl = window.location.origin;
-    setUrl(localUrl);
+    fetchLocalIp().then((info: { ip: string; port: number; url: string }) => {
+      const networkUrl = info.url;
+      setUrl(networkUrl);
 
-    QRCode.toDataURL(localUrl, {
-      width: 280,
-      margin: 2,
-      color: { dark: '#00d4ff', light: '#1a1a1a' }
-    }).then(setQrDataUrl).catch(console.error);
+      QRCode.toDataURL(networkUrl, {
+        width: 280,
+        margin: 2,
+        color: { dark: '#00d4ff', light: '#1a1a1a' }
+      }).then(setQrDataUrl).catch(console.error);
+    }).catch(() => {
+      const fallback = window.location.origin;
+      setUrl(fallback);
+      QRCode.toDataURL(fallback, {
+        width: 280,
+        margin: 2,
+        color: { dark: '#00d4ff', light: '#1a1a1a' }
+      }).then(setQrDataUrl).catch(console.error);
+    });
   }, []);
 
   const handleCopy = () => {

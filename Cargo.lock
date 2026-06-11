@@ -2750,6 +2750,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "futures-util",
+ "local-ip-address",
  "log",
  "open",
  "plugin-volume-master",

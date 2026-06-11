@@ -72,6 +72,12 @@ export async function fetchSystemStats() {
   return data.data;
 }
 
+export async function fetchLocalIp() {
+  const res = await fetch(`${API_BASE}/local-ip`);
+  const data = await res.json();
+  return data.data;
+}
+
 export async function fetchPluginData(pluginName: string) {
   const res = await fetch(`${API_BASE}/plugins/${pluginName}`);
   const data = await res.json();
