@@ -884,6 +884,8 @@ version = "0.1.0"
 dependencies = [
  "log",
  "plugin-system",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

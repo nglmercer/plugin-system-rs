@@ -21,6 +21,10 @@ pub trait Plugin: Any + Send + Sync {
     fn interface_ids(&self) -> Vec<&'static str> {
         Vec::new()
     }
+
+    fn interface_data(&self) -> Option<serde_json::Value> {
+        None
+    }
 }
 
 impl dyn Plugin {

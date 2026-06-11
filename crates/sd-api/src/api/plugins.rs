@@ -4,7 +4,7 @@ use axum::{
 };
 use serde::Serialize;
 
-use crate::{api::system::system_stats_data, response::ApiResponse, state::AppState};
+use crate::{response::ApiResponse, state::AppState};
 
 #[derive(Serialize)]
 pub(crate) struct PluginDataResponse {
@@ -33,17 +33,23 @@ pub(crate) async fn get_plugin_data(
     let plugin_manager = state.plugin_manager.plugin_manager();
     let manager = plugin_manager.read().await;
 
-    match manager.get_plugin_info(&plugin_name) {
-        Ok(info) => {
-            let data = match plugin_name.as_str() {
-                "system-monitor" => system_stats_data(),
-                _ => serde_json::json!({}),
-            };
+    match manager.get_plugin_arc(&plugin_name) {
+        Ok(plugin_arc) => {
+            let plugin = plugin_arc.read().expect("plugin lock poisoned");
+            let meta = plugin.metadata();
+            let interfaces: Vec<String> = plugin
+                .interface_ids()
+                .into_iter()
+                .map(|s| s.to_string())
+                .collect();
+            let data = plugin
+                .interface_data()
+                .unwrap_or_else(|| serde_json::json!({}));
 
             Json(ApiResponse::success(PluginDataResponse {
-                name: info.name,
-                version: info.version,
-                interfaces: info.interfaces,
+                name: meta.name,
+                version: meta.version,
+                interfaces,
                 data,
             }))
         }
