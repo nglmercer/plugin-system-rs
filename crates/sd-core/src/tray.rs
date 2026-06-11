@@ -60,16 +60,12 @@ pub fn spawn_tray(shutdown: Arc<AtomicBool>) {
         let url = format!("http://{}:{}", local_ip, PORT);
 
         let open_item = MenuItem::with_id("open", "Open in Browser", true, None);
-        let qr_item = MenuItem::with_id("qr", "Show QR Code (mobile)", true, None);
-        let copy_url_item = MenuItem::with_id("copy_url", &format!("Copy URL: {}", url), true, None);
         let status_item = MenuItem::with_id("status", &format!("Server: {}", url), false, None);
         let exit_item = MenuItem::with_id("exit", "Exit", true, None);
 
         tray_menu.append(&status_item).unwrap();
         tray_menu.append(&PredefinedMenuItem::separator()).unwrap();
         tray_menu.append(&open_item).unwrap();
-        tray_menu.append(&qr_item).unwrap();
-        tray_menu.append(&copy_url_item).unwrap();
         tray_menu.append(&PredefinedMenuItem::separator()).unwrap();
         tray_menu.append(&exit_item).unwrap();
 
@@ -105,32 +101,6 @@ pub fn spawn_tray(shutdown: Arc<AtomicBool>) {
                                 println!("Opening browser: {}", url);
                                 let _ = open::that(&url);
                             }
-                            "qr" => {
-                                let url = format!("http://{}:{}", get_local_ip(), PORT);
-                                println!("\n=== QR CODE ===");
-                                println!("Scan to connect from mobile:");
-                                println!("{}", generate_qr_text(&url));
-                                println!("URL: {}\n", url);
-                            }
-                            "copy_url" => {
-                                let url = format!("http://{}:{}", get_local_ip(), PORT);
-                                println!("URL copied: {}", url);
-                                #[cfg(target_os = "linux")]
-                                {
-                                    let _ = std::process::Command::new("xclip")
-                                        .args(["-selection", "clipboard"])
-                                        .arg("-i")
-                                        .stdin(std::process::Stdio::piped())
-                                        .spawn()
-                                        .and_then(|mut child| {
-                                            use std::io::Write;
-                                            if let Some(stdin) = child.stdin.as_mut() {
-                                                stdin.write_all(url.as_bytes())?;
-                                            }
-                                            child.wait().map(|_| ())
-                                        });
-                                }
-                            }
                             "exit" => {
                                 println!("Exit requested from tray");
                                 shutdown.store(true, Ordering::Relaxed);
@@ -147,170 +117,4 @@ pub fn spawn_tray(shutdown: Arc<AtomicBool>) {
             let _ = tray_channel.try_recv();
         });
     });
-}
-
-fn generate_qr_text(url: &str) -> String {
-    let mut result = String::new();
-    let modules = encode_qr(url);
-    let size = modules.len();
-
-    result.push_str("  ");
-    for _ in 0..size + 4 {
-        result.push('\u{2588}');
-        result.push('\u{2588}');
-    }
-    result.push('\n');
-
-    for _ in 0..2 {
-        result.push_str("  ");
-        result.push('\u{2588}');
-        result.push('\u{2588}');
-        for _ in 0..size {
-            result.push('\u{2588}');
-            result.push('\u{2588}');
-        }
-        result.push('\u{2588}');
-        result.push('\u{2588}');
-        result.push('\n');
-    }
-
-    for row in &modules {
-        result.push_str("  ");
-        result.push('\u{2588}');
-        result.push('\u{2588}');
-        for &cell in row {
-            if cell {
-                result.push(' ');
-                result.push(' ');
-            } else {
-                result.push('\u{2588}');
-                result.push('\u{2588}');
-            }
-        }
-        result.push('\u{2588}');
-        result.push('\u{2588}');
-        result.push('\n');
-    }
-
-    for _ in 0..2 {
-        result.push_str("  ");
-        result.push('\u{2588}');
-        result.push('\u{2588}');
-        for _ in 0..size {
-            result.push('\u{2588}');
-            result.push('\u{2588}');
-        }
-        result.push('\u{2588}');
-        result.push('\u{2588}');
-        result.push('\n');
-    }
-
-    result.push_str("  ");
-    for _ in 0..size + 4 {
-        result.push('\u{2588}');
-        result.push('\u{2588}');
-    }
-    result.push('\n');
-
-    result
-}
-
-fn encode_qr(data: &str) -> Vec<Vec<bool>> {
-    let size = 25;
-    let mut modules = vec![vec![false; size]; size];
-
-    add_finder_pattern(&mut modules, 0, 0);
-    add_finder_pattern(&mut modules, size - 7, 0);
-    add_finder_pattern(&mut modules, 0, size - 7);
-
-    let bytes = data.as_bytes();
-    let mut bit_idx = 0;
-    let mut col = size - 1;
-    let mut going_up = true;
-
-    while col >= 2 {
-        if col == 6 {
-            col -= 1;
-            continue;
-        }
-
-        let rows: Vec<usize> = if going_up {
-            (0..size).collect()
-        } else {
-            (0..size).rev().collect()
-        };
-
-        for &row in &rows {
-            if is_reserved(row, col, size) && is_reserved(row, col - 1, size) {
-                continue;
-            }
-
-            if !is_reserved(row, col, size) && bit_idx < bytes.len() * 8 {
-                let byte_idx = bit_idx / 8;
-                let bit_pos = 7 - (bit_idx % 8);
-                modules[row][col] = (bytes[byte_idx] >> bit_pos) & 1 == 1;
-                bit_idx += 1;
-            }
-
-            if col > 0 && !is_reserved(row, col - 1, size) {
-                if bit_idx < bytes.len() * 8 {
-                    let byte_idx = bit_idx / 8;
-                    let bit_pos = 7 - (bit_idx % 8);
-                    modules[row][col - 1] = (bytes[byte_idx] >> bit_pos) & 1 == 1;
-                    bit_idx += 1;
-                }
-            }
-        }
-
-        going_up = !going_up;
-        col = col.saturating_sub(2);
-    }
-
-    modules
-}
-
-fn is_reserved(row: usize, col: usize, size: usize) -> bool {
-    if row < 9 && col < 9 {
-        return true;
-    }
-    if row < 9 && col >= size - 8 {
-        return true;
-    }
-    if row >= size - 8 && col < 9 {
-        return true;
-    }
-    if row == 6 || col == 6 {
-        return true;
-    }
-    false
-}
-
-fn add_finder_pattern(modules: &mut Vec<Vec<bool>>, start_row: usize, start_col: usize) {
-    for r in 0..7 {
-        for c in 0..7 {
-            let is_black = r == 0
-                || r == 6
-                || c == 0
-                || c == 6
-                || (r >= 2 && r <= 4 && c >= 2 && c <= 4);
-            if start_row + r < modules.len() && start_col + c < modules[0].len() {
-                modules[start_row + r][start_col + c] = is_black;
-            }
-        }
-    }
-
-    if start_row > 0 {
-        for c in 0..8 {
-            if start_col + c < modules[0].len() && start_row + 7 < modules.len() {
-                modules[start_row + 7][start_col + c] = false;
-            }
-        }
-    }
-    if start_col > 0 {
-        for r in 0..8 {
-            if start_row + r < modules.len() && start_col + 7 < modules[0].len() {
-                modules[start_row + r][start_col + 7] = false;
-            }
-        }
-    }
 }

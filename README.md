@@ -7,8 +7,6 @@ A plugin-based StreamDeck control system with web UI, built in Rust. Control OBS
 ### System Tray
 - **System tray icon** with context menu (multiplatform: Linux/Windows/macOS)
 - **Open in Browser** - Launch the web UI in your default browser
-- **Show QR Code** - Display QR code in terminal for mobile access
-- **Copy URL** - Copy the local network URL to clipboard
 - **Exit** - Clean shutdown from tray
 
 ### QR Code (Web UI)
@@ -131,8 +129,6 @@ cargo run
 
 The server starts on `http://localhost:3000`. A system tray icon will appear in your system tray. Right-click it for options:
 - **Open in Browser** - Launch the web UI
-- **Show QR Code** - Display QR code for mobile access
-- **Copy URL** - Copy the local network URL
 - **Exit** - Shutdown the server
 
 ### Development Mode
