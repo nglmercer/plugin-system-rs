@@ -2,8 +2,11 @@ use anyhow::{Context, Result};
 use cargo_metadata::MetadataCommand;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
+use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::mpsc;
+use std::time::Duration;
 
 #[derive(Parser)]
 #[command(name = "sd-plugins", about = "StreamDeck Plugin Build CLI")]
@@ -56,6 +59,17 @@ enum Commands {
 
     /// Validate plugin configurations
     Check,
+
+    /// Watch plugins and auto-rebuild, then run a command
+    Dev {
+        /// Build in release mode
+        #[arg(short, long)]
+        release: bool,
+
+        /// Command to run after building plugins
+        #[arg(required = true, last = true)]
+        command: Vec<String>,
+    },
 }
 
 fn main() -> Result<()> {
@@ -73,6 +87,7 @@ fn main() -> Result<()> {
         Commands::Clean => cmd_clean(),
         Commands::Package { version, output } => cmd_package(&version, &output),
         Commands::Check => cmd_check(),
+        Commands::Dev { release, command } => cmd_dev(release, command),
     }
 }
 
@@ -562,6 +577,305 @@ fn cmd_check() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn cmd_dev(release: bool, command: Vec<String>) -> Result<()> {
+    let workspace_root = find_workspace_root()?;
+    let target_triple = get_host_target()?;
+
+    println!("{}", "=== StreamDeck Dev Mode ===".cyan().bold());
+    println!("Watching plugins for changes...");
+    println!("Command: {}", command.join(" ").yellow());
+    println!();
+
+    // Initial build of all plugins
+    println!("{}", "Building plugins...".yellow());
+    build_all_plugins(&workspace_root, &target_triple, release)?;
+    println!();
+
+    // Spawn the user's command
+    println!("{}", "Starting application...".green());
+    let mut child = spawn_command(&command)?;
+
+    // Set up file watcher
+    let (tx, rx) = mpsc::channel();
+    let mut watcher: RecommendedWatcher =
+        Watcher::new(tx, notify::Config::default()).context("Failed to create file watcher")?;
+
+    let watch_dirs = get_watch_dirs(&workspace_root);
+    for dir in &watch_dirs {
+        if dir.exists() {
+            watcher
+                .watch(dir.as_path(), RecursiveMode::Recursive)
+                .context(format!("Failed to watch {}", dir.display()))?;
+            println!("  Watching: {}", dir.display().to_string().dimmed());
+        }
+    }
+    println!();
+    println!("{}", "Press Ctrl+C to stop".dimmed());
+    println!();
+
+    // Debounce loop
+    let mut last_build = std::time::Instant::now();
+    let debounce = Duration::from_millis(500);
+
+    loop {
+        match rx.recv() {
+            Ok(Ok(event)) => {
+                if !is_relevant_event(&event) {
+                    continue;
+                }
+
+                // Debounce: skip if we just built
+                if last_build.elapsed() < debounce {
+                    continue;
+                }
+
+                let paths = get_changed_paths(&event);
+                if paths.is_empty() {
+                    continue;
+                }
+
+                println!("\n{}", "Changes detected, rebuilding...".yellow().bold());
+                for p in &paths {
+                    println!("  Changed: {}", p.display().to_string().dimmed());
+                }
+
+                // Determine affected plugins
+                let affected = determine_affected_plugins(&paths);
+                if affected.is_empty() {
+                    println!("  {}", "No plugin changes, skipping rebuild".dimmed());
+                    continue;
+                }
+
+                // Rebuild affected plugins
+                match build_plugins(&workspace_root, &target_triple, release, &affected) {
+                    Ok(()) => {
+                        last_build = std::time::Instant::now();
+
+                        // Kill old process and respawn
+                        println!("{}", "Restarting application...".green());
+                        child.kill().ok();
+                        child.wait().ok();
+                        child = spawn_command(&command)?;
+                    }
+                    Err(e) => {
+                        println!("{} {}", "Build failed:".red(), e);
+                        println!("  {}", "Waiting for more changes...".dimmed());
+                    }
+                }
+            }
+            Ok(Err(e)) => {
+                println!("{} {}", "Watch error:".red(), e);
+            }
+            Err(e) => {
+                println!("{} {}", "Channel error:".red(), e);
+                break;
+            }
+        }
+    }
+
+    child.kill().ok();
+    child.wait().ok();
+    Ok(())
+}
+
+fn get_watch_dirs(workspace_root: &Path) -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+
+    // Watch plugin source directories
+    let plugins_dir = workspace_root.join("plugins");
+    if plugins_dir.exists() {
+        if let Ok(entries) = std::fs::read_dir(&plugins_dir) {
+            for entry in entries.flatten() {
+                if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                    let src_dir = entry.path().join("src");
+                    if src_dir.exists() {
+                        dirs.push(src_dir);
+                    }
+                }
+            }
+        }
+    }
+
+    // Watch shared plugin crates
+    let system_src = workspace_root.join("crates/plugin-system/src");
+    if system_src.exists() {
+        dirs.push(system_src);
+    }
+
+    let macros_src = workspace_root.join("crates/plugin-macros/src");
+    if macros_src.exists() {
+        dirs.push(macros_src);
+    }
+
+    dirs
+}
+
+fn is_relevant_event(event: &Event) -> bool {
+    matches!(
+        event.kind,
+        EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)
+    )
+}
+
+fn get_changed_paths(event: &Event) -> Vec<PathBuf> {
+    event
+        .paths
+        .iter()
+        .filter(|p| {
+            // Only care about .rs and .toml files
+            p.extension()
+                .map(|ext| ext == "rs" || ext == "toml")
+                .unwrap_or(false)
+        })
+        .cloned()
+        .collect()
+}
+
+fn determine_affected_plugins(paths: &[PathBuf]) -> Vec<String> {
+    let mut affected = Vec::new();
+    let mut rebuild_all = false;
+
+    for path in paths {
+        let path_str = path.to_string_lossy();
+
+        // Changes in shared crates affect ALL plugins
+        if path_str.contains("crates/plugin-system/") || path_str.contains("crates/plugin-macros/")
+        {
+            rebuild_all = true;
+            break;
+        }
+
+        // Changes in a specific plugin
+        if let Some(plugin_name) = extract_plugin_name(&path_str) {
+            if !affected.contains(&plugin_name) {
+                affected.push(plugin_name);
+            }
+        }
+    }
+
+    if rebuild_all {
+        return vec!["__all__".to_string()];
+    }
+
+    affected
+}
+
+fn extract_plugin_name(path: &str) -> Option<String> {
+    // Extract plugin name from path like ".../plugins/plugin-volume-master/src/..."
+    if let Some(start) = path.find("/plugins/plugin-") {
+        let rest = &path[start + "/plugins/plugin-".len()..];
+        if let Some(end) = rest.find('/') {
+            let name = &rest[..end];
+            return Some(format!("plugin-{}", name));
+        }
+    }
+    None
+}
+
+fn build_all_plugins(workspace_root: &Path, target_triple: &str, release: bool) -> Result<()> {
+    let plugins = discover_plugins(workspace_root)?;
+    let plugins_refs: Vec<&PluginInfo> = plugins.iter().collect();
+    build_plugins_with_info(workspace_root, target_triple, release, &plugins_refs)
+}
+
+fn build_plugins(
+    workspace_root: &Path,
+    target_triple: &str,
+    release: bool,
+    affected: &[String],
+) -> Result<()> {
+    let all_plugins = discover_plugins(workspace_root)?;
+
+    let plugins_to_build: Vec<&PluginInfo> = if affected.contains(&"__all__".to_string()) {
+        all_plugins.iter().collect()
+    } else {
+        all_plugins
+            .iter()
+            .filter(|p| affected.contains(&p.name))
+            .collect()
+    };
+
+    if plugins_to_build.is_empty() {
+        return Ok(());
+    }
+
+    build_plugins_with_info(workspace_root, target_triple, release, &plugins_to_build)
+}
+
+fn build_plugins_with_info(
+    workspace_root: &Path,
+    target_triple: &str,
+    release: bool,
+    plugins: &[&PluginInfo],
+) -> Result<()> {
+    let profile_flag = if release { "--release" } else { "" };
+    let host_target = get_host_target().unwrap_or_default();
+    let mut built = 0;
+
+    for plugin in plugins {
+        print!("  Building {}... ", plugin.name.cyan());
+
+        let mut args = vec!["build"];
+        if !profile_flag.is_empty() {
+            args.push(profile_flag);
+        }
+        if target_triple != host_target {
+            args.push("--target");
+            args.push(target_triple);
+        }
+        args.push("--lib");
+        args.push("-p");
+        args.push(&plugin.name);
+
+        let status = Command::new("cargo")
+            .args(&args)
+            .current_dir(workspace_root)
+            .status()
+            .context(format!("Failed to build {}", plugin.name))?;
+
+        if status.success() {
+            println!("{}", "OK".green());
+            built += 1;
+
+            // Copy plugin to plugins/ directory
+            let lib_filename = get_plugin_lib_filename(&plugin.lib_name, target_triple);
+            let src_dir = if target_triple == host_target {
+                workspace_root.join("target/release")
+            } else {
+                workspace_root.join(format!("target/{}/release", target_triple))
+            };
+            let src = src_dir.join(&lib_filename);
+            let dst = workspace_root.join("plugins").join(&lib_filename);
+
+            if src.exists() {
+                std::fs::copy(&src, &dst)
+                    .context(format!("Failed to copy {} to plugins/", lib_filename))?;
+            }
+        } else {
+            println!("{}", "FAILED".red());
+            anyhow::bail!("Failed to build {}", plugin.name);
+        }
+    }
+
+    println!("  Built {} plugin(s)", built.to_string().green());
+    Ok(())
+}
+
+fn spawn_command(command: &[String]) -> Result<std::process::Child> {
+    let program = command.first().context("No command specified")?;
+    let args = &command[1..];
+
+    let child = Command::new(program)
+        .args(args)
+        .stdin(std::process::Stdio::inherit())
+        .stdout(std::process::Stdio::inherit())
+        .stderr(std::process::Stdio::inherit())
+        .spawn()
+        .context(format!("Failed to spawn command: {}", command.join(" ")))?;
+
+    Ok(child)
 }
 
 fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {

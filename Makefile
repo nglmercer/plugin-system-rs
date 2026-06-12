@@ -36,6 +36,8 @@ help:
 		'  make plugins-list           List discovered plugins' \
 		'  make plugins-check          Validate plugin configurations' \
 		'  make plugins-clean          Clean plugin build artifacts' \
+		'  make dev CMD="..."          Watch plugins + auto-rebuild + run command' \
+		'  make dev-release CMD="..."  Same as dev but in release mode' \
 		'' \
 		'Tray icon system dependencies:' \
 		'  Arch Linux: pacman -S gtk3 xdotool libappindicator-gtk3' \
@@ -75,6 +77,16 @@ plugins-check:
 plugins-clean:
 	$(CARGO) build -p sd-plugins-cli 2>/dev/null
 	./target/debug/sd-plugins clean
+
+.PHONY: dev
+dev:
+	$(CARGO) build -p sd-plugins-cli 2>/dev/null
+	./target/debug/sd-plugins dev -- $(CMD)
+
+.PHONY: dev-release
+dev-release:
+	$(CARGO) build --release -p sd-plugins-cli 2>/dev/null
+	./target/release/sd-plugins dev -r -- $(CMD)
 
 .PHONY: ensure-linux-x64-target
 ensure-linux-x64-target:

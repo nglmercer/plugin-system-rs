@@ -140,6 +140,33 @@ The server starts on `http://localhost:3000`. A system tray icon will appear in 
 
 ### Development Mode
 
+For plugin development with auto-rebuild and auto-restart:
+
+```bash
+# Build CLI tool first
+cargo build -p sd-plugins-cli
+
+# Watch plugins + auto-restart sd-core
+./target/debug/sd-plugins dev -- cargo run --bin sd-core
+
+# Or with release mode
+./target/debug/sd-plugins dev -r -- cargo run --release --bin sd-core
+```
+
+Or use Make targets:
+
+```bash
+make dev CMD="cargo run --bin sd-core"
+make dev-release CMD="cargo run --release --bin sd-core"
+```
+
+The `dev` command:
+1. Builds all plugins once
+2. Runs your command (e.g. `cargo run --bin sd-core`)
+3. Watches `plugins/*/src/`, `crates/plugin-system/src/`, `crates/plugin-macros/src/` for changes
+4. On change: rebuilds affected plugins and restarts your command
+5. Press Ctrl+C to stop
+
 For frontend development with hot reload:
 
 ```bash
@@ -474,6 +501,9 @@ cargo build -p sd-plugins-cli
 # Build specific plugin
 ./target/debug/sd-plugins build -p plugin-obs
 
+# Watch plugins + auto-rebuild + run command
+./target/debug/sd-plugins dev -- cargo run --bin sd-core
+
 # List discovered plugins
 ./target/debug/sd-plugins list
 
@@ -492,6 +522,7 @@ Or use Make targets:
 ```bash
 make build-plugins          # Build all plugins
 make build-plugins-release  # Build release mode
+make dev CMD="cargo run --bin sd-core"  # Watch + rebuild + run
 make plugins-list           # List plugins
 make plugins-check          # Validate configs
 make plugins-clean          # Clean artifacts
