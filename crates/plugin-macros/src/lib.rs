@@ -352,7 +352,7 @@ fn extract_metadata_name(input: &ItemImpl) -> Option<String> {
 
 fn kebab_to_pascal_case(value: &str) -> String {
     value
-        .split(|c: char| c == '-' || c == '_')
+        .split(['-', '_'])
         .filter(|part| !part.is_empty())
         .map(|part| {
             let mut chars = part.chars();
@@ -864,7 +864,7 @@ fn generate_plugin_export_all(
         }
     }
 
-    let _interface_names: Vec<_> = args.interfaces.iter().cloned().collect();
+    let _interface_names: Vec<_> = args.interfaces.to_vec();
 
     let _all_method_names = method_names;
     let metadata_export_tokens = metadata_exports(self_ty, prefix_opt);
