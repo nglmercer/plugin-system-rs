@@ -101,7 +101,7 @@ jobs:
           copy target\release\sd-core.exe release\ -Force
           copy target\release\plugin_*.dll release\plugins\ -Force
           xcopy web\dist release\web /E /I
-          cd release && 7z a ..\streamdeck-windows-x64.zip .
+          Set-Location release; 7z a ..\streamdeck-windows-x64.zip .
         shell: powershell
       - uses: actions/upload-artifact@v4
         with:
@@ -134,7 +134,7 @@ jobs:
           copy target\aarch64-pc-windows-msvc\release\sd-core.exe release\ -Force
           copy target\aarch64-pc-windows-msvc\release\plugin_*.dll release\plugins\ -Force
           xcopy web\dist release\web /E /I
-          cd release && 7z a ..\streamdeck-windows-arm64.zip .
+          Set-Location release; 7z a ..\streamdeck-windows-arm64.zip .
         shell: powershell
       - uses: actions/upload-artifact@v4
         with:
