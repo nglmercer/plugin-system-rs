@@ -70,18 +70,24 @@ jobs:
       - name: Build core
         run: |
           PKG_CONFIG_ALLOW_CROSS=1 \
+          PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig:$PKG_CONFIG_PATH \
           cargo build --release -p sd-core --target aarch64-unknown-linux-gnu
       - name: Build plugins
         run: |
           PKG_CONFIG_ALLOW_CROSS=1 \
+          PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig:$PKG_CONFIG_PATH \
           cargo build --release -p plugin-timer --target aarch64-unknown-linux-gnu
           PKG_CONFIG_ALLOW_CROSS=1 \
+          PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig:$PKG_CONFIG_PATH \
           cargo build --release -p plugin-key-simulator --target aarch64-unknown-linux-gnu
           PKG_CONFIG_ALLOW_CROSS=1 \
+          PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig:$PKG_CONFIG_PATH \
           cargo build --release -p plugin-volume-master --target aarch64-unknown-linux-gnu
           PKG_CONFIG_ALLOW_CROSS=1 \
+          PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig:$PKG_CONFIG_PATH \
           cargo build --release -p plugin-system-monitor --target aarch64-unknown-linux-gnu
           PKG_CONFIG_ALLOW_CROSS=1 \
+          PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig:$PKG_CONFIG_PATH \
           cargo build --release -p plugin-obs --target aarch64-unknown-linux-gnu
       - name: Package
         run: |
