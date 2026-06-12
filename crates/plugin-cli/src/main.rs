@@ -307,10 +307,11 @@ fn cmd_build(
 
             // Copy plugin to plugins/ directory
             let lib_filename = get_plugin_lib_filename(&plugin.lib_name, &target_triple);
+            let profile = if release { "release" } else { "debug" };
             let src_dir = if target_triple == get_host_target().unwrap_or_default() {
-                workspace_root.join("target/release")
+                workspace_root.join(format!("target/{}", profile))
             } else {
-                workspace_root.join(format!("target/{}/release", target_triple))
+                workspace_root.join(format!("target/{}/{}", target_triple, profile))
             };
             let src = src_dir.join(&lib_filename);
             let dst = workspace_root.join("plugins").join(&lib_filename);
@@ -841,10 +842,11 @@ fn build_plugins_with_info(
 
             // Copy plugin to plugins/ directory
             let lib_filename = get_plugin_lib_filename(&plugin.lib_name, target_triple);
+            let profile = if release { "release" } else { "debug" };
             let src_dir = if target_triple == host_target {
-                workspace_root.join("target/release")
+                workspace_root.join(format!("target/{}", profile))
             } else {
-                workspace_root.join(format!("target/{}/release", target_triple))
+                workspace_root.join(format!("target/{}/{}", target_triple, profile))
             };
             let src = src_dir.join(&lib_filename);
             let dst = workspace_root.join("plugins").join(&lib_filename);
