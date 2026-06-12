@@ -87,7 +87,10 @@ impl PluginManager {
         std::fs::create_dir_all(&temp_dir)?;
 
         let temp_path = temp_dir.join(format!("{}_{}.{}", name, std::process::id(), ext));
-        std::fs::write(&temp_path, &bytes)?;
+        if let Err(e) = std::fs::write(&temp_path, &bytes) {
+            let _ = std::fs::remove_file(&temp_path);
+            return Err(e.into());
+        }
 
         log::info!(
             "Wrote {} bytes to temp file: {}",
@@ -97,7 +100,13 @@ impl PluginManager {
 
         let source = loader.source();
         let original_path = Path::new(&source);
-        let actual_name = self.load_plugin_with_prefix(&temp_path, Some(original_path))?;
+        let actual_name = match self.load_plugin_with_prefix(&temp_path, Some(original_path)) {
+            Ok(name) => name,
+            Err(e) => {
+                let _ = std::fs::remove_file(&temp_path);
+                return Err(e);
+            }
+        };
         if let Some(loaded) = self.loaded.get_mut(&actual_name) {
             if loaded.temp_path.is_none() {
                 loaded.temp_path = Some(temp_path.clone());
@@ -188,6 +197,39 @@ impl PluginManager {
         {
             let _ = std::fs::remove_file(&temp_path);
             log::debug!("Removed temp plugin file: {}", temp_path.display());
+        }
+    }
+
+    fn cleanup_stale_temp_files(&self) {
+        let temp_dir = std::env::temp_dir().join("plugin-system");
+        if !temp_dir.exists() {
+            return;
+        }
+        let my_pid = std::process::id();
+        let mut removed = 0u32;
+        if let Ok(entries) = std::fs::read_dir(&temp_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if !path.is_file() {
+                    continue;
+                }
+                // Only remove files that belong to a different PID
+                if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                    // Format: {name}_{pid}.so — extract the PID suffix
+                    if let Some(last_underscore) = stem.rfind('_') {
+                        let pid_str = &stem[last_underscore + 1..];
+                        if let Ok(file_pid) = pid_str.parse::<u32>() {
+                            if file_pid != my_pid {
+                                let _ = std::fs::remove_file(&path);
+                                removed += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if removed > 0 {
+            log::info!("Cleaned up {} stale temp plugin files", removed);
         }
     }
 
@@ -442,6 +484,8 @@ impl PluginManager {
     pub fn load_plugins_from_dir(&mut self, dir: impl AsRef<Path>) -> Result<Vec<String>> {
         let dir = dir.as_ref();
         log::info!("Scanning for plugins in {}", dir.display());
+
+        self.cleanup_stale_temp_files();
 
         let mut loaded = Vec::new();
 
