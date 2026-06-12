@@ -1,4 +1,4 @@
-use plugin_system::{command, CommandResult, Plugin, PluginContext, PluginMetadata};
+use plugin_system::{command, CommandResult, PluginContext, PluginMetadata};
 use serde::{Deserialize, Serialize};
 use tokio::runtime::Runtime;
 
@@ -34,6 +34,7 @@ impl Default for ObsPlugin {
     }
 }
 
+#[plugin_system::plugin_export(interfaces = ["ObsControl"])]
 impl ObsPlugin {
     pub fn new() -> Self {
         let runtime = Runtime::new().expect("Failed to create tokio runtime");
@@ -42,6 +43,32 @@ impl ObsPlugin {
             runtime,
             data: ObsData::default(),
         }
+    }
+
+    fn metadata(&self) -> PluginMetadata {
+        plugin_system::plugin_metadata! {
+            name: "obs",
+            version: "0.1.0",
+            authors: ["StreamDeck Core"],
+            dependencies: []
+        }
+    }
+
+    fn on_load(&mut self, _ctx: &PluginContext) {
+        log::info!("OBS Plugin loaded");
+    }
+
+    fn on_unload(&mut self) {
+        log::info!("OBS Plugin unloading");
+        self.runtime.block_on(self.controller.disconnect());
+    }
+
+    fn plugin_type_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
+
+    fn interface_data(&self) -> Option<serde_json::Value> {
+        serde_json::to_value(&self.data).ok()
     }
 
     fn refresh_status(&mut self) {
@@ -98,7 +125,10 @@ impl ObsPlugin {
     #[command("connect")]
     fn obs_connect(&mut self, host: String, port: u16, password: Option<String>) -> CommandResult {
         let password_str = password.as_deref();
-        match self.runtime.block_on(self.controller.connect(&host, port, password_str)) {
+        match self
+            .runtime
+            .block_on(self.controller.connect(&host, port, password_str))
+        {
             Ok(()) => {
                 self.refresh_status();
                 Ok(serde_json::json!({"ok": true}))
@@ -179,7 +209,10 @@ impl ObsPlugin {
 
     #[command("set_scene")]
     fn obs_set_scene(&mut self, scene_name: String) -> CommandResult {
-        match self.runtime.block_on(self.controller.set_current_scene(&scene_name)) {
+        match self
+            .runtime
+            .block_on(self.controller.set_current_scene(&scene_name))
+        {
             Ok(()) => Ok(serde_json::json!({"ok": true})),
             Err(e) => Ok(serde_json::json!({"ok": false, "error": e})),
         }
@@ -195,7 +228,10 @@ impl ObsPlugin {
 
     #[command("set_input_volume")]
     fn obs_set_input_volume(&mut self, input_name: String, volume: f64) -> CommandResult {
-        match self.runtime.block_on(self.controller.set_input_volume(&input_name, volume)) {
+        match self
+            .runtime
+            .block_on(self.controller.set_input_volume(&input_name, volume))
+        {
             Ok(()) => Ok(serde_json::json!({"ok": true})),
             Err(e) => Ok(serde_json::json!({"ok": false, "error": e})),
         }
@@ -203,7 +239,10 @@ impl ObsPlugin {
 
     #[command("set_input_mute")]
     fn obs_set_input_mute(&mut self, input_name: String, muted: bool) -> CommandResult {
-        match self.runtime.block_on(self.controller.set_input_mute(&input_name, muted)) {
+        match self
+            .runtime
+            .block_on(self.controller.set_input_mute(&input_name, muted))
+        {
             Ok(()) => Ok(serde_json::json!({"ok": true})),
             Err(e) => Ok(serde_json::json!({"ok": false, "error": e})),
         }
@@ -243,18 +282,28 @@ impl ObsPlugin {
 
     #[command("get_scene_items")]
     fn obs_get_scene_items(&mut self, scene_name: String) -> CommandResult {
-        match self.runtime.block_on(self.controller.get_scene_item_list(&scene_name)) {
+        match self
+            .runtime
+            .block_on(self.controller.get_scene_item_list(&scene_name))
+        {
             Ok(items) => Ok(serde_json::json!({"items": items})),
             Err(e) => Ok(serde_json::json!({"ok": false, "error": e})),
         }
     }
 
     #[command("set_scene_item_enabled")]
-    fn obs_set_scene_item_enabled(&mut self, scene_name: String, item_id: i32, enabled: bool) -> CommandResult {
-        match self.runtime.block_on(
-            self.controller
-                .set_scene_item_enabled(&scene_name, item_id, enabled),
-        ) {
+    fn obs_set_scene_item_enabled(
+        &mut self,
+        scene_name: String,
+        item_id: i32,
+        enabled: bool,
+    ) -> CommandResult {
+        match self
+            .runtime
+            .block_on(
+                self.controller
+                    .set_scene_item_enabled(&scene_name, item_id, enabled),
+            ) {
             Ok(()) => Ok(serde_json::json!({"ok": true})),
             Err(e) => Ok(serde_json::json!({"ok": false, "error": e})),
         }
@@ -270,104 +319,12 @@ impl ObsPlugin {
 
     #[command("set_studio_mode")]
     fn obs_set_studio_mode(&mut self, enabled: bool) -> CommandResult {
-        match self.runtime.block_on(self.controller.set_studio_mode(enabled)) {
+        match self
+            .runtime
+            .block_on(self.controller.set_studio_mode(enabled))
+        {
             Ok(()) => Ok(serde_json::json!({"ok": true})),
             Err(e) => Ok(serde_json::json!({"ok": false, "error": e})),
-        }
-    }
-}
-
-#[plugin_system::plugin_export]
-impl Plugin for ObsPlugin {
-    fn metadata(&self) -> PluginMetadata {
-        plugin_system::plugin_metadata! {
-            name: "obs",
-            version: "0.1.0",
-            authors: ["StreamDeck Core"],
-            dependencies: []
-        }
-    }
-
-    fn on_load(&mut self, _ctx: &PluginContext) {
-        log::info!("OBS Plugin loaded");
-    }
-
-    fn on_unload(&mut self) {
-        log::info!("OBS Plugin unloading");
-        self.runtime.block_on(self.controller.disconnect());
-    }
-
-    fn plugin_type_name(&self) -> &'static str {
-        std::any::type_name::<Self>()
-    }
-
-    fn interface_ids(&self) -> Vec<&'static str> {
-        vec!["ObsControl"]
-    }
-
-    fn interface_data(&self) -> Option<serde_json::Value> {
-        serde_json::to_value(&self.data).ok()
-    }
-
-    fn handle_command(
-        &mut self,
-        method: &str,
-        args: serde_json::Value,
-    ) -> Option<serde_json::Value> {
-        match method {
-            "connect" => {
-                let host = args.get("host").and_then(|v| v.as_str()).unwrap_or("127.0.0.1").to_string();
-                let port = args.get("port").and_then(|v| v.as_u64()).unwrap_or(4455) as u16;
-                let password = args.get("password").and_then(|v| v.as_str()).map(String::from);
-                plugin_system::command_to_json(self.obs_connect(host, port, password))
-            }
-            "disconnect" => plugin_system::command_to_json(self.obs_disconnect()),
-            "refresh" => plugin_system::command_to_json(self.obs_refresh()),
-            "get_status" => plugin_system::command_to_json(self.obs_get_status()),
-            "start_stream" => plugin_system::command_to_json(self.obs_start_stream()),
-            "stop_stream" => plugin_system::command_to_json(self.obs_stop_stream()),
-            "start_record" => plugin_system::command_to_json(self.obs_start_record()),
-            "stop_record" => plugin_system::command_to_json(self.obs_stop_record()),
-            "toggle_record_pause" => plugin_system::command_to_json(self.obs_toggle_record_pause()),
-            "get_scenes" => plugin_system::command_to_json(self.obs_get_scenes()),
-            "set_scene" => {
-                let scene_name = args.get("scene_name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                plugin_system::command_to_json(self.obs_set_scene(scene_name))
-            }
-            "get_inputs" => plugin_system::command_to_json(self.obs_get_inputs()),
-            "set_input_volume" => {
-                let input_name = args.get("input_name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let volume = args.get("volume").and_then(|v| v.as_f64()).unwrap_or(0.0);
-                plugin_system::command_to_json(self.obs_set_input_volume(input_name, volume))
-            }
-            "set_input_mute" => {
-                let input_name = args.get("input_name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let muted = args.get("muted").and_then(|v| v.as_bool()).unwrap_or(false);
-                plugin_system::command_to_json(self.obs_set_input_mute(input_name, muted))
-            }
-            "toggle_virtual_cam" => plugin_system::command_to_json(self.obs_toggle_virtual_cam()),
-            "save_replay" => plugin_system::command_to_json(self.obs_save_replay()),
-            "get_transitions" => plugin_system::command_to_json(self.obs_get_transitions()),
-            "set_transition" => {
-                let name = args.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                plugin_system::command_to_json(self.obs_set_transition(name))
-            }
-            "get_scene_items" => {
-                let scene_name = args.get("scene_name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                plugin_system::command_to_json(self.obs_get_scene_items(scene_name))
-            }
-            "set_scene_item_enabled" => {
-                let scene_name = args.get("scene_name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let item_id = args.get("item_id").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
-                let enabled = args.get("enabled").and_then(|v| v.as_bool()).unwrap_or(true);
-                plugin_system::command_to_json(self.obs_set_scene_item_enabled(scene_name, item_id, enabled))
-            }
-            "get_studio_mode" => plugin_system::command_to_json(self.obs_get_studio_mode()),
-            "set_studio_mode" => {
-                let enabled = args.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false);
-                plugin_system::command_to_json(self.obs_set_studio_mode(enabled))
-            }
-            _ => None,
         }
     }
 }

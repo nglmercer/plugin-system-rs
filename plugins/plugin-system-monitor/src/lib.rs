@@ -1,4 +1,4 @@
-use plugin_system::{Plugin, PluginContext, PluginMetadata};
+use plugin_system::{PluginContext, PluginMetadata};
 use serde::Serialize;
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -32,6 +32,7 @@ impl Default for SystemMonitorPlugin {
     }
 }
 
+#[plugin_system::plugin_export]
 impl SystemMonitorPlugin {
     pub fn new() -> Self {
         Self {
@@ -39,8 +40,25 @@ impl SystemMonitorPlugin {
         }
     }
 
-    pub fn interface_ids(&self) -> Vec<&'static str> {
-        vec!["SystemMonitor"]
+    fn metadata(&self) -> PluginMetadata {
+        plugin_system::plugin_metadata! {
+            name: "system-monitor",
+            version: "0.1.0",
+            authors: ["StreamDeck Core"],
+            dependencies: []
+        }
+    }
+
+    fn on_load(&mut self, _ctx: &PluginContext) {
+        log::info!("SystemMonitorPlugin loaded");
+    }
+
+    fn on_unload(&mut self) {
+        log::info!("SystemMonitorPlugin unloading");
+    }
+
+    fn plugin_type_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
     }
 
     pub fn interface_data(&self) -> Option<serde_json::Value> {
@@ -227,38 +245,5 @@ impl SystemMonitor for SystemMonitorPlugin {
 
     fn refresh(&mut self) {
         self.stats = Self::collect_all();
-    }
-}
-
-#[plugin_system::plugin_export]
-impl Plugin for SystemMonitorPlugin {
-    fn metadata(&self) -> PluginMetadata {
-        plugin_system::plugin_metadata! {
-            name: "system-monitor",
-            version: "0.1.0",
-            authors: ["StreamDeck Core"],
-            dependencies: []
-        }
-    }
-
-    fn on_load(&mut self, _ctx: &PluginContext) {
-        log::info!("SystemMonitorPlugin loaded");
-        self.refresh();
-    }
-
-    fn on_unload(&mut self) {
-        log::info!("SystemMonitorPlugin unloading");
-    }
-
-    fn plugin_type_name(&self) -> &'static str {
-        std::any::type_name::<Self>()
-    }
-
-    fn interface_ids(&self) -> Vec<&'static str> {
-        SystemMonitorPlugin::interface_ids(self)
-    }
-
-    fn interface_data(&self) -> Option<serde_json::Value> {
-        SystemMonitorPlugin::interface_data(self)
     }
 }

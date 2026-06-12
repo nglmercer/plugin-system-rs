@@ -1,4 +1,4 @@
-use plugin_system::{command, CommandResult, Plugin, PluginContext, PluginMetadata};
+use plugin_system::{command, CommandResult, PluginContext, PluginMetadata};
 use serde::{Deserialize, Serialize};
 
 #[cfg(target_os = "linux")]
@@ -65,6 +65,7 @@ impl Default for VolumeMasterPlugin {
     }
 }
 
+#[plugin_system::plugin_export]
 impl VolumeMasterPlugin {
     pub fn new() -> Self {
         let mut controller = platform::create_controller();
@@ -85,6 +86,28 @@ impl VolumeMasterPlugin {
         Self { controller, data }
     }
 
+    fn metadata(&self) -> PluginMetadata {
+        plugin_system::plugin_metadata! {
+            name: "volume-master",
+            version: "0.1.0",
+            authors: ["StreamDeck Core"],
+            dependencies: []
+        }
+    }
+
+    fn on_load(&mut self, _ctx: &PluginContext) {
+        log::info!("VolumeMasterPlugin loaded");
+        self.refresh_internal();
+    }
+
+    fn on_unload(&mut self) {
+        log::info!("VolumeMasterPlugin unloading");
+    }
+
+    fn plugin_type_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
+
     fn refresh_internal(&mut self) {
         if let Ok(state) = self.controller.get_master_volume() {
             self.data.state = state;
@@ -92,6 +115,10 @@ impl VolumeMasterPlugin {
         if let Ok(apps) = self.controller.get_app_volumes() {
             self.data.apps = apps;
         }
+    }
+
+    fn interface_data(&self) -> Option<serde_json::Value> {
+        serde_json::to_value(&self.data).ok()
     }
 
     #[command("refresh")]
@@ -132,67 +159,5 @@ impl VolumeMasterPlugin {
             app.muted = muted;
         }
         Ok(serde_json::json!({"ok": true}))
-    }
-}
-
-#[plugin_system::plugin_export]
-impl Plugin for VolumeMasterPlugin {
-    fn metadata(&self) -> PluginMetadata {
-        plugin_system::plugin_metadata! {
-            name: "volume-master",
-            version: "0.1.0",
-            authors: ["StreamDeck Core"],
-            dependencies: []
-        }
-    }
-
-    fn on_load(&mut self, _ctx: &PluginContext) {
-        log::info!("VolumeMasterPlugin loaded");
-        self.refresh_internal();
-    }
-
-    fn on_unload(&mut self) {
-        log::info!("VolumeMasterPlugin unloading");
-    }
-
-    fn plugin_type_name(&self) -> &'static str {
-        std::any::type_name::<Self>()
-    }
-
-    fn interface_ids(&self) -> Vec<&'static str> {
-        vec!["VolumeMaster"]
-    }
-
-    fn interface_data(&self) -> Option<serde_json::Value> {
-        serde_json::to_value(&self.data).ok()
-    }
-
-    fn handle_command(
-        &mut self,
-        method: &str,
-        args: serde_json::Value,
-    ) -> Option<serde_json::Value> {
-        match method {
-            "refresh" => plugin_system::command_to_json(self.vol_refresh()),
-            "set_volume" => {
-                let volume = args.get("volume").and_then(|v| v.as_f64()).unwrap_or(50.0);
-                plugin_system::command_to_json(self.vol_set_volume(volume))
-            }
-            "set_mute" => {
-                let muted = args.get("muted").and_then(|v| v.as_bool()).unwrap_or(false);
-                plugin_system::command_to_json(self.vol_set_muted(muted))
-            }
-            "set_app_volume" => {
-                let app_name = args.get("app_name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let volume = args.get("volume").and_then(|v| v.as_f64()).unwrap_or(50.0);
-                plugin_system::command_to_json(self.vol_set_app_volume(app_name, volume))
-            }
-            "set_app_mute" => {
-                let app_name = args.get("app_name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let muted = args.get("muted").and_then(|v| v.as_bool()).unwrap_or(false);
-                plugin_system::command_to_json(self.vol_set_app_muted(app_name, muted))
-            }
-            _ => None,
-        }
     }
 }

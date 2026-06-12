@@ -1,4 +1,4 @@
-use plugin_system::{Plugin, PluginMetadata};
+use plugin_system::{PluginContext, PluginMetadata};
 use std::collections::HashMap;
 
 pub struct TimerPlugin {
@@ -11,11 +11,33 @@ impl Default for TimerPlugin {
     }
 }
 
+#[plugin_system::plugin_export]
 impl TimerPlugin {
     pub fn new() -> Self {
         Self {
             timers: HashMap::new(),
         }
+    }
+
+    fn metadata(&self) -> PluginMetadata {
+        plugin_system::plugin_metadata! {
+            name: "timer",
+            version: "0.1.0",
+            authors: ["StreamDeck Core"],
+            dependencies: []
+        }
+    }
+
+    fn on_load(&mut self, _ctx: &PluginContext) {
+        log::info!("TimerPlugin loaded");
+    }
+
+    fn on_unload(&mut self) {
+        log::info!("TimerPlugin unloading");
+    }
+
+    fn plugin_type_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
     }
 
     pub fn start_timer(&mut self, name: String, seconds: u64) {
@@ -28,33 +50,5 @@ impl TimerPlugin {
 
     pub fn list_timers(&self) -> Vec<String> {
         self.timers.keys().cloned().collect()
-    }
-
-    pub fn interface_ids(&self) -> Vec<&'static str> {
-        vec!["Timer"]
-    }
-}
-
-#[plugin_system::plugin_export]
-impl Plugin for TimerPlugin {
-    fn metadata(&self) -> PluginMetadata {
-        plugin_system::plugin_metadata! {
-            name: "timer",
-            version: "0.1.0",
-            authors: ["StreamDeck Core"],
-            dependencies: []
-        }
-    }
-
-    fn on_load(&mut self, _ctx: &plugin_system::PluginContext) {
-        log::info!("TimerPlugin loaded");
-    }
-
-    fn on_unload(&mut self) {
-        log::info!("TimerPlugin unloading");
-    }
-
-    fn plugin_type_name(&self) -> &'static str {
-        std::any::type_name::<Self>()
     }
 }

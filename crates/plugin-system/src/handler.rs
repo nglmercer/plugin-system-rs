@@ -9,7 +9,11 @@ use crate::traits::Plugin;
 /// without requiring type-based downcasting.
 pub trait CommandHandler: Send + Sync {
     /// Handle a command by name with JSON arguments.
-    fn handle_command(&mut self, method: &str, args: serde_json::Value) -> Option<serde_json::Value>;
+    fn handle_command(
+        &mut self,
+        method: &str,
+        args: serde_json::Value,
+    ) -> Option<serde_json::Value>;
 
     /// List all commands this handler supports.
     fn commands(&self) -> Vec<&'static str> {
@@ -29,7 +33,11 @@ impl PluginCommandHandler {
 }
 
 impl CommandHandler for PluginCommandHandler {
-    fn handle_command(&mut self, method: &str, args: serde_json::Value) -> Option<serde_json::Value> {
+    fn handle_command(
+        &mut self,
+        method: &str,
+        args: serde_json::Value,
+    ) -> Option<serde_json::Value> {
         let mut plugin = self.plugin.write().expect("plugin lock poisoned");
         plugin.handle_command(method, args)
     }
@@ -49,10 +57,8 @@ impl CommandRegistry {
 
     /// Register a command handler for a plugin.
     pub fn register(&mut self, plugin_name: &str, handler: Box<dyn CommandHandler>) {
-        self.handlers.insert(
-            plugin_name.to_string(),
-            Arc::new(RwLock::new(handler)),
-        );
+        self.handlers
+            .insert(plugin_name.to_string(), Arc::new(RwLock::new(handler)));
     }
 
     /// Get a command handler by plugin name.

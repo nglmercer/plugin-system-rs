@@ -166,6 +166,7 @@ macro_rules! plugin_call_ok_response {
     ($state:expr, $plugin:expr, $method:expr, $args:expr, $success:expr) => {{
         let pm = $state.plugin_manager.plugin_manager();
         let manager = pm.read().await;
-        $crate::api::helpers::call_plugin_ok_response(&manager, $plugin, $method, $args, $success).await
+        $crate::api::helpers::call_plugin_ok_response(&manager, $plugin, $method, $args, $success)
+            .await
     }};
 }

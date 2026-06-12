@@ -1,6 +1,8 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, Expr, ExprArray, FnArg, Ident, ImplItem, ItemImpl, ReturnType, Type};
+use syn::{
+    parse_macro_input, Expr, ExprArray, FnArg, Ident, ImplItem, ItemImpl, LitStr, ReturnType, Type,
+};
 
 #[proc_macro_attribute]
 pub fn plugin_interface(_attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -55,7 +57,7 @@ pub fn define_plugin(item: TokenStream) -> TokenStream {
 
 struct ExportArgs {
     prefix: Option<String>,
-    interfaces: Vec<syn::Path>,
+    interfaces: Vec<String>,
 }
 
 impl syn::parse::Parse for ExportArgs {
@@ -67,66 +69,45 @@ impl syn::parse::Parse for ExportArgs {
             });
         }
 
+        let mut prefix = None;
+
         if input.peek(syn::LitStr) {
             let lit: syn::LitStr = input.parse()?;
-            let prefix = lit.value();
+            prefix = Some(lit.value());
 
             if input.peek(syn::Token![,]) {
                 let _comma: syn::Token![,] = input.parse()?;
-                let ident: Ident = input.parse()?;
-                if ident != "interfaces" {
-                    return Err(syn::Error::new(ident.span(), "expected `interfaces`"));
-                }
-                let _eq: syn::Token![=] = input.parse()?;
-                let arr: ExprArray = input.parse()?;
-                let interfaces = arr
-                    .elems
-                    .into_iter()
-                    .filter_map(|expr| {
-                        if let Expr::Path(ep) = expr {
-                            Some(ep.path)
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
+            } else {
                 return Ok(ExportArgs {
-                    prefix: Some(prefix),
-                    interfaces,
+                    prefix,
+                    interfaces: Vec::new(),
                 });
             }
-
-            return Ok(ExportArgs {
-                prefix: Some(prefix),
-                interfaces: Vec::new(),
-            });
         }
 
         let ident: Ident = input.parse()?;
-        if ident == "interfaces" {
-            let _eq: syn::Token![=] = input.parse()?;
-            let arr: ExprArray = input.parse()?;
-            let interfaces = arr
-                .elems
-                .into_iter()
-                .filter_map(|expr| {
-                    if let Expr::Path(ep) = expr {
-                        Some(ep.path)
+        if ident != "interfaces" {
+            return Err(syn::Error::new(ident.span(), "expected `interfaces`"));
+        }
+        let _eq: syn::Token![=] = input.parse()?;
+        let arr: ExprArray = input.parse()?;
+        let interfaces = arr
+            .elems
+            .into_iter()
+            .filter_map(|expr| match expr {
+                Expr::Lit(expr_lit) => {
+                    if let syn::Lit::Str(lit) = expr_lit.lit {
+                        Some(lit.value())
                     } else {
                         None
                     }
-                })
-                .collect();
-            return Ok(ExportArgs {
-                prefix: None,
-                interfaces,
-            });
-        }
+                }
+                Expr::Path(ep) => ep.path.segments.last().map(|s| s.ident.to_string()),
+                _ => None,
+            })
+            .collect();
 
-        Err(syn::Error::new(
-            ident.span(),
-            "expected string prefix or `interfaces = [...]`",
-        ))
+        Ok(ExportArgs { prefix, interfaces })
     }
 }
 
@@ -203,16 +184,44 @@ fn metadata_exports(self_ty: &Type, prefix: Option<&str>) -> proc_macro2::TokenS
     }
 }
 
-/// Check if a method has a #[command] attribute (via __command_marker) and extract the command name.
-fn get_command_name(_method: &syn::ImplItemFn) -> Option<String> {
-    // No longer used - handle_command is implemented manually
-    None
+fn get_command_name(method: &syn::ImplItemFn) -> Option<String> {
+    method.attrs.iter().find_map(|attr| {
+        if !attr.path().is_ident("command") {
+            return None;
+        }
+
+        if let Ok(lit) = attr.parse_args::<LitStr>() {
+            Some(lit.value())
+        } else {
+            Some(method.sig.ident.to_string())
+        }
+    })
+}
+
+fn is_option_type(ty: &Type) -> bool {
+    match ty {
+        Type::Path(p) => p.path.segments.last().is_some_and(|s| s.ident == "Option"),
+        _ => false,
+    }
+}
+
+fn generate_arg_extraction(pat: &syn::Pat, ty: &Type) -> proc_macro2::TokenStream {
+    if is_option_type(ty) {
+        quote! {
+            let #pat = __args.get(stringify!(#pat))
+                .and_then(|v| serde_json::from_value(v.clone()).ok());
+        }
+    } else {
+        quote! {
+            let #pat = __args.get(stringify!(#pat))
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default();
+        }
+    }
 }
 
 /// Generate the handle_command implementation from #[command] methods.
-fn generate_handle_command(
-    methods: &[&syn::ImplItemFn],
-) -> proc_macro2::TokenStream {
+fn generate_handle_command(methods: &[&syn::ImplItemFn]) -> proc_macro2::TokenStream {
     let mut match_arms = Vec::new();
 
     for method in methods {
@@ -227,106 +236,12 @@ fn generate_handle_command(
 
         for input_arg in &method.sig.inputs {
             match input_arg {
-                FnArg::Receiver(_) => {
-                    // self is handled separately
-                }
+                FnArg::Receiver(_) => {}
                 FnArg::Typed(pat_type) => {
                     let pat = &pat_type.pat;
                     let ty = &pat_type.ty;
 
-                    let ty_str = match ty.as_ref() {
-                        Type::Path(p) => p
-                            .path
-                            .segments
-                            .last()
-                            .map(|s| s.ident.to_string())
-                            .unwrap_or_default(),
-                        _ => String::new(),
-                    };
-
-                    let extraction = match ty_str.as_str() {
-                        "String" => quote! {
-                            let #pat = __args.get(stringify!(#pat))
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("")
-                                .to_string();
-                        },
-                        "u64" => quote! {
-                            let #pat = __args.get(stringify!(#pat))
-                                .and_then(|v| v.as_u64())
-                                .unwrap_or(0);
-                        },
-                        "u32" => quote! {
-                            let #pat = __args.get(stringify!(#pat))
-                                .and_then(|v| v.as_u64())
-                                .unwrap_or(0) as u32;
-                        },
-                        "u16" => quote! {
-                            let #pat = __args.get(stringify!(#pat))
-                                .and_then(|v| v.as_u64())
-                                .unwrap_or(0) as u16;
-                        },
-                        "u8" => quote! {
-                            let #pat = __args.get(stringify!(#pat))
-                                .and_then(|v| v.as_u64())
-                                .unwrap_or(0) as u8;
-                        },
-                        "i64" => quote! {
-                            let #pat = __args.get(stringify!(#pat))
-                                .and_then(|v| v.as_i64())
-                                .unwrap_or(0);
-                        },
-                        "i32" => quote! {
-                            let #pat = __args.get(stringify!(#pat))
-                                .and_then(|v| v.as_i64())
-                                .unwrap_or(0) as i32;
-                        },
-                        "i16" => quote! {
-                            let #pat = __args.get(stringify!(#pat))
-                                .and_then(|v| v.as_i64())
-                                .unwrap_or(0) as i16;
-                        },
-                        "i8" => quote! {
-                            let #pat = __args.get(stringify!(#pat))
-                                .and_then(|v| v.as_i64())
-                                .unwrap_or(0) as i8;
-                        },
-                        "f64" => quote! {
-                            let #pat = __args.get(stringify!(#pat))
-                                .and_then(|v| v.as_f64())
-                                .unwrap_or(0.0);
-                        },
-                        "f32" => quote! {
-                            let #pat = __args.get(stringify!(#pat))
-                                .and_then(|v| v.as_f64())
-                                .unwrap_or(0.0) as f32;
-                        },
-                        "bool" => quote! {
-                            let #pat = __args.get(stringify!(#pat))
-                                .and_then(|v| v.as_bool())
-                                .unwrap_or(false);
-                        },
-                        "Option" => quote! {
-                            let #pat = __args.get(stringify!(#pat)).cloned();
-                        },
-                        "Vec" => quote! {
-                            let #pat = __args.get(stringify!(#pat))
-                                .and_then(|v| v.as_array())
-                                .map(|arr| {
-                                    arr.iter()
-                                        .filter_map(|v| v.as_str().map(String::from))
-                                        .collect()
-                                })
-                                .unwrap_or_default();
-                        },
-                        _ => quote! {
-                            let #pat = __args.get(stringify!(#pat))
-                                .cloned()
-                                .unwrap_or(serde_json::Value::Null);
-                        },
-                    };
-
-                    arg_extractions.push(extraction);
+                    arg_extractions.push(generate_arg_extraction(pat, ty));
                     method_args.push(quote! { #pat });
                 }
             }
@@ -346,8 +261,8 @@ fn generate_handle_command(
             fn handle_command(
                 &mut self,
                 _method: &str,
-                _args: serde_json::Value,
-            ) -> Option<serde_json::Value> {
+                _args: plugin_system::serde_json::Value,
+            ) -> Option<plugin_system::serde_json::Value> {
                 None
             }
         }
@@ -356,8 +271,8 @@ fn generate_handle_command(
             fn handle_command(
                 &mut self,
                 method: &str,
-                args: serde_json::Value,
-            ) -> Option<serde_json::Value> {
+                args: plugin_system::serde_json::Value,
+            ) -> Option<plugin_system::serde_json::Value> {
                 let __args = args;
                 match method {
                     #(#match_arms)*
@@ -368,23 +283,172 @@ fn generate_handle_command(
     }
 }
 
-/// Get all methods that have #[command] attribute.
-fn get_command_methods(input: &ItemImpl) -> Vec<&syn::ImplItemFn> {
-    input
-        .items
-        .iter()
-        .filter_map(|item| {
-            if let ImplItem::Fn(method) = item {
-                if get_command_name(method).is_some() {
-                    Some(method)
-                } else {
-                    None
-                }
+fn method_exists(input: &ItemImpl, name: &str) -> bool {
+    input.items.iter().any(|item| {
+        if let ImplItem::Fn(method) = item {
+            method.sig.ident == name
+        } else {
+            false
+        }
+    })
+}
+
+fn extract_metadata_name(input: &ItemImpl) -> Option<String> {
+    let metadata_method = input.items.iter().find_map(|item| {
+        if let ImplItem::Fn(method) = item {
+            if method.sig.ident == "metadata" {
+                Some(method)
             } else {
                 None
             }
+        } else {
+            None
+        }
+    })?;
+
+    let tokens = quote!(#metadata_method).to_string();
+    let name_marker = "name :";
+    let marker_pos = tokens.find(name_marker)?;
+    let after_marker = &tokens[marker_pos + name_marker.len()..];
+    let quote_pos = after_marker.find('"')?;
+    let value = &after_marker[quote_pos + 1..];
+    let end_quote = value.find('"')?;
+
+    Some(value[..end_quote].to_string())
+}
+
+fn kebab_to_pascal_case(value: &str) -> String {
+    value
+        .split(|c: char| c == '-' || c == '_')
+        .filter(|part| !part.is_empty())
+        .map(|part| {
+            let mut chars = part.chars();
+            match chars.next() {
+                Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+                None => String::new(),
+            }
         })
         .collect()
+}
+
+fn default_interface_id(input: &ItemImpl, self_ty: &Type) -> String {
+    if let Some(name) = extract_metadata_name(input) {
+        let pascal = kebab_to_pascal_case(&name);
+        if !pascal.is_empty() {
+            return pascal;
+        }
+    }
+
+    match self_ty {
+        Type::Path(p) => p
+            .path
+            .segments
+            .last()
+            .map(|s| s.ident.to_string())
+            .unwrap_or_default(),
+        _ => String::new(),
+    }
+}
+
+fn generate_interface_ids_method(interface_ids: &[String]) -> proc_macro2::TokenStream {
+    let ids = interface_ids
+        .iter()
+        .map(|id| LitStr::new(id, proc_macro2::Span::call_site()));
+
+    quote! {
+        fn interface_ids(&self) -> Vec<&'static str> {
+            vec![#(#ids),*]
+        }
+    }
+}
+
+fn generate_inherent_trait_items(
+    input: &ItemImpl,
+    interface_ids: &[String],
+    handle_command_impl: proc_macro2::TokenStream,
+) -> syn::Result<Vec<proc_macro2::TokenStream>> {
+    let self_ty = input.self_ty.as_ref();
+    let has_on_load = method_exists(input, "on_load");
+    let has_on_unload = method_exists(input, "on_unload");
+    let has_plugin_type_name = method_exists(input, "plugin_type_name");
+    let has_interface_data = method_exists(input, "interface_data");
+
+    let metadata_impl = if method_exists(input, "metadata") {
+        quote! {
+            fn metadata(&self) -> plugin_system::PluginMetadata {
+                <#self_ty>::metadata(self)
+            }
+        }
+    } else {
+        return Err(syn::Error::new_spanned(
+            &input.self_ty,
+            "#[plugin_export] inherent impl requires a metadata method",
+        ));
+    };
+
+    let on_load_impl = if has_on_load {
+        quote! {
+            fn on_load(&mut self, ctx: &plugin_system::PluginContext) {
+                <#self_ty>::on_load(self, ctx)
+            }
+        }
+    } else {
+        quote! {
+            fn on_load(&mut self, _ctx: &plugin_system::PluginContext) {}
+        }
+    };
+
+    let on_unload_impl = if has_on_unload {
+        quote! {
+            fn on_unload(&mut self) {
+                <#self_ty>::on_unload(self)
+            }
+        }
+    } else {
+        quote! {
+            fn on_unload(&mut self) {}
+        }
+    };
+
+    let plugin_type_name_impl = if has_plugin_type_name {
+        quote! {
+            fn plugin_type_name(&self) -> &'static str {
+                <#self_ty>::plugin_type_name(self)
+            }
+        }
+    } else {
+        quote! {
+            fn plugin_type_name(&self) -> &'static str {
+                std::any::type_name::<Self>()
+            }
+        }
+    };
+
+    let interface_ids_impl = generate_interface_ids_method(interface_ids);
+
+    let interface_data_impl = if has_interface_data {
+        quote! {
+            fn interface_data(&self) -> Option<serde_json::Value> {
+                <#self_ty>::interface_data(self)
+            }
+        }
+    } else {
+        quote! {
+            fn interface_data(&self) -> Option<plugin_system::serde_json::Value> {
+                None
+            }
+        }
+    };
+
+    Ok(vec![
+        metadata_impl,
+        on_load_impl,
+        on_unload_impl,
+        plugin_type_name_impl,
+        interface_ids_impl,
+        interface_data_impl,
+        handle_command_impl,
+    ])
 }
 
 fn generate_plugin_export(
@@ -393,6 +457,17 @@ fn generate_plugin_export(
 ) -> syn::Result<proc_macro2::TokenStream> {
     let args = parse_export_args(attr)?;
 
+    if input.trait_.is_some() {
+        generate_plugin_export_trait(args, input)
+    } else {
+        generate_plugin_export_inherent(args, input)
+    }
+}
+
+fn generate_plugin_export_trait(
+    args: ExportArgs,
+    input: ItemImpl,
+) -> syn::Result<proc_macro2::TokenStream> {
     let (_, trait_path, _) = input.trait_.as_ref().ok_or_else(|| {
         syn::Error::new_spanned(
             &input.self_ty,
@@ -433,14 +508,10 @@ fn generate_plugin_export(
         None => format_ident!("plugin_destroy"),
     };
 
-    // Check for #[command] methods and generate handle_command
     let command_methods = get_command_methods(&input);
     let handle_command_impl = generate_handle_command(&command_methods);
 
-    // Keep all items including #[command] methods (they're the trait method implementations)
     let impl_items: Vec<_> = input.items.to_vec();
-
-    // Check if handle_command is already defined in the impl block
     let has_handle_command = impl_items.iter().any(|item| {
         if let ImplItem::Fn(method) = item {
             method.sig.ident == "handle_command"
@@ -449,10 +520,8 @@ fn generate_plugin_export(
         }
     });
 
-    // Build the impl block items
     let mut final_items = impl_items;
 
-    // If there are command methods and no explicit handle_command, add the generated one
     if !command_methods.is_empty() && !has_handle_command {
         final_items.push(syn::parse_quote! {
             #handle_command_impl
@@ -481,6 +550,88 @@ fn generate_plugin_export(
 
         #metadata_export_tokens
     })
+}
+
+fn generate_plugin_export_inherent(
+    args: ExportArgs,
+    input: ItemImpl,
+) -> syn::Result<proc_macro2::TokenStream> {
+    let self_ty = input.self_ty.as_ref();
+    let resolved_prefix = match args.prefix.as_deref() {
+        Some(p) => p.to_string(),
+        None => derive_prefix_from_type(self_ty),
+    };
+    let prefix_opt = if resolved_prefix.is_empty() {
+        None
+    } else {
+        Some(resolved_prefix.as_str())
+    };
+
+    let interface_ids = if args.interfaces.is_empty() {
+        vec![default_interface_id(&input, self_ty)]
+    } else {
+        args.interfaces
+    };
+
+    let command_methods = get_command_methods(&input);
+    let handle_command_impl = generate_handle_command(&command_methods);
+    let trait_items = generate_inherent_trait_items(&input, &interface_ids, handle_command_impl)?;
+    let impl_items = input.items;
+    let metadata_export_tokens = metadata_exports(self_ty, prefix_opt);
+
+    let create_fn_name = match prefix_opt {
+        Some(p) => format_ident!("plugin_{}_create", p),
+        None => format_ident!("plugin_create"),
+    };
+    let destroy_fn_name = match prefix_opt {
+        Some(p) => format_ident!("plugin_{}_destroy", p),
+        None => format_ident!("plugin_destroy"),
+    };
+
+    Ok(quote! {
+        impl #self_ty {
+            #(#impl_items)*
+        }
+
+        impl plugin_system::Plugin for #self_ty {
+            #(#trait_items)*
+        }
+
+        #[no_mangle]
+        pub extern "C" fn #create_fn_name() -> *mut () {
+            let boxed: Box<dyn plugin_system::Plugin> = Box::new(<#self_ty>::new());
+            let outer = Box::new(boxed);
+            Box::into_raw(outer) as *mut ()
+        }
+
+        #[no_mangle]
+        pub unsafe extern "C" fn #destroy_fn_name(ptr: *mut ()) {
+            if !ptr.is_null() {
+                let outer = Box::from_raw(ptr as *mut Box<dyn plugin_system::Plugin>);
+                drop(outer);
+            }
+        }
+
+        #metadata_export_tokens
+    })
+}
+
+fn get_command_methods(input: &ItemImpl) -> Vec<&syn::ImplItemFn> {
+    input
+        .items
+        .iter()
+        .filter_map(|item| {
+            if let ImplItem::Fn(method) = item {
+                if get_command_name(method).is_some() {
+                    Some(method)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 fn generate_plugin_export_all(
@@ -680,16 +831,7 @@ fn generate_plugin_export_all(
         }
     }
 
-    let _interface_names: Vec<_> = args
-        .interfaces
-        .iter()
-        .map(|p| {
-            p.segments
-                .last()
-                .map(|s| s.ident.to_string())
-                .unwrap_or_default()
-        })
-        .collect();
+    let _interface_names: Vec<_> = args.interfaces.iter().cloned().collect();
 
     let _all_method_names = method_names;
     let metadata_export_tokens = metadata_exports(self_ty, prefix_opt);

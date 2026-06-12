@@ -28,13 +28,17 @@ impl PluginContext {
             .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
-    pub fn command_registry(&self) -> std::sync::RwLockReadGuard<'_, crate::handler::CommandRegistry> {
+    pub fn command_registry(
+        &self,
+    ) -> std::sync::RwLockReadGuard<'_, crate::handler::CommandRegistry> {
         self.command_registry
             .read()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
-    pub fn command_registry_mut(&self) -> std::sync::RwLockWriteGuard<'_, crate::handler::CommandRegistry> {
+    pub fn command_registry_mut(
+        &self,
+    ) -> std::sync::RwLockWriteGuard<'_, crate::handler::CommandRegistry> {
         self.command_registry
             .write()
             .unwrap_or_else(|poisoned| poisoned.into_inner())

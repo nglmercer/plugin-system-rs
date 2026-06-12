@@ -103,7 +103,13 @@ pub(crate) async fn get_volume_state(
     let manager = pm.read().await;
 
     // First refresh the data
-    let _ = crate::api::helpers::call_plugin_ok(&manager, "volume-master", "refresh", serde_json::json!({})).await;
+    let _ = crate::api::helpers::call_plugin_ok(
+        &manager,
+        "volume-master",
+        "refresh",
+        serde_json::json!({}),
+    )
+    .await;
 
     // Then read the interface data
     if let Ok(plugin_arc) = manager.get_plugin_arc("volume-master") {
@@ -125,7 +131,13 @@ pub(crate) async fn get_app_volumes(
     let manager = pm.read().await;
 
     // First refresh the data
-    let _ = crate::api::helpers::call_plugin_ok(&manager, "volume-master", "refresh", serde_json::json!({})).await;
+    let _ = crate::api::helpers::call_plugin_ok(
+        &manager,
+        "volume-master",
+        "refresh",
+        serde_json::json!({}),
+    )
+    .await;
 
     // Then read the interface data
     if let Ok(plugin_arc) = manager.get_plugin_arc("volume-master") {
@@ -163,7 +175,16 @@ pub(crate) async fn set_master_volume(
     let pm = state.plugin_manager.plugin_manager();
     let manager = pm.read().await;
     let args = serde_json::json!({"volume": req.volume});
-    Json(crate::api::helpers::call_plugin_ok_response(&manager, "volume-master", "set_volume", args, "Volume set").await)
+    Json(
+        crate::api::helpers::call_plugin_ok_response(
+            &manager,
+            "volume-master",
+            "set_volume",
+            args,
+            "Volume set",
+        )
+        .await,
+    )
 }
 
 pub(crate) async fn set_master_mute(
@@ -173,7 +194,16 @@ pub(crate) async fn set_master_mute(
     let pm = state.plugin_manager.plugin_manager();
     let manager = pm.read().await;
     let args = serde_json::json!({"muted": req.muted});
-    Json(crate::api::helpers::call_plugin_ok_response(&manager, "volume-master", "set_mute", args, "Mute set").await)
+    Json(
+        crate::api::helpers::call_plugin_ok_response(
+            &manager,
+            "volume-master",
+            "set_mute",
+            args,
+            "Mute set",
+        )
+        .await,
+    )
 }
 
 pub(crate) async fn set_app_volume(
@@ -183,7 +213,16 @@ pub(crate) async fn set_app_volume(
     let pm = state.plugin_manager.plugin_manager();
     let manager = pm.read().await;
     let args = serde_json::json!({"app_name": req.app_name, "volume": req.volume});
-    Json(crate::api::helpers::call_plugin_ok_response(&manager, "volume-master", "set_app_volume", args, "App volume set").await)
+    Json(
+        crate::api::helpers::call_plugin_ok_response(
+            &manager,
+            "volume-master",
+            "set_app_volume",
+            args,
+            "App volume set",
+        )
+        .await,
+    )
 }
 
 pub(crate) async fn set_app_mute(
@@ -193,5 +232,14 @@ pub(crate) async fn set_app_mute(
     let pm = state.plugin_manager.plugin_manager();
     let manager = pm.read().await;
     let args = serde_json::json!({"app_name": req.app_name, "muted": req.muted});
-    Json(crate::api::helpers::call_plugin_ok_response(&manager, "volume-master", "set_app_mute", args, "App mute set").await)
+    Json(
+        crate::api::helpers::call_plugin_ok_response(
+            &manager,
+            "volume-master",
+            "set_app_mute",
+            args,
+            "App mute set",
+        )
+        .await,
+    )
 }

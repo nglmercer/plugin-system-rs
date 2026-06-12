@@ -1,4 +1,4 @@
-use plugin_system::{command, CommandResult, Plugin, PluginContext, PluginMetadata};
+use plugin_system::{command, CommandResult, PluginContext, PluginMetadata};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex, OnceLock};
@@ -114,9 +114,31 @@ impl Default for KeySimulatorPlugin {
     }
 }
 
+#[plugin_system::plugin_export]
 impl KeySimulatorPlugin {
     pub fn new() -> Self {
         Self
+    }
+
+    fn metadata(&self) -> PluginMetadata {
+        plugin_system::plugin_metadata! {
+            name: "key-simulator",
+            version: "0.1.0",
+            authors: ["StreamDeck Core"],
+            dependencies: []
+        }
+    }
+
+    fn on_load(&mut self, _ctx: &PluginContext) {
+        log::info!("KeySimulatorPlugin loaded");
+    }
+
+    fn on_unload(&mut self) {
+        log::info!("KeySimulatorPlugin unloading");
+    }
+
+    fn plugin_type_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
     }
 
     fn listen_for_combo(&self, timeout_ms: u64) -> Result<String, String> {
@@ -419,59 +441,4 @@ fn map_key_to_rdev(key: &str) -> Option<rdev::Key> {
             }
         }
     })
-}
-
-#[plugin_system::plugin_export]
-impl Plugin for KeySimulatorPlugin {
-    fn metadata(&self) -> PluginMetadata {
-        plugin_system::plugin_metadata! {
-            name: "key-simulator",
-            version: "0.1.0",
-            authors: ["StreamDeck Core"],
-            dependencies: []
-        }
-    }
-
-    fn on_load(&mut self, _ctx: &PluginContext) {
-        log::info!("KeySimulatorPlugin loaded");
-    }
-
-    fn on_unload(&mut self) {
-        log::info!("KeySimulatorPlugin unloading");
-    }
-
-    fn plugin_type_name(&self) -> &'static str {
-        std::any::type_name::<Self>()
-    }
-
-    fn interface_ids(&self) -> Vec<&'static str> {
-        vec!["KeySimulator"]
-    }
-
-    fn handle_command(
-        &mut self,
-        method: &str,
-        args: serde_json::Value,
-    ) -> Option<serde_json::Value> {
-        match method {
-            "simulate_keys" => {
-                let keys: Vec<String> = args
-                    .get("keys")
-                    .and_then(|v| v.as_array())
-                    .map(|arr| {
-                        arr.iter()
-                            .filter_map(|v| v.as_str().map(String::from))
-                            .collect()
-                    })
-                    .unwrap_or_default();
-                plugin_system::command_to_json(self.key_simulate_keys(keys))
-            }
-            "listen_for_combo" => {
-                let timeout = args.get("timeout_ms").and_then(|v| v.as_u64()).unwrap_or(15000);
-                plugin_system::command_to_json(self.key_listen_for_combo(timeout))
-            }
-            "reset_recording" => plugin_system::command_to_json(self.key_reset_recording()),
-            _ => None,
-        }
-    }
 }
