@@ -36,10 +36,13 @@ fn percent_from_channel_volumes(cv: &ChannelVolumes) -> f32 {
 
 const POLL_MS: u64 = 10;
 
+type SinkInput = (u32, String, f32, bool, Option<u32>);
+
 // ---------------------------------------------------------------------------
 // PulseController
 // ---------------------------------------------------------------------------
 
+#[allow(clippy::arc_with_non_send_sync)]
 pub struct PulseController {
     mainloop: Arc<Mutex<Mainloop>>,
     context: Arc<Mutex<Context>>,
@@ -52,8 +55,7 @@ impl PulseController {
     fn new() -> Result<Self, String> {
         let mut ml = Mainloop::new().ok_or("Mainloop::new() failed")?;
 
-        let mut ctx = Context::new(&ml, "plugin-volume-master")
-            .ok_or("Context::new() failed")?;
+        let mut ctx = Context::new(&ml, "plugin-volume-master").ok_or("Context::new() failed")?;
 
         ctx.connect(None, ContextFlagSet::NOFLAGS, None)
             .map_err(|e| format!("context.connect() failed: {:?}", e))?;
@@ -90,10 +92,12 @@ impl PulseController {
         ctx.set_state_callback(None);
         ml.unlock();
 
-        Ok(Self {
-            mainloop: Arc::new(Mutex::new(ml)),
-            context: Arc::new(Mutex::new(ctx)),
-        })
+        #[allow(clippy::arc_with_non_send_sync)]
+        let mainloop = Arc::new(Mutex::new(ml));
+        #[allow(clippy::arc_with_non_send_sync)]
+        let context = Arc::new(Mutex::new(ctx));
+
+        Ok(Self { mainloop, context })
     }
 
     fn shutdown(&self) {
@@ -112,10 +116,13 @@ impl PulseController {
         F: FnOnce(&mut Mainloop, &mut Introspector) -> Result<R, String>,
     {
         let mut ml = self.mainloop.lock().map_err(|e| format!("lock: {}", e))?;
-        let ctx = self.context.lock().map_err(|e| format!("lock ctx: {}", e))?;
+        let ctx = self
+            .context
+            .lock()
+            .map_err(|e| format!("lock ctx: {}", e))?;
         ml.lock();
         let mut intro = ctx.introspect();
-        let result = f(&mut *ml, &mut intro);
+        let result = f(&mut ml, &mut intro);
         drop(intro);
         drop(ctx);
         ml.unlock();
@@ -137,7 +144,10 @@ impl PulseController {
         }
     }
 
-    fn get_default_sink_name(ml: &mut Mainloop, intro: &mut Introspector) -> Result<String, String> {
+    fn get_default_sink_name(
+        ml: &mut Mainloop,
+        intro: &mut Introspector,
+    ) -> Result<String, String> {
         let result: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
         let r = result.clone();
 
@@ -150,26 +160,38 @@ impl PulseController {
         val.ok_or_else(|| "No default sink".to_string())
     }
 
-    fn get_sink_input_infos(ml: &mut Mainloop, intro: &mut Introspector) -> Vec<(u32, String, f32, bool, Option<u32>)> {
-        let inputs: Arc<Mutex<Vec<(u32, String, f32, bool, Option<u32>)>>> = Arc::new(Mutex::new(Vec::new()));
+    fn get_sink_input_infos(
+        ml: &mut Mainloop,
+        intro: &mut Introspector,
+    ) -> Vec<(u32, String, f32, bool, Option<u32>)> {
+        let inputs: Arc<Mutex<Vec<SinkInput>>> = Arc::new(Mutex::new(Vec::new()));
         let inp = inputs.clone();
 
         let op = intro.get_sink_input_info_list(move |result| {
             if let ListResult::Item(info) = result {
-                let raw_name = info.name.as_ref()
+                let raw_name = info
+                    .name
+                    .as_ref()
                     .map(|s| s.to_string())
                     .unwrap_or_else(|| "Unknown".into());
-                let app_name = info.proplist
+                let app_name = info
+                    .proplist
                     .get_str(proplist::properties::APPLICATION_NAME)
-                    .or_else(|| info.proplist.get_str(proplist::properties::APPLICATION_PROCESS_BINARY))
+                    .or_else(|| {
+                        info.proplist
+                            .get_str(proplist::properties::APPLICATION_PROCESS_BINARY)
+                    })
                     .unwrap_or_else(|| raw_name.clone());
-                let pid = info.proplist
+                let pid = info
+                    .proplist
                     .get_str(proplist::properties::APPLICATION_PROCESS_ID)
                     .and_then(|s| s.parse::<u32>().ok());
                 let vol = percent_from_channel_volumes(&info.volume);
                 let muted = info.mute;
 
-                inp.lock().unwrap().push((info.index, app_name, vol, muted, pid));
+                inp.lock()
+                    .unwrap()
+                    .push((info.index, app_name, vol, muted, pid));
             }
         });
         let _ = Self::poll_op(ml, || op.get_state());
@@ -203,7 +225,10 @@ impl VolumeControl for PulseController {
 
             let volume = vol_out.lock().unwrap().take().unwrap_or(0.0);
             let muted = mute_out.lock().unwrap().take().unwrap_or(false);
-            let device_name = name_out.lock().unwrap().take()
+            let device_name = name_out
+                .lock()
+                .unwrap()
+                .take()
                 .unwrap_or_else(|| "Default".to_string());
 
             Ok(VolumeState {
@@ -223,9 +248,13 @@ impl VolumeControl for PulseController {
             let success: Arc<Mutex<Option<bool>>> = Arc::new(Mutex::new(None));
             let sc = success.clone();
 
-            let op = intro.set_sink_volume_by_name(&sink_name, &new_cv, Some(Box::new(move |ok| {
-                *sc.lock().unwrap() = Some(ok);
-            })));
+            let op = intro.set_sink_volume_by_name(
+                &sink_name,
+                &new_cv,
+                Some(Box::new(move |ok| {
+                    *sc.lock().unwrap() = Some(ok);
+                })),
+            );
             Self::poll_op(ml, || op.get_state())?;
             Ok(())
         })
@@ -238,9 +267,13 @@ impl VolumeControl for PulseController {
             let success: Arc<Mutex<Option<bool>>> = Arc::new(Mutex::new(None));
             let sc = success.clone();
 
-            let op = intro.set_sink_mute_by_name(&sink_name, muted, Some(Box::new(move |ok| {
-                *sc.lock().unwrap() = Some(ok);
-            })));
+            let op = intro.set_sink_mute_by_name(
+                &sink_name,
+                muted,
+                Some(Box::new(move |ok| {
+                    *sc.lock().unwrap() = Some(ok);
+                })),
+            );
             Self::poll_op(ml, || op.get_state())?;
             Ok(())
         })
@@ -249,9 +282,15 @@ impl VolumeControl for PulseController {
     fn get_app_volumes(&mut self) -> Result<Vec<AppVolume>, String> {
         self.with_introspect(|ml, intro| {
             let list = Self::get_sink_input_infos(ml, intro);
-            Ok(list.into_iter().map(|(_, name, volume, muted, pid)| {
-                AppVolume { name, volume, muted, pid }
-            }).collect())
+            Ok(list
+                .into_iter()
+                .map(|(_, name, volume, muted, pid)| AppVolume {
+                    name,
+                    volume,
+                    muted,
+                    pid,
+                })
+                .collect())
         })
     }
 
@@ -271,9 +310,13 @@ impl VolumeControl for PulseController {
             let success: Arc<Mutex<Option<bool>>> = Arc::new(Mutex::new(None));
             let sc = success.clone();
 
-            let op = intro.set_sink_input_volume(index, &new_cv, Some(Box::new(move |ok| {
-                *sc.lock().unwrap() = Some(ok);
-            })));
+            let op = intro.set_sink_input_volume(
+                index,
+                &new_cv,
+                Some(Box::new(move |ok| {
+                    *sc.lock().unwrap() = Some(ok);
+                })),
+            );
             Self::poll_op(ml, || op.get_state())?;
             Ok(())
         })
@@ -292,9 +335,13 @@ impl VolumeControl for PulseController {
             let success: Arc<Mutex<Option<bool>>> = Arc::new(Mutex::new(None));
             let sc = success.clone();
 
-            let op = intro.set_sink_input_mute(index, muted, Some(Box::new(move |ok| {
-                *sc.lock().unwrap() = Some(ok);
-            })));
+            let op = intro.set_sink_input_mute(
+                index,
+                muted,
+                Some(Box::new(move |ok| {
+                    *sc.lock().unwrap() = Some(ok);
+                })),
+            );
             Self::poll_op(ml, || op.get_state())?;
             Ok(())
         })
@@ -304,10 +351,13 @@ impl VolumeControl for PulseController {
 impl PulseController {
     fn get_default_sink_name_outer(&self) -> Result<String, String> {
         let mut ml = self.mainloop.lock().map_err(|e| format!("lock: {}", e))?;
-        let ctx = self.context.lock().map_err(|e| format!("lock ctx: {}", e))?;
+        let ctx = self
+            .context
+            .lock()
+            .map_err(|e| format!("lock ctx: {}", e))?;
         ml.lock();
         let mut intro = ctx.introspect();
-        let result = Self::get_default_sink_name(&mut *ml, &mut intro);
+        let result = Self::get_default_sink_name(&mut ml, &mut intro);
         drop(intro);
         drop(ctx);
         ml.unlock();

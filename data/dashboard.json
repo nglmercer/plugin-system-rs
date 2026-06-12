@@ -63,7 +63,7 @@
       "rowSpan": 1,
       "settings": {
         "refreshInterval": 2000,
-        "variant": "detailed"
+        "variant": "compact"
       }
     },
     {
@@ -84,7 +84,7 @@
       "id": "ktdulyjz",
       "type": "obs-inputs",
       "title": "OBS Inputs",
-      "colSpan": 1,
+      "colSpan": 2,
       "rowSpan": 1,
       "settings": {
         "refreshInterval": 2000,
