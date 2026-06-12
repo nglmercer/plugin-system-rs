@@ -36,10 +36,6 @@ impl TimerPlugin {
         log::info!("TimerPlugin unloading");
     }
 
-    fn plugin_type_name(&self) -> &'static str {
-        std::any::type_name::<Self>()
-    }
-
     pub fn start_timer(&mut self, name: String, seconds: u64) {
         self.timers.insert(name, seconds);
     }

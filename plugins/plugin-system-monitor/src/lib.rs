@@ -70,10 +70,6 @@ impl SystemMonitorPlugin {
         log::info!("SystemMonitorPlugin unloading");
     }
 
-    fn plugin_type_name(&self) -> &'static str {
-        std::any::type_name::<Self>()
-    }
-
     pub fn interface_data(&self) -> Option<serde_json::Value> {
         serde_json::to_value(&self.stats).ok()
     }

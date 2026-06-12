@@ -137,10 +137,6 @@ impl KeySimulatorPlugin {
         log::info!("KeySimulatorPlugin unloading");
     }
 
-    fn plugin_type_name(&self) -> &'static str {
-        std::any::type_name::<Self>()
-    }
-
     fn listen_for_combo(&self, timeout_ms: u64) -> Result<String, String> {
         if cfg!(test) {
             let _ = timeout_ms;

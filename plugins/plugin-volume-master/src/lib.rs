@@ -125,10 +125,6 @@ impl VolumeMasterPlugin {
         log::info!("VolumeMasterPlugin unloading");
     }
 
-    fn plugin_type_name(&self) -> &'static str {
-        std::any::type_name::<Self>()
-    }
-
     fn refresh_internal(&mut self) {
         if let Ok(state) = self.controller.get_master_volume() {
             self.data.state = state;

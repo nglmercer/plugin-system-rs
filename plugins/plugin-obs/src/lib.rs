@@ -76,10 +76,6 @@ impl ObsPlugin {
         self.runtime.block_on(self.controller.disconnect());
     }
 
-    fn plugin_type_name(&self) -> &'static str {
-        std::any::type_name::<Self>()
-    }
-
     fn interface_data(&self) -> Option<serde_json::Value> {
         serde_json::to_value(&self.data).ok()
     }
