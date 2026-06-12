@@ -29,6 +29,22 @@ pub trait Plugin: Any + Send + Sync {
     fn on_unload(&mut self);
 
     fn plugin_type_name(&self) -> &'static str;
+
+    fn handle_command(
+        &mut self,
+        _method: &str,
+        _args: serde_json::Value,
+    ) -> Option<serde_json::Value> {
+        None
+    }
+
+    fn interface_ids(&self) -> Vec<&'static str> {
+        Vec::new()
+    }
+
+    fn interface_data(&self) -> Option<serde_json::Value> {
+        None
+    }
 }
 
 impl dyn Plugin {

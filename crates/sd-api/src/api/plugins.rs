@@ -2,10 +2,6 @@ use axum::{
     extract::{Path, State},
     Json,
 };
-use plugin_key_simulator::KeySimulatorPlugin;
-use plugin_obs::ObsPlugin;
-use plugin_system_monitor::SystemMonitorPlugin;
-use plugin_volume_master::VolumeMasterPlugin;
 use serde::Serialize;
 
 use crate::{response::ApiResponse, state::AppState};
@@ -41,40 +37,14 @@ pub(crate) async fn get_plugin_data(
         Ok(plugin_arc) => {
             let plugin = plugin_arc.read().expect("plugin lock poisoned");
             let meta = plugin.metadata();
-
-            let interfaces: Vec<String> = match plugin_name.as_str() {
-                "obs" => plugin
-                    .downcast_ref::<ObsPlugin>()
-                    .map(|p| p.interface_ids().into_iter().map(String::from).collect())
-                    .unwrap_or_default(),
-                "volume-master" => plugin
-                    .downcast_ref::<VolumeMasterPlugin>()
-                    .map(|p| p.interface_ids().into_iter().map(String::from).collect())
-                    .unwrap_or_default(),
-                "system-monitor" => plugin
-                    .downcast_ref::<SystemMonitorPlugin>()
-                    .map(|p| p.interface_ids().into_iter().map(String::from).collect())
-                    .unwrap_or_default(),
-                "key-simulator" => plugin
-                    .downcast_ref::<KeySimulatorPlugin>()
-                    .map(|p| p.interface_ids().into_iter().map(String::from).collect())
-                    .unwrap_or_default(),
-                _ => Vec::new(),
-            };
-
-            let data = match plugin_name.as_str() {
-                "obs" => plugin
-                    .downcast_ref::<ObsPlugin>()
-                    .and_then(|p| p.interface_data()),
-                "volume-master" => plugin
-                    .downcast_ref::<VolumeMasterPlugin>()
-                    .and_then(|p| p.interface_data()),
-                "system-monitor" => plugin
-                    .downcast_ref::<SystemMonitorPlugin>()
-                    .and_then(|p| p.interface_data()),
-                _ => None,
-            }
-            .unwrap_or_else(|| serde_json::json!({}));
+            let interfaces: Vec<String> = plugin
+                .interface_ids()
+                .into_iter()
+                .map(String::from)
+                .collect();
+            let data = plugin
+                .interface_data()
+                .unwrap_or_else(|| serde_json::json!({}));
 
             Json(ApiResponse::success(PluginDataResponse {
                 name: meta.name,

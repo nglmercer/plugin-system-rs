@@ -2534,6 +2534,7 @@ dependencies = [
  "log",
  "plugin-system",
  "rdev",
+ "serde_json",
 ]
 
 [[package]]
@@ -2999,10 +3000,7 @@ dependencies = [
  "local-ip-address",
  "log",
  "open",
- "plugin-key-simulator",
- "plugin-obs",
- "plugin-system-monitor",
- "plugin-volume-master",
+ "plugin-system",
  "sd-actions",
  "sd-devices",
  "sd-events",

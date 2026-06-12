@@ -1,5 +1,4 @@
 use axum::{extract::State, Json};
-use plugin_key_simulator::KeySimulatorPlugin;
 use serde::{Deserialize, Serialize};
 
 use crate::{response::ApiResponse, state::AppState};
@@ -29,12 +28,20 @@ pub(crate) async fn send_hotkey(
         let guard = pm.blocking_read();
         guard
             .with_plugin_mut("key-simulator", |plugin| {
+                let args = serde_json::json!({"keys": keys_for_sim});
                 plugin
-                    .downcast_mut::<KeySimulatorPlugin>()
+                    .handle_command("simulate_keys", args)
                     .ok_or("Key simulator plugin not available".to_string())
-                    .and_then(|p| {
-                        p.simulate_keys_plugin(&keys_for_sim)
-                            .map_err(|e| e.to_string())
+                    .and_then(|result| {
+                        if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
+                            Ok(())
+                        } else {
+                            Err(result
+                                .get("error")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("Unknown error")
+                                .to_string())
+                        }
                     })
             })
             .unwrap_or(Err("Key simulator plugin not available".to_string()))
@@ -89,13 +96,21 @@ pub(crate) async fn record_hotkey(
     let result = tokio::task::spawn_blocking(move || {
         let guard = pm.blocking_read();
         guard
-            .with_plugin("key-simulator", |plugin| {
+            .with_plugin_mut("key-simulator", |plugin| {
+                let args = serde_json::json!({"timeout_ms": req.timeout_ms});
                 plugin
-                    .downcast_ref::<KeySimulatorPlugin>()
+                    .handle_command("listen_for_combo", args)
                     .ok_or("Key simulator plugin not available".to_string())
-                    .and_then(|p| {
-                        p.listen_for_combo_plugin(req.timeout_ms)
-                            .map_err(|e| e.to_string())
+                    .and_then(|result| {
+                        if let Some(combo) = result.get("combo").and_then(|v| v.as_str()) {
+                            Ok(combo.to_string())
+                        } else {
+                            Err(result
+                                .get("error")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("Unknown error")
+                                .to_string())
+                        }
                     })
             })
             .unwrap_or(Err("Key simulator plugin not available".to_string()))
@@ -117,10 +132,9 @@ pub(crate) async fn reset_hotkey_recording(
 ) -> Json<ApiResponse<String>> {
     let pm = state.plugin_manager.plugin_manager().clone();
     let guard = pm.blocking_read();
-    let _ = guard.with_plugin("key-simulator", |plugin| {
-        if let Some(p) = plugin.downcast_ref::<KeySimulatorPlugin>() {
-            p.reset_recording_state_plugin();
-        }
+    let _ = guard.with_plugin_mut("key-simulator", |plugin| {
+        let args = serde_json::json!({});
+        plugin.handle_command("reset_recording", args);
     });
     log::info!("[Hotkey] Recording state reset");
     Json(ApiResponse::success("Recording state reset".to_string()))

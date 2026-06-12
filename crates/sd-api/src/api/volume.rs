@@ -1,5 +1,4 @@
 use axum::{extract::State, Json};
-use plugin_volume_master::VolumeMasterPlugin;
 use serde::{Deserialize, Serialize};
 
 use crate::{response::ApiResponse, state::AppState};
@@ -107,16 +106,12 @@ pub(crate) async fn get_volume_state(
         // Refresh data before reading
         {
             let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-            if let Some(vol) = plugin.downcast_mut::<VolumeMasterPlugin>() {
-                vol.handle_command("refresh", serde_json::json!({}));
-            }
+            plugin.handle_command("refresh", serde_json::json!({}));
         }
         let plugin = plugin_arc.read().expect("plugin lock poisoned");
-        if let Some(vol) = plugin.downcast_ref::<VolumeMasterPlugin>() {
-            if let Some(data) = vol.interface_data() {
-                if let Some(resp) = parse_volume_data(data) {
-                    return Json(ApiResponse::success(resp));
-                }
+        if let Some(data) = plugin.interface_data() {
+            if let Some(resp) = parse_volume_data(data) {
+                return Json(ApiResponse::success(resp));
             }
         }
     }
@@ -131,37 +126,31 @@ pub(crate) async fn get_app_volumes(
     let manager = plugin_manager.read().await;
 
     if let Ok(plugin_arc) = manager.get_plugin_arc("volume-master") {
-        // Refresh data before reading
         {
             let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-            if let Some(vol) = plugin.downcast_mut::<VolumeMasterPlugin>() {
-                vol.handle_command("refresh", serde_json::json!({}));
-            }
+            plugin.handle_command("refresh", serde_json::json!({}));
         }
         let plugin = plugin_arc.read().expect("plugin lock poisoned");
-        if let Some(vol) = plugin.downcast_ref::<VolumeMasterPlugin>() {
-            if let Some(data) = vol.interface_data() {
-                let apps = data
-                    .get("apps")
-                    .and_then(|a| a.as_array())
-                    .map(|arr| {
-                        arr.iter()
-                            .map(|a| AppVolumeResponse {
-                                name: a
-                                    .get("name")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("")
-                                    .to_string(),
-                                volume: a.get("volume").and_then(|v| v.as_f64()).unwrap_or(0.0)
-                                    as f32,
-                                muted: a.get("muted").and_then(|v| v.as_bool()).unwrap_or(false),
-                                pid: a.get("pid").and_then(|v| v.as_u64()).map(|p| p as u32),
-                            })
-                            .collect()
-                    })
-                    .unwrap_or_default();
-                return Json(ApiResponse::success(apps));
-            }
+        if let Some(data) = plugin.interface_data() {
+            let apps = data
+                .get("apps")
+                .and_then(|a| a.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .map(|a| AppVolumeResponse {
+                            name: a
+                                .get("name")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string(),
+                            volume: a.get("volume").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
+                            muted: a.get("muted").and_then(|v| v.as_bool()).unwrap_or(false),
+                            pid: a.get("pid").and_then(|v| v.as_u64()).map(|p| p as u32),
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            return Json(ApiResponse::success(apps));
         }
     }
 
@@ -177,18 +166,16 @@ pub(crate) async fn set_master_volume(
 
     if let Ok(plugin_arc) = manager.get_plugin_arc("volume-master") {
         let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-        if let Some(vol) = plugin.downcast_mut::<VolumeMasterPlugin>() {
-            let args = serde_json::json!({"volume": req.volume});
-            if let Some(result) = vol.handle_command("set_volume", args) {
-                if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
-                    return Json(ApiResponse::success("Volume set".to_string()));
-                } else {
-                    let error = result
-                        .get("error")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("Unknown error");
-                    return Json(ApiResponse::error(error.to_string()));
-                }
+        let args = serde_json::json!({"volume": req.volume});
+        if let Some(result) = plugin.handle_command("set_volume", args) {
+            if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
+                return Json(ApiResponse::success("Volume set".to_string()));
+            } else {
+                let error = result
+                    .get("error")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown error");
+                return Json(ApiResponse::error(error.to_string()));
             }
         }
     }
@@ -205,18 +192,16 @@ pub(crate) async fn set_master_mute(
 
     if let Ok(plugin_arc) = manager.get_plugin_arc("volume-master") {
         let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-        if let Some(vol) = plugin.downcast_mut::<VolumeMasterPlugin>() {
-            let args = serde_json::json!({"muted": req.muted});
-            if let Some(result) = vol.handle_command("set_mute", args) {
-                if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
-                    return Json(ApiResponse::success("Mute set".to_string()));
-                } else {
-                    let error = result
-                        .get("error")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("Unknown error");
-                    return Json(ApiResponse::error(error.to_string()));
-                }
+        let args = serde_json::json!({"muted": req.muted});
+        if let Some(result) = plugin.handle_command("set_mute", args) {
+            if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
+                return Json(ApiResponse::success("Mute set".to_string()));
+            } else {
+                let error = result
+                    .get("error")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown error");
+                return Json(ApiResponse::error(error.to_string()));
             }
         }
     }
@@ -233,18 +218,16 @@ pub(crate) async fn set_app_volume(
 
     if let Ok(plugin_arc) = manager.get_plugin_arc("volume-master") {
         let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-        if let Some(vol) = plugin.downcast_mut::<VolumeMasterPlugin>() {
-            let args = serde_json::json!({"app_name": req.app_name, "volume": req.volume});
-            if let Some(result) = vol.handle_command("set_app_volume", args) {
-                if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
-                    return Json(ApiResponse::success("App volume set".to_string()));
-                } else {
-                    let error = result
-                        .get("error")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("Unknown error");
-                    return Json(ApiResponse::error(error.to_string()));
-                }
+        let args = serde_json::json!({"app_name": req.app_name, "volume": req.volume});
+        if let Some(result) = plugin.handle_command("set_app_volume", args) {
+            if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
+                return Json(ApiResponse::success("App volume set".to_string()));
+            } else {
+                let error = result
+                    .get("error")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown error");
+                return Json(ApiResponse::error(error.to_string()));
             }
         }
     }
@@ -261,18 +244,16 @@ pub(crate) async fn set_app_mute(
 
     if let Ok(plugin_arc) = manager.get_plugin_arc("volume-master") {
         let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-        if let Some(vol) = plugin.downcast_mut::<VolumeMasterPlugin>() {
-            let args = serde_json::json!({"app_name": req.app_name, "muted": req.muted});
-            if let Some(result) = vol.handle_command("set_app_mute", args) {
-                if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
-                    return Json(ApiResponse::success("App mute set".to_string()));
-                } else {
-                    let error = result
-                        .get("error")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("Unknown error");
-                    return Json(ApiResponse::error(error.to_string()));
-                }
+        let args = serde_json::json!({"app_name": req.app_name, "muted": req.muted});
+        if let Some(result) = plugin.handle_command("set_app_mute", args) {
+            if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
+                return Json(ApiResponse::success("App mute set".to_string()));
+            } else {
+                let error = result
+                    .get("error")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown error");
+                return Json(ApiResponse::error(error.to_string()));
             }
         }
     }

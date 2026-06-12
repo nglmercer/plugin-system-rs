@@ -443,4 +443,47 @@ impl Plugin for KeySimulatorPlugin {
     fn plugin_type_name(&self) -> &'static str {
         std::any::type_name::<Self>()
     }
+
+    fn handle_command(
+        &mut self,
+        method: &str,
+        args: serde_json::Value,
+    ) -> Option<serde_json::Value> {
+        match method {
+            "simulate_keys" => {
+                let keys: Vec<String> = args
+                    .get("keys")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                match self.simulate_keys_plugin(&keys) {
+                    Ok(()) => Some(serde_json::json!({"ok": true})),
+                    Err(e) => Some(serde_json::json!({"ok": false, "error": e.to_string()})),
+                }
+            }
+            "listen_for_combo" => {
+                let timeout = args
+                    .get("timeout_ms")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(15000);
+                match self.listen_for_combo_plugin(timeout) {
+                    Ok(combo) => Some(serde_json::json!({"combo": combo})),
+                    Err(e) => Some(serde_json::json!({"ok": false, "error": e.to_string()})),
+                }
+            }
+            "reset_recording" => {
+                self.reset_recording_state_plugin();
+                Some(serde_json::json!({"ok": true}))
+            }
+            _ => None,
+        }
+    }
+
+    fn interface_ids(&self) -> Vec<&'static str> {
+        KeySimulatorPlugin::interface_ids(self)
+    }
 }

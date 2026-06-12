@@ -124,7 +124,12 @@ fn parse_export_args(attr: TokenStream) -> syn::Result<ExportArgs> {
 ///      ObsPlugin -> "obs"
 fn derive_prefix_from_type(ty: &Type) -> String {
     let type_name = match ty {
-        Type::Path(p) => p.path.segments.last().map(|s| s.ident.to_string()).unwrap_or_default(),
+        Type::Path(p) => p
+            .path
+            .segments
+            .last()
+            .map(|s| s.ident.to_string())
+            .unwrap_or_default(),
         _ => return String::new(),
     };
 
@@ -142,7 +147,10 @@ fn derive_prefix_from_type(ty: &Type) -> String {
             if i > 0 {
                 // Check if previous char was lowercase or if next char is lowercase (for sequences like "HTTPServer")
                 let prev = name.chars().nth(i - 1).unwrap_or(' ');
-                if prev.is_lowercase() || (prev.is_uppercase() && name.chars().nth(i + 1).map_or(false, |c| c.is_lowercase())) {
+                if prev.is_lowercase()
+                    || (prev.is_uppercase()
+                        && name.chars().nth(i + 1).is_some_and(|c| c.is_lowercase()))
+                {
                     result.push('_');
                 }
             }
@@ -217,7 +225,11 @@ fn generate_plugin_export(
         Some(p) => p.to_string(),
         None => derive_prefix_from_type(self_ty),
     };
-    let prefix_opt = if resolved_prefix.is_empty() { None } else { Some(resolved_prefix.as_str()) };
+    let prefix_opt = if resolved_prefix.is_empty() {
+        None
+    } else {
+        Some(resolved_prefix.as_str())
+    };
     let metadata_export_tokens = metadata_exports(self_ty, prefix_opt);
 
     let create_fn_name = match prefix_opt {
@@ -285,7 +297,11 @@ fn generate_plugin_export_all(
         Some(p) => p.to_string(),
         None => derive_prefix_from_type(self_ty),
     };
-    let prefix_opt = if resolved_prefix.is_empty() { None } else { Some(resolved_prefix.as_str()) };
+    let prefix_opt = if resolved_prefix.is_empty() {
+        None
+    } else {
+        Some(resolved_prefix.as_str())
+    };
 
     let mut method_exports = Vec::new();
     let mut method_names = Vec::new();

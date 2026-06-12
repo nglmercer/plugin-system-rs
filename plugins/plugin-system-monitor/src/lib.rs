@@ -253,4 +253,12 @@ impl Plugin for SystemMonitorPlugin {
     fn plugin_type_name(&self) -> &'static str {
         std::any::type_name::<Self>()
     }
+
+    fn interface_ids(&self) -> Vec<&'static str> {
+        SystemMonitorPlugin::interface_ids(self)
+    }
+
+    fn interface_data(&self) -> Option<serde_json::Value> {
+        SystemMonitorPlugin::interface_data(self)
+    }
 }

@@ -10,10 +10,7 @@ sd-actions = { path = "../sd-actions" }
 sd-profiles = { path = "../sd-profiles" }
 sd-devices = { path = "../sd-devices" }
 sd-plugins = { path = "../sd-plugins" }
-plugin-obs = { path = "../../plugins/plugin-obs" }
-plugin-volume-master = { path = "../../plugins/plugin-volume-master" }
-plugin-system-monitor = { path = "../../plugins/plugin-system-monitor" }
-plugin-key-simulator = { path = "../../plugins/plugin-key-simulator" }
+plugin-system = { path = "../plugin-system" }
 axum = { version = "0.7", features = ["ws", "json"] }
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }

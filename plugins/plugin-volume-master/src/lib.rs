@@ -200,4 +200,20 @@ impl Plugin for VolumeMasterPlugin {
     fn plugin_type_name(&self) -> &'static str {
         std::any::type_name::<Self>()
     }
+
+    fn handle_command(
+        &mut self,
+        method: &str,
+        args: serde_json::Value,
+    ) -> Option<serde_json::Value> {
+        VolumeMasterPlugin::handle_command(self, method, args)
+    }
+
+    fn interface_ids(&self) -> Vec<&'static str> {
+        VolumeMasterPlugin::interface_ids(self)
+    }
+
+    fn interface_data(&self) -> Option<serde_json::Value> {
+        VolumeMasterPlugin::interface_data(self)
+    }
 }
