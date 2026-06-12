@@ -46,10 +46,10 @@ pub struct VolumeData {
 }
 
 pub trait VolumeControl: Send + Sync {
-    fn get_master_volume(&self) -> Result<VolumeState, String>;
+    fn get_master_volume(&mut self) -> Result<VolumeState, String>;
     fn set_master_volume(&mut self, volume: f32) -> Result<(), String>;
     fn set_muted(&mut self, muted: bool) -> Result<(), String>;
-    fn get_app_volumes(&self) -> Result<Vec<AppVolume>, String>;
+    fn get_app_volumes(&mut self) -> Result<Vec<AppVolume>, String>;
     fn set_app_volume(&mut self, app_name: &str, volume: f32) -> Result<(), String>;
     fn set_app_muted(&mut self, app_name: &str, muted: bool) -> Result<(), String>;
 }
@@ -67,7 +67,7 @@ impl Default for VolumeMasterPlugin {
 
 impl VolumeMasterPlugin {
     pub fn new() -> Self {
-        let controller = platform::create_controller();
+        let mut controller = platform::create_controller();
         let data = controller
             .get_master_volume()
             .map(|state| VolumeData {

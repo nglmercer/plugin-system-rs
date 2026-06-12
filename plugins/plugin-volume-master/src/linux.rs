@@ -136,7 +136,7 @@ fn parse_sink_inputs(output: &str) -> Vec<SinkInput> {
 }
 
 impl VolumeControl for PulseController {
-    fn get_master_volume(&self) -> Result<VolumeState, String> {
+    fn get_master_volume(&mut self) -> Result<VolumeState, String> {
         let output = run_pactl(&["get-sink-volume", "@DEFAULT_SINK@"])?;
         let volume = parse_volume_percent(&output).unwrap_or(0.0);
 
@@ -171,7 +171,7 @@ impl VolumeControl for PulseController {
         Ok(())
     }
 
-    fn get_app_volumes(&self) -> Result<Vec<AppVolume>, String> {
+    fn get_app_volumes(&mut self) -> Result<Vec<AppVolume>, String> {
         let output = run_pactl(&["list", "sink-inputs"])?;
         let inputs = parse_sink_inputs(&output);
 

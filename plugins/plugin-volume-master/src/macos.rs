@@ -13,7 +13,7 @@ pub fn per_app_supported() -> bool {
 }
 
 impl VolumeControl for MacOSController {
-    fn get_master_volume(&self) -> Result<VolumeState, String> {
+    fn get_master_volume(&mut self) -> Result<VolumeState, String> {
         use coreaudio_rs::sys::{
             kAudioDevicePropertyScopeOutput, kAudioHardwarePropertyDefaultOutputDevice,
             kAudioObjectPropertyElementMain, kAudioObjectPropertyScopeGlobal, AudioDeviceID,
@@ -194,7 +194,7 @@ impl VolumeControl for MacOSController {
         Ok(())
     }
 
-    fn get_app_volumes(&self) -> Result<Vec<AppVolume>, String> {
+    fn get_app_volumes(&mut self) -> Result<Vec<AppVolume>, String> {
         Ok(Vec::new())
     }
 

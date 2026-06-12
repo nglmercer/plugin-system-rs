@@ -48,7 +48,7 @@ fn get_device() -> WinResult<IMMDevice> {
 }
 
 impl VolumeControl for WindowsController {
-    fn get_master_volume(&self) -> Result<VolumeState, String> {
+    fn get_master_volume(&mut self) -> Result<VolumeState, String> {
         ensure_com();
 
         unsafe {
@@ -106,7 +106,7 @@ impl VolumeControl for WindowsController {
         Ok(())
     }
 
-    fn get_app_volumes(&self) -> Result<Vec<AppVolume>, String> {
+    fn get_app_volumes(&mut self) -> Result<Vec<AppVolume>, String> {
         ensure_com();
 
         let mut apps = Vec::new();

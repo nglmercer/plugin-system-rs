@@ -11,7 +11,7 @@ pub fn per_app_supported() -> bool {
 }
 
 impl VolumeControl for UnsupportedController {
-    fn get_master_volume(&self) -> Result<VolumeState, String> {
+    fn get_master_volume(&mut self) -> Result<VolumeState, String> {
         Err("Volume control not supported on this platform".to_string())
     }
 
@@ -23,7 +23,7 @@ impl VolumeControl for UnsupportedController {
         Err("Volume control not supported on this platform".to_string())
     }
 
-    fn get_app_volumes(&self) -> Result<Vec<AppVolume>, String> {
+    fn get_app_volumes(&mut self) -> Result<Vec<AppVolume>, String> {
         Ok(Vec::new())
     }
 
