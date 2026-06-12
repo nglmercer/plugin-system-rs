@@ -6,7 +6,7 @@ import { buildDefaultWidget, generateId } from "./widgetHelpers";
 import { WidgetLibrary } from "./WidgetLibrary";
 import { WidgetWizard } from "./WidgetWizard";
 import { WidgetContent } from "./WidgetContent";
-import { WidgetIcon, Icons } from "./Icons";
+import { Icons } from "./Icons";
 
 interface ContextMenuState {
   visible: boolean;
@@ -27,7 +27,6 @@ export function WidgetGrid() {
     visible: false, x: 0, y: 0, widgetId: "",
   });
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const longPressTriggered = useRef(false);
 
   useEffect(() => {
     fetchDashboard()
@@ -124,9 +123,8 @@ export function WidgetGrid() {
   }
 
   const handlePointerDown = useCallback((e: Event, widgetId: string) => {
-    longPressTriggered.current = false;
     const target = e.target as HTMLElement;
-    if (target.closest(".widget-control-btn")) return;
+    if (target.closest(".ctx-menu") || target.closest(".ctx-item")) return;
 
     if (e.type === "contextmenu") {
       showContextMenu(e, widgetId);
@@ -134,7 +132,6 @@ export function WidgetGrid() {
     }
 
     longPressTimer.current = setTimeout(() => {
-      longPressTriggered.current = true;
       showContextMenu(e, widgetId);
     }, 500);
   }, []);
@@ -208,37 +205,6 @@ export function WidgetGrid() {
                 onPointermove: handlePointerMove,
                 onPointercancel: handlePointerUp,
               },
-              h(
-                "div",
-                { class: "widget-header" },
-                h("span", { class: "widget-title" },
-                  h(WidgetIcon, { type: widget.type }),
-                  " ",
-                  widget.title,
-                ),
-                h(
-                  "div",
-                  { class: "widget-controls" },
-                  h(
-                    "button",
-                    {
-                      class: "widget-control-btn edit",
-                      onClick: () => setWizardWidget(widget.id),
-                      title: "Edit",
-                    },
-                    h(Icons.edit, null),
-                  ),
-                  h(
-                    "button",
-                    {
-                      class: "widget-control-btn remove",
-                      onClick: () => handleRemoveWidget(widget.id),
-                      title: "Remove",
-                    },
-                    h(Icons.close, null),
-                  ),
-                ),
-              ),
               h(
                 "div",
                 { class: "widget-content" },
