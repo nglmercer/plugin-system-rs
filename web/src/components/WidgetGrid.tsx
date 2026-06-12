@@ -1,12 +1,19 @@
 import { h } from "preact";
-import { useState, useEffect } from "preact/hooks";
-import { WidgetType, DashboardLayout } from "../lib/types";
+import { useState, useEffect, useRef, useCallback } from "preact/hooks";
+import { WidgetType, DashboardLayout, WidgetConfig } from "../lib/types";
 import { fetchDashboard, saveDashboard } from "../lib/api";
-import { buildDefaultWidget } from "./widgetHelpers";
+import { buildDefaultWidget, generateId } from "./widgetHelpers";
 import { WidgetLibrary } from "./WidgetLibrary";
 import { WidgetWizard } from "./WidgetWizard";
 import { WidgetContent } from "./WidgetContent";
 import { WidgetIcon, Icons } from "./Icons";
+
+interface ContextMenuState {
+  visible: boolean;
+  x: number;
+  y: number;
+  widgetId: string;
+}
 
 export function WidgetGrid() {
   const [layout, setLayout] = useState<DashboardLayout>({
@@ -16,6 +23,11 @@ export function WidgetGrid() {
   const [loading, setLoading] = useState(true);
   const [showLibrary, setShowLibrary] = useState(false);
   const [wizardWidget, setWizardWidget] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState>({
+    visible: false, x: 0, y: 0, widgetId: "",
+  });
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTriggered = useRef(false);
 
   useEffect(() => {
     fetchDashboard()
@@ -30,9 +42,25 @@ export function WidgetGrid() {
     function handleAddWidgetFromFAB() {
       setShowLibrary(true);
     }
-    window.addEventListener('sd:add-widget', handleAddWidgetFromFAB);
-    return () => window.removeEventListener('sd:add-widget', handleAddWidgetFromFAB);
+    window.addEventListener("sd:add-widget", handleAddWidgetFromFAB);
+    return () => window.removeEventListener("sd:add-widget", handleAddWidgetFromFAB);
   }, []);
+
+  useEffect(() => {
+    function handleClickOutside() {
+      if (contextMenu.visible) {
+        setContextMenu((prev) => ({ ...prev, visible: false }));
+      }
+    }
+    if (contextMenu.visible) {
+      document.addEventListener("click", handleClickOutside);
+      document.addEventListener("contextmenu", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("click", handleClickOutside);
+      document.removeEventListener("contextmenu", handleClickOutside);
+    };
+  }, [contextMenu.visible]);
 
   function persist(next: DashboardLayout) {
     setLayout(next);
@@ -67,6 +95,69 @@ export function WidgetGrid() {
     persist({ ...layout, widgets: layout.widgets.filter((w) => w.id !== id) });
     setWizardWidget(null);
   }
+
+  function handleCloneWidget(id: string) {
+    const original = layout.widgets.find((w) => w.id === id);
+    if (!original) return;
+    const clone: WidgetConfig = {
+      ...original,
+      id: generateId(),
+      title: original.title + " (copy)",
+      settings: { ...original.settings },
+    };
+    persist({ ...layout, widgets: [...layout.widgets, clone] });
+    setContextMenu((prev) => ({ ...prev, visible: false }));
+  }
+
+  function showContextMenu(e: Event, widgetId: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    const me = e as MouseEvent;
+    const touch = (e as TouchEvent).changedTouches?.[0];
+    const clientX = me.clientX ?? touch?.clientX ?? 0;
+    const clientY = me.clientY ?? touch?.clientY ?? 0;
+    const menuW = 180;
+    const menuH = 140;
+    const x = Math.min(clientX, window.innerWidth - menuW - 8);
+    const y = Math.min(clientY, window.innerHeight - menuH - 8);
+    setContextMenu({ visible: true, x, y, widgetId });
+  }
+
+  const handlePointerDown = useCallback((e: Event, widgetId: string) => {
+    longPressTriggered.current = false;
+    const target = e.target as HTMLElement;
+    if (target.closest(".widget-control-btn")) return;
+
+    if (e.type === "contextmenu") {
+      showContextMenu(e, widgetId);
+      return;
+    }
+
+    longPressTimer.current = setTimeout(() => {
+      longPressTriggered.current = true;
+      showContextMenu(e, widgetId);
+    }, 500);
+  }, []);
+
+  const handlePointerUp = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }, []);
+
+  const handlePointerMove = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    };
+  }, []);
 
   if (loading)
     return h("div", { class: "dashboard-loading" }, "Loading dashboard...");
@@ -111,6 +202,11 @@ export function WidgetGrid() {
                   gridColumn: `span ${widget.colSpan}`,
                   gridRow: `span ${widget.rowSpan}`,
                 },
+                onContextMenu: (e: Event) => handlePointerDown(e, widget.id),
+                onPointerdown: (e: Event) => handlePointerDown(e, widget.id),
+                onPointerup: handlePointerUp,
+                onPointermove: handlePointerMove,
+                onPointercancel: handlePointerUp,
               },
               h(
                 "div",
@@ -151,6 +247,50 @@ export function WidgetGrid() {
             ),
           ),
         ),
+    contextMenu.visible &&
+      h(
+        "div",
+        {
+          class: "ctx-menu",
+          style: { left: contextMenu.x + "px", top: contextMenu.y + "px" },
+        },
+        h(
+          "button",
+          {
+            class: "ctx-item",
+            onClick: () => {
+              setWizardWidget(contextMenu.widgetId);
+              setContextMenu((prev) => ({ ...prev, visible: false }));
+            },
+          },
+          h(Icons.edit, null),
+          "Edit",
+        ),
+        h(
+          "button",
+          {
+            class: "ctx-item",
+            onClick: () => {
+              handleCloneWidget(contextMenu.widgetId);
+            },
+          },
+          h(Icons.copy, null),
+          "Clone",
+        ),
+        h("div", { class: "ctx-separator" }),
+        h(
+          "button",
+          {
+            class: "ctx-item ctx-danger",
+            onClick: () => {
+              handleRemoveWidget(contextMenu.widgetId);
+              setContextMenu((prev) => ({ ...prev, visible: false }));
+            },
+          },
+          h(Icons.close, null),
+          "Delete",
+        ),
+      ),
     showLibrary &&
       h(WidgetLibrary, {
         onAdd: handleAddWidget,
