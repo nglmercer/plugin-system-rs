@@ -81,6 +81,23 @@ export const Icons = {
     h("rect", { x: "2", y: "4", width: "20", height: "16", rx: "2" }),
     h("path", { d: "M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10" }),
   ),
+  dashboard: () => h("svg", { ...s },
+    h("rect", { x: "3", y: "3", width: "7", height: "7", rx: "1" }),
+    h("rect", { x: "14", y: "3", width: "7", height: "7", rx: "1" }),
+    h("rect", { x: "3", y: "14", width: "7", height: "7", rx: "1" }),
+    h("rect", { x: "14", y: "14", width: "7", height: "7", rx: "1" }),
+  ),
+  profiles: () => h("svg", { ...s },
+    h("path", { d: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" }),
+    h("circle", { cx: "9", cy: "7", r: "4" }),
+    h("path", { d: "M23 21v-2a4 4 0 0 0-3-3.87" }),
+    h("path", { d: "M16 3.13a4 4 0 0 1 0 7.75" }),
+  ),
+  plugins: () => h("svg", { ...s },
+    h("path", { d: "M12 2L2 7l10 5 10-5-10-5z" }),
+    h("path", { d: "M2 17l10 5 10-5" }),
+    h("path", { d: "M2 12l10 5 10-5" }),
+  ),
 } as const;
 
 export type IconName = keyof typeof Icons;

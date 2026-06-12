@@ -11,44 +11,78 @@ export function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('theme') as 'dark' | 'light') || 'dark';
   });
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
 
+  useEffect(() => {
+    if (menuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [menuOpen]);
+
   function toggleTheme() {
     setTheme(t => t === 'dark' ? 'light' : 'dark');
   }
 
+  function navigateTo(page: 'dashboard' | 'profiles' | 'plugins') {
+    setCurrentPage(page);
+    setMenuOpen(false);
+  }
+
+  function handleAddWidget() {
+    setMenuOpen(false);
+    window.dispatchEvent(new CustomEvent('sd:add-widget'));
+  }
+
   return h('div', { class: 'app' },
-    h('nav', { class: 'nav' },
-      h('h1', null, 'StreamDeck'),
-      h('div', { class: 'nav-links' },
+    h('main', { class: 'main' },
+      currentPage === 'dashboard' && h(Dashboard, null),
+      currentPage === 'profiles' && h(Profiles, null),
+      currentPage === 'plugins' && h(Plugins, null),
+    ),
+    menuOpen && h('div', { class: 'fab-overlay', onClick: () => setMenuOpen(false) }),
+    h('div', { class: `fab-menu ${menuOpen ? 'open' : ''}` },
+      h('button', {
+        class: currentPage === 'dashboard' ? 'active' : '',
+        onClick: () => navigateTo('dashboard')
+      }, h(Icons.dashboard, null), 'Dashboard'),
+      h('button', {
+        class: currentPage === 'profiles' ? 'active' : '',
+        onClick: () => navigateTo('profiles')
+      }, h(Icons.profiles, null), 'Profiles'),
+      h('button', {
+        class: currentPage === 'plugins' ? 'active' : '',
+        onClick: () => navigateTo('plugins')
+      }, h(Icons.plugins, null), 'Plugins'),
+      h('div', { class: 'fab-divider' }),
+      h('button', { class: 'fab-add-btn', onClick: handleAddWidget },
+        h(Icons.plus, null), 'Add Widget'
+      ),
+      h('div', { class: 'fab-divider' }),
+      h('div', { class: 'fab-bottom-row' },
         h('button', {
-          class: currentPage === 'dashboard' ? 'active' : '',
-          onClick: () => setCurrentPage('dashboard')
-        }, 'Dashboard'),
-        h('button', {
-          class: currentPage === 'profiles' ? 'active' : '',
-          onClick: () => setCurrentPage('profiles')
-        }, 'Profiles'),
-        h('button', {
-          class: currentPage === 'plugins' ? 'active' : '',
-          onClick: () => setCurrentPage('plugins')
-        }, 'Plugins'),
-        h('button', {
-          class: 'nav-theme-btn',
+          class: 'fab-theme-btn',
           onClick: toggleTheme,
           title: `Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`,
         }, theme === 'dark' ? h(Icons.sun, null) : h(Icons.moon, null)),
         h(QrButton, null)
       )
     ),
-    h('main', { class: 'main' },
-      currentPage === 'dashboard' && h(Dashboard, null),
-      currentPage === 'profiles' && h(Profiles, null),
-      currentPage === 'plugins' && h(Plugins, null),
+    h('button', {
+      class: `fab-burger ${menuOpen ? 'open' : ''}`,
+      onClick: () => setMenuOpen(!menuOpen),
+      'aria-label': 'Menu',
+    },
+      h('span', null),
+      h('span', null),
+      h('span', null),
     )
   );
 }

@@ -26,6 +26,14 @@ export function WidgetGrid() {
       .catch(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    function handleAddWidgetFromFAB() {
+      setShowLibrary(true);
+    }
+    window.addEventListener('sd:add-widget', handleAddWidgetFromFAB);
+    return () => window.removeEventListener('sd:add-widget', handleAddWidgetFromFAB);
+  }, []);
+
   function persist(next: DashboardLayout) {
     setLayout(next);
     saveDashboard(next);

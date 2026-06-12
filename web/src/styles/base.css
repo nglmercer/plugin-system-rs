@@ -1,43 +1,157 @@
-/* Layout & Nav */
+/* Layout */
 .app {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
     background: var(--bg-page);
 }
-.nav {
+.main {
+    flex: 1;
+    padding: 1.5rem 2rem;
+    width: 100%;
+    min-width: 0;
+}
+
+/* Floating Action Button — Burger */
+.fab-burger {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 5px;
+    z-index: 200;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+.fab-burger:hover {
+    transform: scale(1.08);
+    box-shadow: 0 6px 24px rgba(0,0,0,0.5);
+}
+.fab-burger span {
+    display: block;
+    width: 20px;
+    height: 2px;
+    background: var(--bg-page);
+    border-radius: 1px;
+    transition: transform 0.3s, opacity 0.3s;
+}
+.fab-burger.open span:nth-child(1) {
+    transform: translateY(7px) rotate(45deg);
+}
+.fab-burger.open span:nth-child(2) {
+    opacity: 0;
+}
+.fab-burger.open span:nth-child(3) {
+    transform: translateY(-7px) rotate(-45deg);
+}
+
+/* Overlay backdrop */
+.fab-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 150;
+    animation: fadeIn 0.2s ease;
+}
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Slide-in menu */
+.fab-menu {
+    position: fixed;
+    top: 0;
+    right: -280px;
+    width: 260px;
+    height: 100vh;
     background: var(--bg-nav);
-    padding: 0.75rem 2rem;
+    border-left: 1px solid var(--border);
+    z-index: 180;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid var(--border);
+    flex-direction: column;
+    padding: 1.5rem 1rem;
+    gap: 0.4rem;
+    transition: right 0.3s ease;
+    overflow-y: auto;
 }
-.nav h1 {
-    font-size: 1.3rem;
-    color: var(--accent);
-    margin: 0;
+.fab-menu.open {
+    right: 0;
 }
-.nav-links {
-    display: flex;
-    gap: 0.75rem;
-    align-items: center;
-}
-.nav-links button {
+.fab-menu button {
     background: transparent;
     border: 1px solid var(--border);
     color: var(--text);
-    padding: 0.4rem 0.8rem;
-    border-radius: 4px;
+    padding: 0.65rem 0.8rem;
+    border-radius: 6px;
     cursor: pointer;
     transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.9rem;
+    text-align: left;
+    width: 100%;
 }
-.nav-links button:hover {
+.fab-menu button:hover {
     background: var(--border);
 }
-.nav-links button.active {
+.fab-menu button.active {
     background: var(--accent);
     color: var(--bg-page);
+    border-color: var(--accent);
+}
+.fab-menu button svg {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+.fab-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 0.4rem 0;
+}
+.fab-add-btn {
+    background: var(--accent) !important;
+    color: var(--bg-page) !important;
+    border-color: var(--accent) !important;
+    font-weight: bold;
+}
+.fab-add-btn:hover {
+    opacity: 0.85 !important;
+}
+.fab-bottom-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-top: auto;
+    padding-top: 0.5rem;
+}
+.fab-theme-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    padding: 0.5rem !important;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    font-size: 1rem;
+    width: auto !important;
+}
+.fab-theme-btn:hover {
+    color: var(--accent);
     border-color: var(--accent);
 }
 .nav-qr-btn {
@@ -45,34 +159,13 @@
     color: var(--bg-page) !important;
     font-weight: bold;
     font-size: 0.8rem;
-    padding: 0.35rem 0.7rem !important;
-    border-radius: 4px !important;
+    padding: 0.5rem 0.7rem !important;
+    border-radius: 6px !important;
+    flex: 1;
+    justify-content: center;
 }
 .nav-qr-btn:hover {
     background: var(--accent-hover) !important;
-}
-.nav-theme-btn {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--text-secondary);
-    padding: 0.35rem;
-    border-radius: 4px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s;
-    font-size: 1rem;
-}
-.nav-theme-btn:hover {
-    color: var(--accent);
-    border-color: var(--accent);
-}
-.main {
-    flex: 1;
-    padding: 1.5rem 2rem;
-    margin: 0 auto;
-    width: 100%;
 }
 
 /* QR Modal */
@@ -192,25 +285,18 @@
 
 /* Mobile: Tablet (768px) */
 @media (max-width: 768px) {
-    .nav {
-        flex-direction: column;
-        gap: 0.5rem;
-        padding: 0.6rem 1rem;
-    }
-    .nav h1 {
-        font-size: 1.1rem;
-    }
-    .nav-links {
-        width: 100%;
-        justify-content: center;
-        flex-wrap: wrap;
-    }
-    .nav-links button {
-        padding: 0.35rem 0.7rem;
-        font-size: 0.85rem;
-    }
     .main {
         padding: 1rem;
+        width: 100%;
+    }
+    .fab-burger {
+        bottom: 1rem;
+        right: 1rem;
+        width: 48px;
+        height: 48px;
+    }
+    .fab-menu {
+        width: 240px;
     }
     .qr-modal {
         width: 95%;
@@ -221,23 +307,19 @@
 
 /* Mobile: Phone (480px) */
 @media (max-width: 480px) {
-    .nav {
-        padding: 0.5rem 0.75rem;
-    }
-    .nav h1 {
-        font-size: 0.95rem;
-    }
-    .nav-links {
-        gap: 0.4rem;
-    }
-    .nav-links button {
-        padding: 0.4rem 0.5rem;
-        font-size: 0.8rem;
-        min-height: 40px;
-        min-width: 40px;
-    }
     .main {
-        padding: 0.6rem;
+        padding: 0.5rem;
+        width: 100%;
+    }
+    .fab-burger {
+        bottom: 0.75rem;
+        right: 0.75rem;
+        width: 46px;
+        height: 46px;
+    }
+    .fab-menu {
+        width: 100%;
+        right: -100%;
     }
     .qr-modal {
         width: 100%;
