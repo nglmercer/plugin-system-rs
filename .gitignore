@@ -31,3 +31,4 @@ coverage/
 *.gcda
 *.gcno
 data/dashboard.json
+macos-sdk/
