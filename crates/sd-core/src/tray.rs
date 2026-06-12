@@ -8,8 +8,6 @@ use tao::platform::unix::EventLoopBuilderExtUnix;
 use tray_icon::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem};
 use tray_icon::{TrayIcon, TrayIconBuilder, TrayIconEvent};
 
-const PORT: u16 = 3000;
-
 fn create_icon_rgba() -> tray_icon::Icon {
     let size = 32u32;
     let mut rgba = vec![0u8; (size * size * 4) as usize];
@@ -48,7 +46,7 @@ fn get_local_ip() -> String {
         .unwrap_or_else(|_| "127.0.0.1".to_string())
 }
 
-pub fn spawn_tray(shutdown: Arc<AtomicBool>, pid_lock_path: PathBuf) {
+pub fn spawn_tray(shutdown: Arc<AtomicBool>, pid_lock_path: PathBuf, port: u16) {
     thread::spawn(move || {
         let mut builder = EventLoopBuilder::<()>::new();
         #[cfg(target_os = "linux")]
@@ -57,8 +55,7 @@ pub fn spawn_tray(shutdown: Arc<AtomicBool>, pid_lock_path: PathBuf) {
 
         let tray_menu = Menu::new();
 
-        let local_ip = get_local_ip();
-        let url = format!("http://{}:{}", local_ip, PORT);
+        let url = format!("http://{}:{port}", get_local_ip());
 
         let open_item = MenuItem::with_id("open", "Open in Browser", true, None);
         let status_item = MenuItem::with_id("status", format!("Server: {}", url), false, None);
@@ -96,7 +93,7 @@ pub fn spawn_tray(shutdown: Arc<AtomicBool>, pid_lock_path: PathBuf) {
             while let Ok(event) = menu_channel.try_recv() {
                 match event.id().0.as_str() {
                     "open" => {
-                        let url = format!("http://localhost:{}", PORT);
+                        let url = format!("http://localhost:{port}");
                         println!("Opening browser: {}", url);
                         let _ = open::that(&url);
                     }

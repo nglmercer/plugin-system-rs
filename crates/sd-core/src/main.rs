@@ -6,6 +6,7 @@ use sd_plugins::SdPluginManager;
 use sd_profiles::ProfileManager;
 use std::fs::{self, OpenOptions};
 use std::io::{self, Write};
+use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -35,9 +36,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let shutdown_clone = shutdown.clone();
     ctrlc_handler(shutdown_clone, pid_lock.path().to_path_buf());
-
-    let shutdown_tray = shutdown.clone();
-    tray::spawn_tray(shutdown_tray, pid_lock.path().to_path_buf());
 
     let events = Arc::new(EventBus::new());
 
@@ -94,24 +92,44 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         events_clone.run().await;
     });
 
-    let addr = "0.0.0.0:3000";
+    let bind_addr = bind_addr();
     let local_ip = local_ip_address::local_ip()
         .map(|ip| ip.to_string())
         .unwrap_or_else(|_| "127.0.0.1".to_string());
 
-    println!("\nStarting HTTP server on http://{}", addr);
-    println!("Local access: http://localhost:3000");
-    println!("Network access: http://{}:3000", local_ip);
-    println!("WebSocket endpoint: ws://{}/ws", addr);
-    println!("API docs: http://{}/api", addr);
+    let app = create_router(state);
+    let listener = tokio::net::TcpListener::bind(bind_addr).await?;
+    let actual_addr = listener.local_addr()?;
+    let port = actual_addr.port();
+
+    let local_http_url = format!("http://127.0.0.1:{port}");
+    let network_http_url = format!("http://{local_ip}:{port}");
+    let local_ws_url = format!("ws://127.0.0.1:{port}/ws");
+    let network_ws_url = format!("ws://{local_ip}:{port}/ws");
+
+    println!("\nStarting HTTP server on http://{actual_addr}");
+    println!("Local access: {local_http_url}");
+    println!("Network access: {network_http_url}");
+    println!("Local WebSocket endpoint: {local_ws_url}");
+    println!("Network WebSocket endpoint: {network_ws_url}");
+    println!("Local API docs: {local_http_url}/api");
+    println!("Network API docs: {network_http_url}/api");
     println!("\nSystem tray icon active. Right-click for options.");
     println!("Press Ctrl+C to stop\n");
 
-    let app = create_router(state);
-    let listener = tokio::net::TcpListener::bind(addr).await?;
+    let shutdown_tray = shutdown.clone();
+    tray::spawn_tray(shutdown_tray, pid_lock.path().to_path_buf(), port);
+
     axum::serve(listener, app).await?;
 
     Ok(())
+}
+
+fn bind_addr() -> SocketAddr {
+    std::env::var("SD_CORE_BIND_ADDR")
+        .unwrap_or_else(|_| "0.0.0.0:0".to_string())
+        .parse()
+        .expect("SD_CORE_BIND_ADDR must be a valid SocketAddr like 0.0.0.0:0")
 }
 
 fn ctrlc_handler(shutdown: Arc<AtomicBool>, pid_lock_path: PathBuf) {
