@@ -4,6 +4,8 @@ use tokio::runtime::Runtime;
 
 mod obs_controller;
 use obs_controller::ObsController;
+#[cfg(test)]
+use obs_controller::{ObsInput, ObsScene, ObsSceneItem, ObsTestState, ObsTransition};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ObsData {
@@ -31,6 +33,17 @@ pub struct ObsPlugin {
 impl Default for ObsPlugin {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl ObsPlugin {
+    #[cfg(test)]
+    pub(crate) fn with_test_controller(state: ObsTestState) -> Self {
+        Self {
+            controller: ObsController::with_test_state(state),
+            runtime: Runtime::new().expect("Failed to create tokio runtime"),
+            data: ObsData::default(),
+        }
     }
 }
 
@@ -221,7 +234,7 @@ impl ObsPlugin {
     #[command("get_inputs")]
     fn obs_get_inputs(&mut self) -> CommandResult {
         match self.runtime.block_on(self.controller.get_input_list()) {
-            Ok(inputs) => Ok(serde_json::json!({"inputs": inputs})),
+            Ok(inputs) => serde_json::to_value(inputs).map_err(|e| e.to_string()),
             Err(e) => Ok(serde_json::json!({"ok": false, "error": e})),
         }
     }
@@ -267,7 +280,7 @@ impl ObsPlugin {
     #[command("get_transitions")]
     fn obs_get_transitions(&mut self) -> CommandResult {
         match self.runtime.block_on(self.controller.get_transitions()) {
-            Ok(transitions) => Ok(serde_json::json!({"transitions": transitions})),
+            Ok(transitions) => serde_json::to_value(transitions).map_err(|e| e.to_string()),
             Err(e) => Ok(serde_json::json!({"ok": false, "error": e})),
         }
     }
@@ -286,7 +299,7 @@ impl ObsPlugin {
             .runtime
             .block_on(self.controller.get_scene_item_list(&scene_name))
         {
-            Ok(items) => Ok(serde_json::json!({"items": items})),
+            Ok(items) => serde_json::to_value(items).map_err(|e| e.to_string()),
             Err(e) => Ok(serde_json::json!({"ok": false, "error": e})),
         }
     }
@@ -312,7 +325,7 @@ impl ObsPlugin {
     #[command("get_studio_mode")]
     fn obs_get_studio_mode(&mut self) -> CommandResult {
         match self.runtime.block_on(self.controller.get_studio_mode()) {
-            Ok(enabled) => Ok(serde_json::json!({"enabled": enabled})),
+            Ok(enabled) => Ok(serde_json::json!(enabled)),
             Err(e) => Ok(serde_json::json!({"ok": false, "error": e})),
         }
     }
@@ -326,5 +339,252 @@ impl ObsPlugin {
             Ok(()) => Ok(serde_json::json!({"ok": true})),
             Err(e) => Ok(serde_json::json!({"ok": false, "error": e})),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use plugin_system::Plugin;
+
+    fn test_state() -> ObsTestState {
+        ObsTestState {
+            current_scene: "Escena".to_string(),
+            scenes: vec![
+                ObsScene {
+                    name: "Escena".to_string(),
+                    index: 0,
+                },
+                ObsScene {
+                    name: "Escena 2".to_string(),
+                    index: 1,
+                },
+            ],
+            inputs: vec![ObsInput {
+                name: "Mic".to_string(),
+                kind: "audio_input_capture".to_string(),
+                uuid: "input-uuid".to_string(),
+                muted: false,
+                volume: 0.5,
+            }],
+            transitions: vec![
+                ObsTransition {
+                    name: "Cut".to_string(),
+                    kind: "cut".to_string(),
+                    duration: 0,
+                },
+                ObsTransition {
+                    name: "Fade".to_string(),
+                    kind: "fade".to_string(),
+                    duration: 0,
+                },
+            ],
+            scene_items: vec![ObsSceneItem {
+                id: 1,
+                name: "Camera".to_string(),
+                enabled: true,
+            }],
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn metadata_and_interface_ids_are_generated() {
+        let plugin = ObsPlugin::with_test_controller(test_state());
+
+        assert_eq!(plugin.metadata().name, "obs");
+        assert_eq!(plugin.interface_ids(), vec!["ObsControl"]);
+    }
+
+    #[test]
+    fn connect_and_status_commands_return_canned_obs_data() {
+        let mut plugin = ObsPlugin::with_test_controller(test_state());
+
+        let connected = plugin
+            .handle_command(
+                "connect",
+                serde_json::json!({"host": "127.0.0.1", "port": 4455, "password": null}),
+            )
+            .unwrap();
+        let status = plugin
+            .handle_command("get_status", serde_json::json!({}))
+            .unwrap();
+
+        assert_eq!(connected["ok"], true);
+        assert_eq!(status["connected"], true);
+        assert_eq!(status["host"], "127.0.0.1");
+        assert_eq!(status["port"], 4455);
+        assert_eq!(status["current_scene"], "Escena");
+        assert_eq!(status["cpu_usage"], 12.5);
+    }
+
+    #[test]
+    fn scene_and_input_commands_use_mock_controller() {
+        let mut plugin = ObsPlugin::with_test_controller(test_state());
+        plugin
+            .handle_command(
+                "connect",
+                serde_json::json!({"host": "127.0.0.1", "port": 4455, "password": null}),
+            )
+            .unwrap();
+
+        let scenes = plugin
+            .handle_command("get_scenes", serde_json::json!({}))
+            .unwrap();
+        let inputs = plugin
+            .handle_command("get_inputs", serde_json::json!({}))
+            .unwrap();
+
+        assert_eq!(scenes["current_scene"], "Escena");
+        assert_eq!(scenes["scenes"][1]["name"], "Escena 2");
+        assert_eq!(inputs[0]["name"], "Mic");
+        assert_eq!(inputs[0]["volume"], 0.5);
+
+        plugin
+            .handle_command("set_scene", serde_json::json!({"scene_name": "Escena 2"}))
+            .unwrap();
+        plugin
+            .handle_command(
+                "set_input_volume",
+                serde_json::json!({"input_name": "Mic", "volume": 0.75}),
+            )
+            .unwrap();
+        plugin
+            .handle_command(
+                "set_input_mute",
+                serde_json::json!({"input_name": "Mic", "muted": true}),
+            )
+            .unwrap();
+
+        let status = plugin
+            .handle_command("get_status", serde_json::json!({}))
+            .unwrap();
+        let inputs = plugin
+            .handle_command("get_inputs", serde_json::json!({}))
+            .unwrap();
+        assert_eq!(status["current_scene"], "Escena 2");
+        assert_eq!(inputs[0]["volume"], 0.75);
+        assert!(inputs[0]["muted"].as_bool().unwrap());
+    }
+
+    #[test]
+    fn streaming_recording_and_studio_commands_use_mock_controller() {
+        let mut plugin = ObsPlugin::with_test_controller(test_state());
+        plugin
+            .handle_command(
+                "connect",
+                serde_json::json!({"host": "127.0.0.1", "port": 4455, "password": null}),
+            )
+            .unwrap();
+
+        assert_eq!(
+            plugin
+                .handle_command("start_stream", serde_json::json!({}))
+                .unwrap()["ok"],
+            true
+        );
+        assert_eq!(
+            plugin
+                .handle_command("start_record", serde_json::json!({}))
+                .unwrap()["ok"],
+            true
+        );
+        assert_eq!(
+            plugin
+                .handle_command("toggle_record_pause", serde_json::json!({}))
+                .unwrap()["ok"],
+            true
+        );
+        assert_eq!(
+            plugin
+                .handle_command("toggle_virtual_cam", serde_json::json!({}))
+                .unwrap()["ok"],
+            true
+        );
+        assert_eq!(
+            plugin
+                .handle_command("set_studio_mode", serde_json::json!({"enabled": true}))
+                .unwrap()["ok"],
+            true
+        );
+
+        let status = plugin
+            .handle_command("get_status", serde_json::json!({}))
+            .unwrap();
+        assert!(status["stream_active"].as_bool().unwrap());
+        assert!(status["record_active"].as_bool().unwrap());
+        assert!(status["record_paused"].as_bool().unwrap());
+        assert!(status["virtual_cam_active"].as_bool().unwrap());
+        assert!(status["studio_mode"].as_bool().unwrap());
+    }
+
+    #[test]
+    fn transitions_scene_items_and_replay_commands_use_mock_controller() {
+        let mut plugin = ObsPlugin::with_test_controller(test_state());
+        plugin
+            .handle_command(
+                "connect",
+                serde_json::json!({"host": "127.0.0.1", "port": 4455, "password": null}),
+            )
+            .unwrap();
+
+        let transitions = plugin
+            .handle_command("get_transitions", serde_json::json!({}))
+            .unwrap();
+        let items = plugin
+            .handle_command(
+                "get_scene_items",
+                serde_json::json!({"scene_name": "Escena"}),
+            )
+            .unwrap();
+        assert_eq!(transitions[0]["name"], "Cut");
+        assert_eq!(items[0]["name"], "Camera");
+        assert!(items[0]["enabled"].as_bool().unwrap());
+
+        assert_eq!(
+            plugin
+                .handle_command("save_replay", serde_json::json!({}))
+                .unwrap()["ok"],
+            true
+        );
+        plugin
+            .handle_command("set_transition", serde_json::json!({"name": "Fade"}))
+            .unwrap();
+        plugin
+            .handle_command(
+                "set_scene_item_enabled",
+                serde_json::json!({"scene_name": "Escena", "item_id": 1, "enabled": false}),
+            )
+            .unwrap();
+
+        let transitions = plugin
+            .handle_command("get_transitions", serde_json::json!({}))
+            .unwrap();
+        let items = plugin
+            .handle_command(
+                "get_scene_items",
+                serde_json::json!({"scene_name": "Escena"}),
+            )
+            .unwrap();
+        assert_eq!(transitions[1]["kind"], "custom");
+        assert!(!items[0]["enabled"].as_bool().unwrap());
+    }
+
+    #[test]
+    fn disconnect_command_resets_interface_data() {
+        let mut plugin = ObsPlugin::with_test_controller(test_state());
+        plugin
+            .handle_command(
+                "connect",
+                serde_json::json!({"host": "127.0.0.1", "port": 4455, "password": null}),
+            )
+            .unwrap();
+
+        plugin
+            .handle_command("disconnect", serde_json::json!({}))
+            .unwrap();
+
+        assert!(!plugin.data.connected);
+        assert_eq!(plugin.data.current_scene, "");
     }
 }

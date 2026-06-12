@@ -33,6 +33,13 @@ pub(crate) async fn get_system_stats(
     let manager = plugin_manager.read().await;
 
     let stats = if let Ok(plugin_arc) = manager.get_plugin_arc("system-monitor") {
+        let _ = crate::api::helpers::call_plugin_ok(
+            &manager,
+            "system-monitor",
+            "refresh",
+            serde_json::json!({}),
+        )
+        .await;
         let plugin = plugin_arc.read().expect("plugin lock poisoned");
         if let Some(data) = plugin.interface_data() {
             serde_json::from_value(data).unwrap_or_else(|_| SystemStats::default())

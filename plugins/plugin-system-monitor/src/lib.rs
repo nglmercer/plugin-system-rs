@@ -1,4 +1,4 @@
-use plugin_system::{PluginContext, PluginMetadata};
+use plugin_system::{command, CommandResult, PluginContext, PluginMetadata};
 use serde::Serialize;
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -32,6 +32,18 @@ impl Default for SystemMonitorPlugin {
     }
 }
 
+impl SystemMonitorPlugin {
+    #[cfg(test)]
+    pub(crate) fn with_stats(stats: SystemStats) -> Self {
+        Self { stats }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn stats(&self) -> &SystemStats {
+        &self.stats
+    }
+}
+
 #[plugin_system::plugin_export]
 impl SystemMonitorPlugin {
     pub fn new() -> Self {
@@ -51,6 +63,7 @@ impl SystemMonitorPlugin {
 
     fn on_load(&mut self, _ctx: &PluginContext) {
         log::info!("SystemMonitorPlugin loaded");
+        self.refresh();
     }
 
     fn on_unload(&mut self) {
@@ -63,6 +76,12 @@ impl SystemMonitorPlugin {
 
     pub fn interface_data(&self) -> Option<serde_json::Value> {
         serde_json::to_value(&self.stats).ok()
+    }
+
+    #[command("refresh")]
+    fn sys_refresh(&mut self) -> CommandResult {
+        self.refresh();
+        Ok(serde_json::json!({"ok": true}))
     }
 
     fn read_cpu_times() -> Option<(u64, u64)> {
@@ -245,5 +264,61 @@ impl SystemMonitor for SystemMonitorPlugin {
 
     fn refresh(&mut self) {
         self.stats = Self::collect_all();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use plugin_system::Plugin;
+
+    fn sample_stats() -> SystemStats {
+        SystemStats {
+            cpu_usage: 42.5,
+            cpu_model: "Test CPU".to_string(),
+            cpu_cores: 8,
+            memory_total: 16 * 1024 * 1024 * 1024,
+            memory_used: 8 * 1024 * 1024 * 1024,
+            memory_usage: 50.0,
+            swap_total: 2 * 1024 * 1024 * 1024,
+            swap_used: 512 * 1024 * 1024,
+            load_avg: [1.0, 2.0, 3.0],
+            uptime: 1234,
+            process_count: 120,
+            thread_count: 900,
+        }
+    }
+
+    #[test]
+    fn metadata_and_interface_ids_are_generated() {
+        let plugin = SystemMonitorPlugin::with_stats(sample_stats());
+
+        assert_eq!(plugin.metadata().name, "system-monitor");
+        assert_eq!(plugin.interface_ids(), vec!["SystemMonitor"]);
+    }
+
+    #[test]
+    fn interface_data_returns_canned_stats_without_reading_proc() {
+        let plugin = SystemMonitorPlugin::with_stats(sample_stats());
+
+        let data = plugin.interface_data().unwrap();
+
+        assert_eq!(data["cpu_usage"], 42.5);
+        assert_eq!(data["cpu_model"], "Test CPU");
+        assert_eq!(data["cpu_cores"], 8);
+        assert_eq!(data["load_avg"][0], 1.0);
+        assert_eq!(data["process_count"], 120);
+        assert_eq!(plugin.stats().cpu_model, "Test CPU");
+    }
+
+    #[test]
+    fn refresh_command_uses_macro_dispatch() {
+        let mut plugin = SystemMonitorPlugin::with_stats(sample_stats());
+
+        let refreshed = plugin
+            .handle_command("refresh", serde_json::json!({}))
+            .unwrap();
+
+        assert_eq!(refreshed["ok"], true);
     }
 }

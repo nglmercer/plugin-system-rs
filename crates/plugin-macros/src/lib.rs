@@ -307,14 +307,47 @@ fn extract_metadata_name(input: &ItemImpl) -> Option<String> {
     })?;
 
     let tokens = quote!(#metadata_method).to_string();
-    let name_marker = "name :";
-    let marker_pos = tokens.find(name_marker)?;
-    let after_marker = &tokens[marker_pos + name_marker.len()..];
-    let quote_pos = after_marker.find('"')?;
-    let value = &after_marker[quote_pos + 1..];
-    let end_quote = value.find('"')?;
+    let bytes = tokens.as_bytes();
 
-    Some(value[..end_quote].to_string())
+    for (index, window) in bytes.windows(4).enumerate() {
+        if window != b"name" {
+            continue;
+        }
+
+        let mut cursor = index + 4;
+        while cursor < bytes.len() && bytes[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+
+        if cursor >= bytes.len() || bytes[cursor] != b':' {
+            continue;
+        }
+
+        cursor += 1;
+        while cursor < bytes.len() && bytes[cursor].is_ascii_whitespace() {
+            cursor += 1;
+        }
+
+        if cursor >= bytes.len() || bytes[cursor] != b'"' {
+            continue;
+        }
+
+        cursor += 1;
+        let start = cursor;
+        while cursor < bytes.len() && bytes[cursor] != b'"' {
+            if bytes[cursor] == b'\\' {
+                cursor = cursor.saturating_add(2);
+            } else {
+                cursor += 1;
+            }
+        }
+
+        if cursor < bytes.len() {
+            return Some(tokens[start..cursor].to_string());
+        }
+    }
+
+    None
 }
 
 fn kebab_to_pascal_case(value: &str) -> String {

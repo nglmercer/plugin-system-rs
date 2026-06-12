@@ -65,6 +65,27 @@ impl Default for VolumeMasterPlugin {
     }
 }
 
+impl VolumeMasterPlugin {
+    #[cfg(test)]
+    pub(crate) fn with_controller(mut controller: Box<dyn VolumeControl>) -> Self {
+        let data = controller
+            .get_master_volume()
+            .map(|state| VolumeData {
+                state,
+                apps: controller.get_app_volumes().unwrap_or_default(),
+                platform_supported: true,
+                per_app_supported: true,
+            })
+            .unwrap_or(VolumeData {
+                platform_supported: false,
+                per_app_supported: false,
+                ..Default::default()
+            });
+
+        Self { controller, data }
+    }
+}
+
 #[plugin_system::plugin_export]
 impl VolumeMasterPlugin {
     pub fn new() -> Self {
@@ -159,5 +180,147 @@ impl VolumeMasterPlugin {
             app.muted = muted;
         }
         Ok(serde_json::json!({"ok": true}))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use plugin_system::Plugin;
+
+    #[derive(Default)]
+    struct MockVolumeControl {
+        state: VolumeState,
+        apps: Vec<AppVolume>,
+    }
+
+    impl MockVolumeControl {
+        fn new() -> Self {
+            Self {
+                state: VolumeState {
+                    master_volume: 45.0,
+                    muted: false,
+                    default_device_name: "Default Output".to_string(),
+                },
+                apps: vec![AppVolume {
+                    name: "Firefox".to_string(),
+                    volume: 14.0,
+                    muted: false,
+                    pid: Some(1324084),
+                }],
+            }
+        }
+    }
+
+    impl VolumeControl for MockVolumeControl {
+        fn get_master_volume(&mut self) -> Result<VolumeState, String> {
+            Ok(self.state.clone())
+        }
+
+        fn set_master_volume(&mut self, volume: f32) -> Result<(), String> {
+            self.state.master_volume = volume;
+            Ok(())
+        }
+
+        fn set_muted(&mut self, muted: bool) -> Result<(), String> {
+            self.state.muted = muted;
+            Ok(())
+        }
+
+        fn get_app_volumes(&mut self) -> Result<Vec<AppVolume>, String> {
+            Ok(self.apps.clone())
+        }
+
+        fn set_app_volume(&mut self, app_name: &str, volume: f32) -> Result<(), String> {
+            if let Some(app) = self.apps.iter_mut().find(|a| a.name == app_name) {
+                app.volume = volume;
+            } else {
+                self.apps.push(AppVolume {
+                    name: app_name.to_string(),
+                    volume,
+                    muted: false,
+                    pid: None,
+                });
+            }
+            Ok(())
+        }
+
+        fn set_app_muted(&mut self, app_name: &str, muted: bool) -> Result<(), String> {
+            if let Some(app) = self.apps.iter_mut().find(|a| a.name == app_name) {
+                app.muted = muted;
+            } else {
+                self.apps.push(AppVolume {
+                    name: app_name.to_string(),
+                    volume: 50.0,
+                    muted,
+                    pid: None,
+                });
+            }
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn metadata_and_interface_ids_are_generated() {
+        let plugin = VolumeMasterPlugin::with_controller(Box::new(MockVolumeControl::new()));
+
+        assert_eq!(plugin.metadata().name, "volume-master");
+        assert_eq!(plugin.interface_ids(), vec!["VolumeMaster"]);
+    }
+
+    #[test]
+    fn refresh_command_updates_interface_data() {
+        let mut plugin = VolumeMasterPlugin::with_controller(Box::new(MockVolumeControl::new()));
+        plugin
+            .handle_command("set_volume", serde_json::json!({"volume": 75.0}))
+            .unwrap();
+
+        let refreshed = plugin
+            .handle_command("refresh", serde_json::json!({}))
+            .unwrap();
+
+        assert_eq!(refreshed["ok"], true);
+        let data = plugin.interface_data().unwrap();
+        assert_eq!(data["state"]["master_volume"], 75.0);
+        assert_eq!(data["apps"][0]["name"], "Firefox");
+    }
+
+    #[test]
+    fn volume_commands_update_mock_state() {
+        let mut plugin = VolumeMasterPlugin::with_controller(Box::new(MockVolumeControl::new()));
+
+        let set_volume = plugin
+            .handle_command("set_volume", serde_json::json!({"volume": 150.0}))
+            .unwrap();
+        let set_mute = plugin
+            .handle_command("set_mute", serde_json::json!({"muted": true}))
+            .unwrap();
+
+        assert_eq!(set_volume["ok"], true);
+        assert_eq!(set_mute["ok"], true);
+        assert_eq!(plugin.data.state.master_volume, 100.0);
+        assert!(plugin.data.state.muted);
+    }
+
+    #[test]
+    fn app_volume_commands_update_mock_state() {
+        let mut plugin = VolumeMasterPlugin::with_controller(Box::new(MockVolumeControl::new()));
+
+        plugin
+            .handle_command(
+                "set_app_volume",
+                serde_json::json!({"app_name": "Firefox", "volume": 33.0}),
+            )
+            .unwrap();
+        plugin
+            .handle_command(
+                "set_app_mute",
+                serde_json::json!({"app_name": "Firefox", "muted": true}),
+            )
+            .unwrap();
+
+        let app = plugin.data.apps.first().unwrap();
+        assert_eq!(app.volume, 33.0);
+        assert!(app.muted);
     }
 }

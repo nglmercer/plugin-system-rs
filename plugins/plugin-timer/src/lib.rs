@@ -52,3 +52,28 @@ impl TimerPlugin {
         self.timers.keys().cloned().collect()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use plugin_system::Plugin;
+
+    #[test]
+    fn metadata_and_interface_ids_are_generated() {
+        let plugin = TimerPlugin::new();
+
+        assert_eq!(plugin.metadata().name, "timer");
+        assert_eq!(plugin.interface_ids(), vec!["Timer"]);
+        assert!(plugin.interface_data().is_none());
+    }
+
+    #[test]
+    fn timer_helpers_manage_timers() {
+        let mut plugin = TimerPlugin::new();
+
+        plugin.start_timer("standup".to_string(), 900);
+
+        assert_eq!(plugin.get_timer("standup"), Some(900));
+        assert_eq!(plugin.list_timers(), vec!["standup".to_string()]);
+    }
+}
