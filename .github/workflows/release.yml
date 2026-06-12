@@ -40,6 +40,8 @@ jobs:
 
   build-linux-arm64:
     runs-on: ubuntu-latest
+    env:
+      CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
