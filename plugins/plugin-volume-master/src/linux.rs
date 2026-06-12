@@ -1,224 +1,421 @@
-use std::process::Command;
-use std::sync::{Arc, Mutex};
+use std::cell::RefCell;
+use std::ops::Deref;
+use std::rc::Rc;
+
+use libpulse_binding::callbacks::ListResult;
+use libpulse_binding::context::introspect::Introspector;
+use libpulse_binding::context::{Context, FlagSet as ContextFlagSet, State as ContextState};
+use libpulse_binding::mainloop::threaded::Mainloop;
+use libpulse_binding::operation::State as OpState;
+use libpulse_binding::proplist;
+use libpulse_binding::volume::{ChannelVolumes, Volume};
 
 use crate::{AppVolume, VolumeControl, VolumeState};
 
+// ---------------------------------------------------------------------------
+// Volume conversion helpers
+// ---------------------------------------------------------------------------
+
+fn percent_to_volume(percent: f32) -> Volume {
+    let p = percent.clamp(0.0, 100.0);
+    Volume(((p / 100.0) * Volume::NORMAL.0 as f32).round() as u32)
+}
+
+fn channel_volumes_from_percent(percent: f32) -> ChannelVolumes {
+    let mut cv = ChannelVolumes::default();
+    cv.set(1, percent_to_volume(percent));
+    cv
+}
+
+fn percent_from_volume(vol: Volume) -> f32 {
+    (vol.0 as f32 / Volume::NORMAL.0 as f32) * 100.0
+}
+
+fn percent_from_channel_volumes(cv: &ChannelVolumes) -> f32 {
+    percent_from_volume(cv.avg())
+}
+
+// ---------------------------------------------------------------------------
+// PulseController
+// ---------------------------------------------------------------------------
+
 pub struct PulseController {
-    cache: Arc<Mutex<Option<VolumeState>>>,
+    mainloop: Rc<RefCell<Mainloop>>,
+    context: Rc<RefCell<Context>>,
 }
 
-pub fn create_controller() -> Box<dyn VolumeControl> {
-    Box::new(PulseController {
-        cache: Arc::new(Mutex::new(None)),
-    })
-}
+// SAFETY: The threaded mainloop's lock()/unlock() provide synchronization.
+// The Rc<RefCell<>> is never moved between threads; only shared via PA's locking.
+// This follows libpulse-binding's documented pattern for threaded mainloop usage.
+unsafe impl Send for PulseController {}
+unsafe impl Sync for PulseController {}
 
-pub fn per_app_supported() -> bool {
-    true
-}
+impl PulseController {
+    fn new() -> Result<Self, String> {
+        let ml = Mainloop::new().ok_or("Mainloop::new() failed")?;
+        let ml_rc = Rc::new(RefCell::new(ml));
 
-fn run_pactl(args: &[&str]) -> Result<String, String> {
-    let output = Command::new("pactl")
-        .args(args)
-        .output()
-        .map_err(|e| format!("Failed to run pactl: {}", e))?;
+        let mut ctx = Context::new(ml_rc.borrow().deref(), "plugin-volume-master")
+            .ok_or("Context::new() failed")?;
 
-    if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
-    } else {
-        Err(format!(
-            "pactl failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        ))
-    }
-}
-
-fn parse_volume_percent(s: &str) -> Option<f32> {
-    for part in s.split_whitespace() {
-        if part.ends_with('%') {
-            if let Ok(v) = part.trim_end_matches('%').trim().parse::<f32>() {
-                return Some(v);
-            }
-        }
-    }
-    None
-}
-
-fn get_default_sink_name() -> Option<String> {
-    Command::new("pactl")
-        .args(["get-default-sink"])
-        .output()
-        .ok()
-        .and_then(|o| {
-            if o.status.success() {
-                let name = String::from_utf8_lossy(&o.stdout).trim().to_string();
-                if name.is_empty() {
-                    None
-                } else {
-                    Some(name)
-                }
-            } else {
-                None
-            }
-        })
-}
-
-struct SinkInput {
-    index: u32,
-    name: String,
-    pid: Option<u32>,
-    volume: f32,
-    muted: bool,
-}
-
-fn parse_sink_inputs(output: &str) -> Vec<SinkInput> {
-    let mut inputs = Vec::new();
-    let mut current_index: Option<u32> = None;
-    let mut current_name: Option<String> = None;
-    let mut current_pid: Option<u32> = None;
-    let mut current_vol: f32 = 0.0;
-    let mut current_muted = false;
-
-    for line in output.lines() {
-        let trimmed = line.trim();
-
-        if trimmed.starts_with("Sink Input #") {
-            if let Some(idx) = current_index.take() {
-                inputs.push(SinkInput {
-                    index: idx,
-                    name: current_name.take().unwrap_or_else(|| "Unknown".to_string()),
-                    pid: current_pid.take(),
-                    volume: current_vol,
-                    muted: current_muted,
-                });
-            }
-            if let Some(num) = trimmed.strip_prefix("Sink Input #") {
-                current_index = num.split_whitespace().next().and_then(|s| s.parse().ok());
-            }
-            current_name = None;
-            current_pid = None;
-            current_vol = 0.0;
-            current_muted = false;
-        } else if trimmed.starts_with("application.name")
-            || trimmed.starts_with("application.process.binary")
         {
-            if current_name.is_none() {
-                if let Some(val) = trimmed.split('=').nth(1) {
-                    current_name = Some(val.trim().trim_matches('"').to_string());
+            let ml_ref = Rc::clone(&ml_rc);
+            let ctx_ptr = &ctx as *const Context;
+            ctx.set_state_callback(Some(Box::new(move || {
+                let state = unsafe { (*ctx_ptr).get_state() };
+                match state {
+                    ContextState::Ready | ContextState::Failed | ContextState::Terminated => {
+                        unsafe { (*ml_ref.as_ptr()).signal(false); }
+                    }
+                    _ => {}
                 }
-            }
-        } else if trimmed.starts_with("application.process.id") {
-            if let Some(val) = trimmed.split('=').nth(1) {
-                if let Ok(pid) = val.trim().trim_matches('"').parse::<u32>() {
-                    current_pid = Some(pid);
-                }
-            }
-        } else if trimmed.contains("Volume:") {
-            if let Some(v) = parse_volume_percent(trimmed) {
-                current_vol = v;
-            }
-        } else if trimmed.starts_with("Mute:") {
-            current_muted = trimmed.contains("yes");
+            })));
         }
+
+        ctx.connect(None, ContextFlagSet::NOFLAGS, None)
+            .map_err(|e| format!("context.connect() failed: {:?}", e))?;
+
+        {
+            let mut ml = ml_rc.borrow_mut();
+            ml.lock();
+            ml.start().map_err(|e| {
+                ml.unlock();
+                format!("mainloop.start() failed: {:?}", e)
+            })?;
+
+            loop {
+                match ctx.get_state() {
+                    ContextState::Ready => break,
+                    ContextState::Failed | ContextState::Terminated => {
+                        let s = ctx.get_state();
+                        ml.unlock();
+                        return Err(format!("Context state: {:?}", s));
+                    }
+                    _ => ml.wait(),
+                }
+            }
+            ctx.set_state_callback(None);
+            ml.unlock();
+        }
+
+        Ok(Self {
+            mainloop: ml_rc,
+            context: Rc::new(RefCell::new(ctx)),
+        })
     }
 
-    if let Some(idx) = current_index {
-        inputs.push(SinkInput {
-            index: idx,
-            name: current_name.unwrap_or_else(|| "Unknown".to_string()),
-            pid: current_pid,
-            volume: current_vol,
-            muted: current_muted,
+    /// Get the default sink name from the PA server.
+    fn get_default_sink_name(&self) -> Result<String, String> {
+        let mut ml = self.mainloop.borrow_mut();
+        ml.lock();
+        let ctx = self.context.borrow();
+        let intro = ctx.introspect();
+
+        let result: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+        let r = result.clone();
+        let ml_ptr = Rc::clone(&self.mainloop);
+
+        let op = intro.get_server_info(move |info| {
+            *r.borrow_mut() = info.default_sink_name.as_ref().map(|s| s.to_string());
+            unsafe { (*ml_ptr.as_ptr()).signal(false); }
         });
+
+        loop {
+            match op.get_state() {
+                OpState::Done => break,
+                _ => ml.wait(),
+            }
+        }
+
+        drop(intro);
+        drop(ctx);
+        let val = result.borrow().clone();
+        val.ok_or_else(|| "No default sink".to_string())
     }
 
-    inputs
+    /// Get all sink inputs. Must be called with mainloop lock held.
+    fn get_sink_input_infos(ml: &mut Mainloop, intro: &mut Introspector, ml_ptr: &Rc<RefCell<Mainloop>>) -> Vec<(u32, String, f32, bool, Option<u32>)> {
+        let inputs: Rc<RefCell<Vec<(u32, String, f32, bool, Option<u32>)>>> = Rc::new(RefCell::new(Vec::new()));
+        let inp = inputs.clone();
+        let ml_signal = Rc::clone(ml_ptr);
+
+        let op = intro.get_sink_input_info_list(move |result| {
+            match result {
+                ListResult::Item(info) => {
+                    let raw_name = info.name.as_ref()
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| "Unknown".into());
+                    let app_name = info.proplist
+                        .get_str(proplist::properties::APPLICATION_NAME)
+                        .or_else(|| info.proplist.get_str(proplist::properties::APPLICATION_PROCESS_BINARY))
+                        .unwrap_or_else(|| raw_name.clone());
+                    let pid = info.proplist
+                        .get_str(proplist::properties::APPLICATION_PROCESS_ID)
+                        .and_then(|s| s.parse::<u32>().ok());
+                    let vol = percent_from_channel_volumes(&info.volume);
+                    let muted = info.mute;
+
+                    inp.borrow_mut().push((info.index, app_name, vol, muted, pid));
+                }
+                ListResult::End => {
+                    unsafe { (*ml_signal.as_ptr()).signal(false); }
+                }
+                ListResult::Error => {}
+            }
+        });
+
+        loop {
+            match op.get_state() {
+                OpState::Done => break,
+                _ => ml.wait(),
+            }
+        }
+
+        let result = inputs.borrow().clone();
+        result
+    }
 }
 
 impl VolumeControl for PulseController {
     fn get_master_volume(&mut self) -> Result<VolumeState, String> {
-        let output = run_pactl(&["get-sink-volume", "@DEFAULT_SINK@"])?;
-        let volume = parse_volume_percent(&output).unwrap_or(0.0);
+        let mut ml = self.mainloop.borrow_mut();
+        ml.lock();
+        let ctx = self.context.borrow();
+        let intro = ctx.introspect();
 
-        let mute_output = run_pactl(&["get-sink-mute", "@DEFAULT_SINK@"])?;
-        let muted = mute_output.contains("yes");
+        // Step 1: get default sink name
+        let default_name: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+        let dn = default_name.clone();
+        let ml_ptr = Rc::clone(&self.mainloop);
 
-        let device_name = get_default_sink_name().unwrap_or_else(|| "Default".to_string());
+        let op = intro.get_server_info(move |info| {
+            *dn.borrow_mut() = info.default_sink_name.as_ref().map(|s| s.to_string());
+            unsafe { (*ml_ptr.as_ptr()).signal(false); }
+        });
+        loop {
+            match op.get_state() {
+                OpState::Done => break,
+                _ => ml.wait(),
+            }
+        }
 
-        let state = VolumeState {
+        let sink_name = default_name.borrow().clone()
+            .ok_or_else(|| "No default sink".to_string())?;
+
+        // Step 2: get sink info by name
+        let vol_out: Rc<RefCell<Option<f32>>> = Rc::new(RefCell::new(None));
+        let mute_out: Rc<RefCell<Option<bool>>> = Rc::new(RefCell::new(None));
+        let name_out: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+
+        let v = vol_out.clone();
+        let m = mute_out.clone();
+        let n = name_out.clone();
+        let ml_ptr = Rc::clone(&self.mainloop);
+
+        let op = intro.get_sink_info_by_name(&sink_name, move |result| {
+            if let ListResult::Item(info) = result {
+                *v.borrow_mut() = Some(percent_from_channel_volumes(&info.volume));
+                *m.borrow_mut() = Some(info.mute);
+                *n.borrow_mut() = info.name.as_ref().map(|s| s.to_string());
+            }
+            unsafe { (*ml_ptr.as_ptr()).signal(false); }
+        });
+        loop {
+            match op.get_state() {
+                OpState::Done => break,
+                _ => ml.wait(),
+            }
+        }
+
+        let volume = vol_out.borrow().unwrap_or(0.0);
+        let muted = mute_out.borrow().unwrap_or(false);
+        let device_name = name_out.borrow().clone()
+            .unwrap_or_else(|| "Default".to_string());
+
+        drop(intro);
+        drop(ctx);
+
+        Ok(VolumeState {
             master_volume: volume,
             muted,
             default_device_name: device_name,
-        };
-
-        *self.cache.lock().unwrap() = Some(state.clone());
-        Ok(state)
+        })
     }
 
     fn set_master_volume(&mut self, volume: f32) -> Result<(), String> {
         let clamped = volume.clamp(0.0, 100.0);
-        run_pactl(&[
-            "set-sink-volume",
-            "@DEFAULT_SINK@",
-            &format!("{}%", clamped as i32),
-        ])?;
+        let sink_name = self.get_default_sink_name()?;
+
+        let mut ml = self.mainloop.borrow_mut();
+        ml.lock();
+        let ctx = self.context.borrow();
+        let mut intro = ctx.introspect();
+
+        let new_cv = channel_volumes_from_percent(clamped);
+        let success: Rc<RefCell<Option<bool>>> = Rc::new(RefCell::new(None));
+        let sc = success.clone();
+        let ml_ptr = Rc::clone(&self.mainloop);
+
+        let op = intro.set_sink_volume_by_name(&sink_name, &new_cv, Some(Box::new(move |ok| {
+            *sc.borrow_mut() = Some(ok);
+            unsafe { (*ml_ptr.as_ptr()).signal(false); }
+        })));
+        loop {
+            match op.get_state() {
+                OpState::Done => break,
+                _ => ml.wait(),
+            }
+        }
+
+        drop(intro);
+        drop(ctx);
         Ok(())
     }
 
     fn set_muted(&mut self, muted: bool) -> Result<(), String> {
-        let val = if muted { "1" } else { "0" };
-        run_pactl(&["set-sink-mute", "@DEFAULT_SINK@", val])?;
+        let sink_name = self.get_default_sink_name()?;
+
+        let mut ml = self.mainloop.borrow_mut();
+        ml.lock();
+        let ctx = self.context.borrow();
+        let mut intro = ctx.introspect();
+
+        let success: Rc<RefCell<Option<bool>>> = Rc::new(RefCell::new(None));
+        let sc = success.clone();
+        let ml_ptr = Rc::clone(&self.mainloop);
+
+        let op = intro.set_sink_mute_by_name(&sink_name, muted, Some(Box::new(move |ok| {
+            *sc.borrow_mut() = Some(ok);
+            unsafe { (*ml_ptr.as_ptr()).signal(false); }
+        })));
+        loop {
+            match op.get_state() {
+                OpState::Done => break,
+                _ => ml.wait(),
+            }
+        }
+
+        drop(intro);
+        drop(ctx);
         Ok(())
     }
 
     fn get_app_volumes(&mut self) -> Result<Vec<AppVolume>, String> {
-        let output = run_pactl(&["list", "sink-inputs"])?;
-        let inputs = parse_sink_inputs(&output);
+        let mut ml = self.mainloop.borrow_mut();
+        ml.lock();
+        let ctx = self.context.borrow();
+        let mut intro = ctx.introspect();
 
-        Ok(inputs
-            .into_iter()
-            .map(|inp| AppVolume {
-                name: inp.name,
-                volume: inp.volume,
-                muted: inp.muted,
-                pid: inp.pid,
-            })
-            .collect())
+        let list = Self::get_sink_input_infos(&mut *ml, &mut intro, &self.mainloop);
+
+        drop(intro);
+        drop(ctx);
+
+        Ok(list.into_iter().map(|(_, name, volume, muted, pid)| {
+            AppVolume { name, volume, muted, pid }
+        }).collect())
     }
 
     fn set_app_volume(&mut self, app_name: &str, volume: f32) -> Result<(), String> {
-        let output = run_pactl(&["list", "sink-inputs"])?;
-        let inputs = parse_sink_inputs(&output);
-
-        let input = inputs
-            .iter()
-            .find(|i| i.name == app_name)
-            .ok_or_else(|| format!("App '{}' not found", app_name))?;
-
-        let idx = input.index.to_string();
         let clamped = volume.clamp(0.0, 100.0);
-        run_pactl(&[
-            "set-sink-input-volume",
-            &idx,
-            &format!("{}%", clamped as i32),
-        ])?;
+
+        // Find the sink input index
+        let index = {
+            let mut ml = self.mainloop.borrow_mut();
+            ml.lock();
+            let ctx = self.context.borrow();
+            let mut intro = ctx.introspect();
+
+            let list = Self::get_sink_input_infos(&mut *ml, &mut intro, &self.mainloop);
+
+            drop(intro);
+            drop(ctx);
+
+            list.iter()
+                .find(|(_, name, _, _, _)| name == app_name)
+                .map(|(idx, _, _, _, _)| *idx)
+                .ok_or_else(|| format!("App '{}' not found", app_name))?
+        };
+
+        // Set the volume
+        let mut ml = self.mainloop.borrow_mut();
+        ml.lock();
+        let ctx = self.context.borrow();
+        let mut intro = ctx.introspect();
+
+        let new_cv = channel_volumes_from_percent(clamped);
+        let success: Rc<RefCell<Option<bool>>> = Rc::new(RefCell::new(None));
+        let sc = success.clone();
+        let ml_ptr = Rc::clone(&self.mainloop);
+
+        let op = intro.set_sink_input_volume(index, &new_cv, Some(Box::new(move |ok| {
+            *sc.borrow_mut() = Some(ok);
+            unsafe { (*ml_ptr.as_ptr()).signal(false); }
+        })));
+        loop {
+            match op.get_state() {
+                OpState::Done => break,
+                _ => ml.wait(),
+            }
+        }
+
+        drop(intro);
+        drop(ctx);
         Ok(())
     }
 
     fn set_app_muted(&mut self, app_name: &str, muted: bool) -> Result<(), String> {
-        let output = run_pactl(&["list", "sink-inputs"])?;
-        let inputs = parse_sink_inputs(&output);
+        // Find the sink input index
+        let index = {
+            let mut ml = self.mainloop.borrow_mut();
+            ml.lock();
+            let ctx = self.context.borrow();
+            let mut intro = ctx.introspect();
 
-        let input = inputs
-            .iter()
-            .find(|i| i.name == app_name)
-            .ok_or_else(|| format!("App '{}' not found", app_name))?;
+            let list = Self::get_sink_input_infos(&mut *ml, &mut intro, &self.mainloop);
 
-        let idx = input.index.to_string();
-        let val = if muted { "1" } else { "0" };
-        run_pactl(&["set-sink-input-mute", &idx, val])?;
+            drop(intro);
+            drop(ctx);
+
+            list.iter()
+                .find(|(_, name, _, _, _)| name == app_name)
+                .map(|(idx, _, _, _, _)| *idx)
+                .ok_or_else(|| format!("App '{}' not found", app_name))?
+        };
+
+        // Set the mute
+        let mut ml = self.mainloop.borrow_mut();
+        ml.lock();
+        let ctx = self.context.borrow();
+        let mut intro = ctx.introspect();
+
+        let success: Rc<RefCell<Option<bool>>> = Rc::new(RefCell::new(None));
+        let sc = success.clone();
+        let ml_ptr = Rc::clone(&self.mainloop);
+
+        let op = intro.set_sink_input_mute(index, muted, Some(Box::new(move |ok| {
+            *sc.borrow_mut() = Some(ok);
+            unsafe { (*ml_ptr.as_ptr()).signal(false); }
+        })));
+        loop {
+            match op.get_state() {
+                OpState::Done => break,
+                _ => ml.wait(),
+            }
+        }
+
+        drop(intro);
+        drop(ctx);
         Ok(())
     }
+}
+
+pub fn create_controller() -> Box<dyn VolumeControl> {
+    Box::new(PulseController::new().expect("Failed to create PulseController"))
+}
+
+pub fn per_app_supported() -> bool {
+    true
 }
 
 #[cfg(test)]
@@ -226,84 +423,35 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_volume_percent() {
-        assert_eq!(
-            parse_volume_percent("Volume: front-left: 52429 /  80% / -5,81 dB"),
-            Some(80.0)
-        );
-        assert_eq!(
-            parse_volume_percent("Volume: front-left: 22702 /  35% / -27,62 dB"),
-            Some(35.0)
-        );
-        assert_eq!(parse_volume_percent("no volume here"), None);
-        assert_eq!(parse_volume_percent("Volume: 0%"), Some(0.0));
-        assert_eq!(parse_volume_percent("Volume: 100%"), Some(100.0));
+    fn test_percent_to_volume_roundtrip() {
+        assert_eq!(percent_from_volume(percent_to_volume(0.0)), 0.0);
+        assert_eq!(percent_from_volume(percent_to_volume(50.0)), 50.0);
+        assert_eq!(percent_from_volume(percent_to_volume(100.0)), 100.0);
     }
 
     #[test]
-    fn test_parse_sink_inputs_empty() {
-        let inputs = parse_sink_inputs("");
-        assert!(inputs.is_empty());
+    fn test_percent_to_volume_clamping() {
+        let v = percent_to_volume(-10.0);
+        assert_eq!(v.0, 0);
+        let v = percent_to_volume(200.0);
+        assert_eq!(v.0, Volume::NORMAL.0);
     }
 
     #[test]
-    fn test_parse_sink_inputs_single() {
-        let output = r#"Sink Input #11139
-	Driver: PipeWire
-	Owner Module: n/a
-	Client: 163
-	Sink: 2182
-	Volume: front-left: 22702 /  35% / -27,62 dB,   front-right: 22702 /  35% / -27,62 dB
-	        balance 0,00
-	Mute: no
-	Properties:
-		application.name = "Firefox"
-		application.process.id = "2231"
-		application.process.binary = "firefox"
-"#;
-        let inputs = parse_sink_inputs(output);
-        assert_eq!(inputs.len(), 1);
-        assert_eq!(inputs[0].index, 11139);
-        assert_eq!(inputs[0].name, "Firefox");
-        assert_eq!(inputs[0].pid, Some(2231));
-        assert_eq!(inputs[0].volume, 35.0);
-        assert!(!inputs[0].muted);
+    fn test_channel_volumes_from_percent() {
+        let cv = channel_volumes_from_percent(75.0);
+        let vol = cv.avg();
+        let pct = percent_from_volume(vol);
+        assert!((pct - 75.0).abs() < 1.0, "expected ~75%, got {}%", pct);
     }
 
     #[test]
-    fn test_parse_sink_inputs_multiple() {
-        let output = r#"Sink Input #100
-	Mute: no
-	Volume: front-left: 32768 /  50% / -6,00 dB
-	Properties:
-		application.name = "Firefox"
-		application.process.id = "1000"
-Sink Input #200
-	Mute: yes
-	Volume: front-left: 16384 /  25% / -12,00 dB
-	Properties:
-		application.name = "Spotify"
-		application.process.id = "2000"
-"#;
-        let inputs = parse_sink_inputs(output);
-        assert_eq!(inputs.len(), 2);
-        assert_eq!(inputs[0].name, "Firefox");
-        assert_eq!(inputs[0].volume, 50.0);
-        assert!(!inputs[0].muted);
-        assert_eq!(inputs[1].name, "Spotify");
-        assert_eq!(inputs[1].volume, 25.0);
-        assert!(inputs[1].muted);
+    fn test_volume_normal_is_100_percent() {
+        assert_eq!(percent_from_volume(Volume::NORMAL), 100.0);
     }
 
     #[test]
-    fn test_parse_sink_inputs_no_props() {
-        let output = r#"Sink Input #500
-	Volume: front-left: 40000 /  61%
-	Mute: no
-"#;
-        let inputs = parse_sink_inputs(output);
-        assert_eq!(inputs.len(), 1);
-        assert_eq!(inputs[0].name, "Unknown");
-        assert_eq!(inputs[0].pid, None);
+    fn test_volume_muted_is_0_percent() {
+        assert_eq!(percent_from_volume(Volume::MUTED), 0.0);
     }
 }

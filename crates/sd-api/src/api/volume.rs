@@ -103,6 +103,13 @@ pub(crate) async fn get_volume_state(
     let manager = plugin_manager.read().await;
 
     if let Ok(plugin_arc) = manager.get_plugin_arc("volume-master") {
+        // Refresh data before reading
+        {
+            let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
+            if plugin.has_interface("VolumeMaster") {
+                plugin.handle_command("refresh", serde_json::json!({}));
+            }
+        }
         let plugin = plugin_arc.read().expect("plugin lock poisoned");
         if plugin.has_interface("VolumeMaster") {
             if let Some(data) = plugin.interface_data() {
@@ -123,6 +130,13 @@ pub(crate) async fn get_app_volumes(
     let manager = plugin_manager.read().await;
 
     if let Ok(plugin_arc) = manager.get_plugin_arc("volume-master") {
+        // Refresh data before reading
+        {
+            let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
+            if plugin.has_interface("VolumeMaster") {
+                plugin.handle_command("refresh", serde_json::json!({}));
+            }
+        }
         let plugin = plugin_arc.read().expect("plugin lock poisoned");
         if plugin.has_interface("VolumeMaster") {
             if let Some(data) = plugin.interface_data() {
