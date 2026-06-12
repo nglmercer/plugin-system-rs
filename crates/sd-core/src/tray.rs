@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
@@ -47,7 +48,7 @@ fn get_local_ip() -> String {
         .unwrap_or_else(|_| "127.0.0.1".to_string())
 }
 
-pub fn spawn_tray(shutdown: Arc<AtomicBool>) {
+pub fn spawn_tray(shutdown: Arc<AtomicBool>, pid_lock_path: PathBuf) {
     thread::spawn(move || {
         let mut builder = EventLoopBuilder::<()>::new();
         #[cfg(target_os = "linux")]
@@ -102,6 +103,7 @@ pub fn spawn_tray(shutdown: Arc<AtomicBool>) {
                     "exit" => {
                         println!("Exit requested from tray");
                         shutdown.store(true, Ordering::Relaxed);
+                        let _ = std::fs::remove_file(&pid_lock_path);
                         *control_flow = ControlFlow::Exit;
                         std::process::exit(0);
                     }
