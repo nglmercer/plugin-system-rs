@@ -1,5 +1,6 @@
 import { h, render } from 'preact';
 import { App } from './App';
+import './styles/theme.css';
 import './styles/base.css';
 import './styles/dashboard.css';
 import './styles/library.css';

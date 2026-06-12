@@ -1,6 +1,7 @@
 import { h } from "preact";
 import { useState } from "preact/hooks";
 import { sendHotkeyCombo, executeAction } from "../lib/api";
+import { Icons } from "./Icons";
 
 export function SendHotkeyWidget({ settings }: { settings: Record<string, any> }) {
   const [executing, setExecuting] = useState(false);
@@ -14,11 +15,21 @@ export function SendHotkeyWidget({ settings }: { settings: Record<string, any> }
     setTimeout(() => setResult(null), 3000);
   }
 
-  return h("div", { class: `action-single-widget ${variant === "detailed" ? "detailed" : ""}` },
-    h("div", { class: "action-single-keys" }, settings.keys || "No key set"),
-    variant === "detailed" && h("div", { class: "action-single-desc" }, "Send keyboard hotkey"),
-    result && h("div", { class: "action-result" }, result),
-    h("button", { class: `action-single-btn ${executing ? "executing" : ""}`, onClick: handleExecute, disabled: executing },
-      executing ? "Sending..." : "Send"),
+  const keys = (settings.keys || "").split("+").map((k: string) => k.trim()).filter(Boolean);
+
+  return h("div", {
+    class: `hotkey-widget ${variant}`,
+    onClick: handleExecute,
+    style: executing ? { opacity: 0.6 } : undefined,
+  },
+    h("div", { class: "hotkey-center" },
+      h("div", { class: "hotkey-icon" }, h(Icons.keyboard, null)),
+      h("div", { class: "hotkey-keys" },
+        keys.length > 0
+          ? keys.map((k: string, i: number) => h("span", { key: i, class: "hotkey-key" }, k))
+          : h("span", { class: "hotkey-key empty" }, "Not set")
+      ),
+      result && h("div", { class: "hotkey-result" }, result),
+    ),
   );
 }

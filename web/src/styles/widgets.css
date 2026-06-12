@@ -1,11 +1,11 @@
 /* System Monitor Widget */
 .sysmon-loading {
-    color: #888;
+    color: var(--text-muted);
     text-align: center;
     padding: 1rem;
 }
 .sysmon-cpu-model {
-    color: #888;
+    color: var(--text-muted);
     font-size: 0.7rem;
     white-space: nowrap;
     overflow: hidden;
@@ -22,7 +22,7 @@
     align-items: center;
 }
 .sysmon-bar-label {
-    color: #aaa;
+    color: var(--text-secondary);
     font-size: 0.75rem;
 }
 .sysmon-bar-value {
@@ -31,7 +31,7 @@
 }
 .sysmon-bar-track {
     height: 6px;
-    background: #404040;
+    background: var(--slider-track);
     border-radius: 3px;
     overflow: hidden;
 }
@@ -41,7 +41,7 @@
     border-radius: 3px;
 }
 .sysmon-bar-detail {
-    color: #666;
+    color: var(--text-dim);
     font-size: 0.65rem;
 }
 .sysmon-info-grid {
@@ -55,19 +55,19 @@
     gap: 0.1rem;
 }
 .sysmon-info-label {
-    color: #666;
+    color: var(--text-dim);
     font-size: 0.65rem;
     text-transform: uppercase;
 }
 .sysmon-info-value {
-    color: #ccc;
+    color: var(--text-secondary);
     font-size: 0.75rem;
     font-family: monospace;
 }
 .sysmon-load-row {
     display: flex;
     justify-content: space-between;
-    color: #888;
+    color: var(--text-muted);
     font-size: 0.65rem;
 }
 
@@ -102,18 +102,18 @@
     gap: 0.25rem;
 }
 .clock-time {
-    color: #fff;
+    color: var(--text);
     font-size: 2rem;
     font-weight: bold;
     font-family: monospace;
 }
 .clock-seconds {
-    color: #888;
+    color: var(--text-muted);
     font-size: 1rem;
     font-family: monospace;
 }
 .clock-date {
-    color: #888;
+    color: var(--text-muted);
     font-size: 0.875rem;
 }
 
@@ -144,7 +144,7 @@
 }
 .clock-variant.detailed .clock-date {
     font-size: 0.8rem;
-    color: #888;
+    color: var(--text-muted);
 }
 
 /* Quick Actions Widget */
@@ -159,8 +159,8 @@
 }
 .action-btn {
     background: #1a1a1a;
-    border: 1px solid #404040;
-    color: #fff;
+    border: 1px solid var(--border);
+    color: var(--text);
     padding: 0.5rem 0.75rem;
     border-radius: 4px;
     cursor: pointer;
@@ -185,7 +185,7 @@
 }
 .action-btn-cat {
     font-size: 0.65rem;
-    color: #888;
+    color: var(--text-muted);
 }
 
 /* Single Action Widgets */
@@ -233,14 +233,14 @@
     gap: 0.3rem;
 }
 .action-single-desc {
-    color: #888;
+    color: var(--text-muted);
     font-size: 0.65rem;
 }
 
 /* Volume Widget */
 .vol-loading,
 .vol-unsupported {
-    color: #888;
+    color: var(--text-muted);
     text-align: center;
     padding: 1rem;
 }
@@ -257,9 +257,9 @@
     font-weight: bold;
 }
 .vol-mute-btn {
-    background: #404040;
+    background: var(--slider-track);
     border: 1px solid #555;
-    color: #fff;
+    color: var(--text);
     padding: 0.3rem 0.8rem;
     border-radius: 4px;
     cursor: pointer;
@@ -281,7 +281,7 @@
     align-items: center;
 }
 .vol-device {
-    color: #888;
+    color: var(--text-muted);
     font-size: 0.7rem;
     white-space: nowrap;
     overflow: hidden;
@@ -289,9 +289,9 @@
     flex: 1;
 }
 .vol-icon-btn {
-    background: #404040;
+    background: var(--slider-track);
     border: 1px solid #555;
-    color: #fff;
+    color: var(--text);
     width: 24px;
     height: 24px;
     border-radius: 4px;
@@ -353,7 +353,7 @@
 
 .vol-apps-toggle {
     background: #1a1a1a;
-    border: 1px solid #404040;
+    border: 1px solid var(--border);
     color: #00d4ff;
     padding: 0.3rem 0.6rem;
     border-radius: 4px;
@@ -386,7 +386,7 @@
     align-items: center;
 }
 .vol-app-name {
-    color: #ccc;
+    color: var(--text-secondary);
     font-size: 0.7rem;
     white-space: nowrap;
     overflow: hidden;
@@ -394,9 +394,9 @@
     flex: 1;
 }
 .vol-app-mute {
-    background: #404040;
+    background: var(--slider-track);
     border: 1px solid #555;
-    color: #fff;
+    color: var(--text);
     width: 20px;
     height: 20px;
     border-radius: 3px;
@@ -427,7 +427,7 @@
     align-items: center;
 }
 .vol-device-full {
-    color: #888;
+    color: var(--text-muted);
     font-size: 0.75rem;
     white-space: nowrap;
     overflow: hidden;
@@ -436,7 +436,7 @@
 }
 .vol-mute-btn-large {
     border: none;
-    color: #fff;
+    color: var(--text);
     padding: 0.3rem 0.8rem;
     border-radius: 4px;
     cursor: pointer;
@@ -456,12 +456,12 @@
     border-top: 1px solid #404040;
 }
 .vol-section-title {
-    color: #888;
+    color: var(--text-muted);
     font-size: 0.7rem;
     text-transform: uppercase;
 }
 .vol-no-apps {
-    color: #666;
+    color: var(--text-dim);
     font-size: 0.7rem;
     font-style: italic;
     text-align: center;
@@ -476,13 +476,13 @@
     border-radius: 4px;
 }
 .vol-app-pid {
-    color: #666;
+    color: var(--text-dim);
     font-size: 0.6rem;
     font-family: monospace;
 }
 .vol-app-mute-btn {
     border: none;
-    color: #fff;
+    color: var(--text);
     padding: 0.2rem 0.5rem;
     border-radius: 3px;
     cursor: pointer;
@@ -495,7 +495,7 @@
     gap: 0.4rem;
 }
 .vol-app-value {
-    color: #ccc;
+    color: var(--text-secondary);
     font-size: 0.7rem;
     min-width: 2.5em;
     text-align: right;
@@ -510,7 +510,7 @@
     justify-content: center;
     gap: 0.5rem;
     height: 100%;
-    color: #666;
+    color: var(--text-dim);
 }
 .volapps-empty-icon {
     font-size: 2rem;
@@ -526,7 +526,7 @@
     gap: 0.3rem;
 }
 .volapps-count {
-    color: #888;
+    color: var(--text-muted);
     font-size: 0.75rem;
     text-transform: uppercase;
     margin-bottom: 0.2rem;
@@ -537,7 +537,7 @@
     align-items: center;
 }
 .volapps-mini-name {
-    color: #ccc;
+    color: var(--text-secondary);
     font-size: 0.7rem;
 }
 .volapps-mini-vol {
@@ -545,7 +545,7 @@
     font-weight: bold;
 }
 .volapps-mini-more {
-    color: #666;
+    color: var(--text-dim);
     font-size: 0.65rem;
 }
 
@@ -560,7 +560,7 @@
     align-items: center;
 }
 .volapps-title {
-    color: #888;
+    color: var(--text-muted);
     font-size: 0.75rem;
     text-transform: uppercase;
 }
@@ -585,7 +585,7 @@
     align-items: center;
 }
 .volapps-item-name {
-    color: #ccc;
+    color: var(--text-secondary);
     font-size: 0.75rem;
     white-space: nowrap;
     overflow: hidden;
@@ -593,9 +593,9 @@
     flex: 1;
 }
 .volapps-mute-btn {
-    background: #404040;
+    background: var(--slider-track);
     border: 1px solid #555;
-    color: #fff;
+    color: var(--text);
     width: 22px;
     height: 22px;
     border-radius: 3px;
@@ -648,7 +648,7 @@
     border: none;
 }
 .volapps-value {
-    color: #ccc;
+    color: var(--text-secondary);
     font-size: 0.7rem;
     min-width: 2.5em;
     text-align: right;
@@ -677,13 +677,13 @@
     flex: 1;
 }
 .volapps-item-pid {
-    color: #666;
+    color: var(--text-dim);
     font-size: 0.6rem;
     font-family: monospace;
 }
 .volapps-mute-btn-detailed {
     border: none;
-    color: #fff;
+    color: var(--text);
     padding: 0.2rem 0.6rem;
     border-radius: 3px;
     cursor: pointer;
@@ -701,7 +701,7 @@
 /* OBS Control Widget */
 .obs-loading,
 .obs-error {
-    color: #888;
+    color: var(--text-muted);
     text-align: center;
     padding: 1rem;
 }
@@ -759,7 +759,7 @@
     font-size: 0.8rem;
 }
 .obs-conn-label {
-    color: #888;
+    color: var(--text-muted);
     font-size: 0.75rem;
 }
 
@@ -775,7 +775,7 @@
     gap: 0.5rem;
 }
 .obs-scene-name {
-    color: #ccc;
+    color: var(--text-secondary);
     font-size: 0.85rem;
     font-weight: bold;
     white-space: nowrap;
@@ -789,9 +789,9 @@
 }
 .obs-toggle-btn {
     flex: 1;
-    background: #404040;
+    background: var(--slider-track);
     border: 1px solid #555;
-    color: #888;
+    color: var(--text-muted);
     padding: 0.3rem;
     border-radius: 4px;
     cursor: pointer;
@@ -804,7 +804,7 @@
 .obs-toggle-btn.active {
     background: #f44336;
     border-color: #f44336;
-    color: #fff;
+    color: var(--text);
 }
 .obs-toggle-btn:disabled {
     opacity: 0.4;
@@ -828,9 +828,9 @@
     gap: 0.3rem;
 }
 .obs-ctrl-btn {
-    background: #404040;
+    background: var(--slider-track);
     border: 1px solid #555;
-    color: #ccc;
+    color: var(--text-secondary);
     padding: 0.35rem;
     border-radius: 4px;
     cursor: pointer;
@@ -843,7 +843,7 @@
 .obs-ctrl-btn.active {
     background: #f44336;
     border-color: #f44336;
-    color: #fff;
+    color: var(--text);
 }
 .obs-ctrl-btn.small {
     font-size: 0.6rem;
@@ -872,12 +872,12 @@
     gap: 0.1rem;
 }
 .obs-stat-label {
-    color: #666;
+    color: var(--text-dim);
     font-size: 0.6rem;
     text-transform: uppercase;
 }
 .obs-stat-value {
-    color: #ccc;
+    color: var(--text-secondary);
     font-size: 0.75rem;
     font-family: monospace;
 }
@@ -885,7 +885,7 @@
 /* OBS Scenes Widget */
 .obsscene-loading,
 .obsscene-error {
-    color: #888;
+    color: var(--text-muted);
     text-align: center;
     padding: 1rem;
 }
@@ -913,9 +913,9 @@
     gap: 0.2rem;
 }
 .obsscene-mini-btn {
-    background: #404040;
+    background: var(--slider-track);
     border: 1px solid #555;
-    color: #ccc;
+    color: var(--text-secondary);
     padding: 0.2rem;
     border-radius: 3px;
     cursor: pointer;
@@ -944,7 +944,7 @@
     align-items: center;
 }
 .obsscene-title {
-    color: #888;
+    color: var(--text-muted);
     font-size: 0.75rem;
     text-transform: uppercase;
 }
@@ -962,8 +962,8 @@
 }
 .obsscene-item-btn {
     background: #1a1a1a;
-    border: 1px solid #404040;
-    color: #ccc;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
     padding: 0.3rem 0.5rem;
     border-radius: 4px;
     cursor: pointer;
@@ -984,7 +984,7 @@
     font-weight: bold;
 }
 .obsscene-item-index {
-    color: #666;
+    color: var(--text-dim);
     font-size: 0.6rem;
 }
 .obsscene-item-btn.active .obsscene-item-index {
@@ -1000,7 +1000,7 @@
     border-top: 1px solid #404040;
 }
 .obsscene-section-title {
-    color: #666;
+    color: var(--text-dim);
     font-size: 0.65rem;
     text-transform: uppercase;
 }
@@ -1010,9 +1010,9 @@
     flex-wrap: wrap;
 }
 .obsscene-transition-btn {
-    background: #404040;
+    background: var(--slider-track);
     border: 1px solid #555;
-    color: #ccc;
+    color: var(--text-secondary);
     padding: 0.2rem 0.5rem;
     border-radius: 3px;
     cursor: pointer;
@@ -1032,9 +1032,9 @@
     gap: 0.4rem;
 }
 .obsscene-eye-btn {
-    background: #404040;
+    background: var(--slider-track);
     border: 1px solid #555;
-    color: #888;
+    color: var(--text-muted);
     padding: 0.15rem 0.4rem;
     border-radius: 3px;
     cursor: pointer;
@@ -1044,10 +1044,10 @@
 .obsscene-eye-btn.active {
     background: #4caf50;
     border-color: #4caf50;
-    color: #fff;
+    color: var(--text);
 }
 .obsscene-source-name {
-    color: #ccc;
+    color: var(--text-secondary);
     font-size: 0.7rem;
     flex: 1;
     white-space: nowrap;
@@ -1058,7 +1058,7 @@
 /* OBS Inputs Widget */
 .obsinput-loading,
 .obsinput-error {
-    color: #888;
+    color: var(--text-muted);
     text-align: center;
     padding: 1rem;
 }
@@ -1072,7 +1072,7 @@
     justify-content: center;
     gap: 0.5rem;
     height: 100%;
-    color: #666;
+    color: var(--text-dim);
 }
 .obsinput-empty-icon {
     font-size: 1.5rem;
@@ -1087,7 +1087,7 @@
     padding: 0.5rem;
 }
 .obsinput-count {
-    color: #888;
+    color: var(--text-muted);
     font-size: 0.75rem;
     text-transform: uppercase;
 }
@@ -1097,13 +1097,13 @@
     align-items: center;
 }
 .obsinput-mini-name {
-    color: #ccc;
+    color: var(--text-secondary);
     font-size: 0.7rem;
 }
 .obsinput-mini-mute {
-    background: #404040;
+    background: var(--slider-track);
     border: 1px solid #555;
-    color: #ccc;
+    color: var(--text-secondary);
     width: 20px;
     height: 20px;
     border-radius: 3px;
@@ -1114,10 +1114,10 @@
 .obsinput-mini-mute.muted {
     background: #f44336;
     border-color: #f44336;
-    color: #fff;
+    color: var(--text);
 }
 .obsinput-more {
-    color: #666;
+    color: var(--text-dim);
     font-size: 0.65rem;
 }
 
@@ -1134,7 +1134,7 @@
     align-items: center;
 }
 .obsinput-title {
-    color: #888;
+    color: var(--text-muted);
     font-size: 0.75rem;
     text-transform: uppercase;
 }
@@ -1162,7 +1162,7 @@
     align-items: center;
 }
 .obsinput-item-name {
-    color: #ccc;
+    color: var(--text-secondary);
     font-size: 0.75rem;
     white-space: nowrap;
     overflow: hidden;
@@ -1170,9 +1170,9 @@
     flex: 1;
 }
 .obsinput-mute-btn-sm {
-    background: #404040;
+    background: var(--slider-track);
     border: 1px solid #555;
-    color: #ccc;
+    color: var(--text-secondary);
     width: 22px;
     height: 22px;
     border-radius: 3px;
@@ -1186,7 +1186,7 @@
 .obsinput-mute-btn-sm.muted {
     background: #f44336;
     border-color: #f44336;
-    color: #fff;
+    color: var(--text);
 }
 .obsinput-slider-row {
     display: flex;
@@ -1226,7 +1226,7 @@
     border: none;
 }
 .obsinput-value {
-    color: #ccc;
+    color: var(--text-secondary);
     font-size: 0.7rem;
     min-width: 2.5em;
     text-align: right;
@@ -1246,14 +1246,14 @@
     gap: 0.1rem;
 }
 .obsinput-item-kind {
-    color: #666;
+    color: var(--text-dim);
     font-size: 0.6rem;
     font-family: monospace;
 }
 .obsinput-mute-btn {
     background: #4caf50;
     border: none;
-    color: #fff;
+    color: var(--text);
     padding: 0.2rem 0.5rem;
     border-radius: 3px;
     cursor: pointer;
@@ -1334,4 +1334,64 @@
         flex-wrap: wrap;
         gap: 0.3rem;
     }
+}
+
+/* ============================================================
+   Send Hotkey — full-space clickable widget
+   ============================================================ */
+.hotkey-widget {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    min-height: 120px;
+    cursor: pointer;
+    user-select: none;
+    transition: opacity 0.15s, transform 0.1s;
+}
+.hotkey-widget:active {
+    transform: scale(0.97);
+}
+.hotkey-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    text-align: center;
+}
+.hotkey-icon {
+    font-size: 2rem;
+    color: var(--accent);
+    opacity: 0.8;
+}
+.hotkey-keys {
+    display: flex;
+    gap: 0.3rem;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+.hotkey-key {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+.hotkey-key.empty {
+    color: var(--text-dim);
+    font-weight: normal;
+    text-transform: none;
+}
+.hotkey-result {
+    color: var(--success);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+.hotkey-widget.detailed .hotkey-icon {
+    font-size: 2.5rem;
 }

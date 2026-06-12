@@ -6,6 +6,7 @@ import { buildDefaultWidget } from "./widgetHelpers";
 import { WidgetLibrary } from "./WidgetLibrary";
 import { WidgetWizard } from "./WidgetWizard";
 import { WidgetContent } from "./WidgetContent";
+import { WidgetIcon, Icons } from "./Icons";
 
 export function WidgetGrid() {
   const [layout, setLayout] = useState<DashboardLayout>({
@@ -74,14 +75,15 @@ export function WidgetGrid() {
       h(
         "button",
         { class: "add-widget-btn", onClick: () => setShowLibrary(true) },
-        "+ Add Widget",
+        h(Icons.plus, null),
+        "Add Widget",
       ),
     ),
     layout.widgets.length === 0
       ? h(
           "div",
           { class: "dashboard-empty" },
-          h("div", { class: "empty-icon" }, "+"),
+          h("div", { class: "empty-icon" }, h(Icons.plus, null)),
           h("div", { class: "empty-text" }, "No widgets added yet"),
           h("div", { class: "empty-sub" }, 'Click "Add Widget" to get started'),
         )
@@ -105,7 +107,11 @@ export function WidgetGrid() {
               h(
                 "div",
                 { class: "widget-header" },
-                h("span", { class: "widget-title" }, widget.title),
+                h("span", { class: "widget-title" },
+                  h(WidgetIcon, { type: widget.type }),
+                  " ",
+                  widget.title,
+                ),
                 h(
                   "div",
                   { class: "widget-controls" },
@@ -114,16 +120,18 @@ export function WidgetGrid() {
                     {
                       class: "widget-control-btn edit",
                       onClick: () => setWizardWidget(widget.id),
+                      title: "Edit",
                     },
-                    "E",
+                    h(Icons.edit, null),
                   ),
                   h(
                     "button",
                     {
                       class: "widget-control-btn remove",
                       onClick: () => handleRemoveWidget(widget.id),
+                      title: "Remove",
                     },
-                    "X",
+                    h(Icons.close, null),
                   ),
                 ),
               ),

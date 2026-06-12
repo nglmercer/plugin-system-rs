@@ -9,7 +9,7 @@
   z-index: 2000;
 }
 .wizard-modal {
-  background: #2d2d2d;
+  background: var(--bg-card);
   border: 1px solid #505050;
   border-radius: 12px;
   width: 95%;
@@ -32,7 +32,7 @@
 .wizard-steps {
   display: flex;
   padding: 1rem 1.5rem;
-  background: #1a1a1a;
+  background: var(--bg-input);
   border-bottom: 1px solid #404040;
 }
 .wizard-step-indicator {
@@ -67,7 +67,7 @@
   font-weight: bold;
   z-index: 1;
   background: #404040;
-  color: #888;
+  color: var(--text-muted);
   border: 2px solid #555;
   transition: all 0.3s;
 }
@@ -77,9 +77,9 @@
   color: #000;
   border-color: #00d4ff;
 }
-.wizard-step-label { font-size: 0.65rem; color: #666; text-transform: uppercase; }
+.wizard-step-label { font-size: 0.65rem; color: var(--text-dim); text-transform: uppercase; }
 .wizard-step-indicator.active .wizard-step-label { color: #00d4ff; }
-.wizard-step-indicator.done .wizard-step-label { color: #888; }
+.wizard-step-indicator.done .wizard-step-label { color: var(--text-muted); }
 
 /* Wizard Body */
 .wizard-body {
@@ -93,28 +93,28 @@
   flex-direction: column;
   gap: 1rem;
 }
-.wizard-step-heading { color: #fff; font-size: 1rem; margin: 0; }
-.wizard-step-desc { color: #888; font-size: 0.8rem; margin: 0; }
+.wizard-step-heading { color: var(--text); font-size: 1rem; margin: 0; }
+.wizard-step-desc { color: var(--text-muted); font-size: 0.8rem; margin: 0; }
 .wizard-field {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
 }
-.wizard-field label { color: #aaa; font-size: 0.8rem; }
+.wizard-field label { color: var(--text-secondary); font-size: 0.8rem; }
 .wizard-field input,
 .wizard-field textarea {
-  background: #1a1a1a;
-  border: 1px solid #404040;
-  color: #fff;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text);
   padding: 0.6rem;
   border-radius: 6px;
   font-size: 0.875rem;
 }
 .wizard-field textarea { min-height: 60px; resize: vertical; }
 .wizard-field select {
-  background: #1a1a1a;
-  border: 1px solid #404040;
-  color: #fff;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text);
   padding: 0.6rem;
   border-radius: 6px;
   font-size: 0.8rem;
@@ -123,7 +123,7 @@
 .wizard-field select:focus { outline: none; border-color: #00d4ff; }
 .wizard-field input:focus,
 .wizard-field textarea:focus { outline: none; border-color: #00d4ff; }
-.wizard-field-hint { color: #666; font-size: 0.7rem; }
+.wizard-field-hint { color: var(--text-dim); font-size: 0.7rem; }
 
 /* Wizard Footer */
 .wizard-footer {
@@ -143,13 +143,13 @@
 }
 .wizard-btn.back {
   background: transparent;
-  border: 1px solid #404040;
-  color: #aaa;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
 }
 .wizard-btn.back:hover { border-color: #00d4ff; color: #00d4ff; }
 .wizard-btn.next { background: #00d4ff; color: #000; }
 .wizard-btn.next:hover { opacity: 0.8; }
-.wizard-btn.apply { background: #4caf50; color: #fff; }
+.wizard-btn.apply { background: #4caf50; color: var(--text); }
 .wizard-btn.apply:hover { opacity: 0.8; }
 
 /* Hotkey Recorder */
@@ -160,8 +160,8 @@
 }
 .hotkey-keys {
   flex: 1;
-  background: #1a1a1a;
-  border: 1px solid #404040;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
   padding: 0.6rem;
   border-radius: 6px;
   font-size: 0.9rem;
@@ -220,7 +220,7 @@
 }
 .hotkey-confirm-btn {
   background: #4caf50;
-  color: #fff;
+  color: var(--text);
   border: none;
   padding: 0.5rem 0.8rem;
   border-radius: 4px;
@@ -242,14 +242,14 @@
 .hotkey-retry-btn:hover { opacity: 0.8; }
 .hotkey-cancel-btn {
   background: transparent;
-  border: 1px solid #404040;
-  color: #aaa;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
   padding: 0.5rem 0.8rem;
   border-radius: 4px;
   cursor: pointer;
   font-size: 0.75rem;
 }
-.hotkey-cancel-btn:hover { color: #fff; border-color: #fff; }
+.hotkey-cancel-btn:hover { color: var(--text); border-color: var(--text); }
 
 /* Style Variants */
 .variant-grid {
@@ -258,7 +258,7 @@
   gap: 0.75rem;
 }
 .variant-card {
-  background: #1a1a1a;
+  background: var(--bg-input);
   border: 2px solid #404040;
   border-radius: 8px;
   padding: 0.75rem;
@@ -268,7 +268,7 @@
   align-items: center;
   transition: all 0.2s;
   text-align: left;
-  color: #fff;
+  color: var(--text);
 }
 .variant-card:hover { border-color: #00d4ff; background: #222; }
 .variant-card.selected { border-color: #4caf50; background: #1a3a1a; }
@@ -276,14 +276,14 @@
   width: 80px;
   height: 50px;
   flex-shrink: 0;
-  background: #2d2d2d;
+  background: var(--bg-card);
   border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
 }
-.variant-preview { font-size: 0.6rem; color: #888; text-align: center; line-height: 1.4; }
+.variant-preview { font-size: 0.6rem; color: var(--text-muted); text-align: center; line-height: 1.4; }
 .variant-preview.sysmon-minimal {
   display: flex;
   flex-direction: column;
@@ -302,23 +302,23 @@
   width: 100%;
   padding: 4px;
 }
-.variant-preview.clock-simple { font-size: 0.8rem; color: #fff; font-family: monospace; }
+.variant-preview.clock-simple { font-size: 0.8rem; color: var(--text); font-family: monospace; }
 .variant-preview.clock-digital {
   display: flex;
   flex-direction: column;
   gap: 1px;
   font-size: 0.7rem;
-  color: #fff;
+  color: var(--text);
   font-family: monospace;
 }
-.mini-sec { font-size: 0.5rem; color: #888; }
-.mini-date { font-size: 0.45rem; color: #888; }
+.mini-sec { font-size: 0.5rem; color: var(--text-muted); }
+.mini-date { font-size: 0.45rem; color: var(--text-muted); }
 .variant-preview.clock-detailed {
   display: flex;
   flex-direction: column;
   gap: 1px;
   font-size: 0.6rem;
-  color: #fff;
+  color: var(--text);
   font-family: monospace;
 }
 .simple-preview {
@@ -335,13 +335,13 @@
   border-radius: 4px; font-size: 0.6rem; font-weight: bold;
 }
 .variant-card-info { flex: 1; display: flex; flex-direction: column; gap: 0.2rem; }
-.variant-card-label { color: #fff; font-weight: bold; font-size: 0.85rem; }
-.variant-card-desc { color: #888; font-size: 0.7rem; }
+.variant-card-label { color: var(--text); font-weight: bold; font-size: 0.85rem; }
+.variant-card-desc { color: var(--text-muted); font-size: 0.7rem; }
 
 /* Wizard Confirm */
 .confirm-details {
-  background: #1a1a1a;
-  border: 1px solid #404040;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -353,19 +353,19 @@
   font-size: 0.8rem;
 }
 .confirm-row:last-child { border-bottom: none; }
-.confirm-row span:first-child { color: #888; text-transform: capitalize; }
-.confirm-row span:last-child { color: #fff; font-family: monospace; }
+.confirm-row span:first-child { color: var(--text-muted); text-transform: capitalize; }
+.confirm-row span:last-child { color: var(--text); font-family: monospace; }
 .confirm-preview { margin-top: 0.5rem; }
 .preview-frame {
-  background: #1a1a1a;
-  border: 1px solid #404040;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 0.75rem;
   min-height: 60px;
 }
 .wizard-remove-btn {
   background: #ff4444;
-  color: #fff;
+  color: var(--text);
   border: none;
   padding: 0.6rem;
   border-radius: 6px;
@@ -377,8 +377,8 @@
 
 /* Key Picker */
 .key-picker {
-  background: #1a1a1a;
-  border: 1px solid #404040;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 0.75rem;
   margin-top: 0.5rem;
@@ -392,7 +392,7 @@
   margin-bottom: 0;
 }
 .key-picker-label {
-  color: #888;
+  color: var(--text-muted);
   font-size: 0.7rem;
   text-transform: uppercase;
   margin-bottom: 0.4rem;
@@ -424,7 +424,7 @@
 }
 .key-picker-chip:hover {
   background: #ff4444;
-  color: #fff;
+  color: var(--text);
 }
 .key-picker-chip-x {
   font-size: 0.9rem;
@@ -437,8 +437,8 @@
 }
 .key-picker-clear {
   background: transparent;
-  border: 1px solid #404040;
-  color: #aaa;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
   padding: 0.35rem 0.7rem;
   border-radius: 4px;
   cursor: pointer;
@@ -451,7 +451,7 @@
 .key-picker-apply {
   background: #4caf50;
   border: none;
-  color: #fff;
+  color: var(--text);
   padding: 0.35rem 0.9rem;
   border-radius: 4px;
   cursor: pointer;
@@ -467,9 +467,9 @@
   flex-wrap: wrap;
 }
 .key-picker-mod {
-  background: #2d2d2d;
-  border: 1px solid #404040;
-  color: #aaa;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
   padding: 0.4rem 0.8rem;
   border-radius: 4px;
   cursor: pointer;
@@ -492,9 +492,9 @@
   gap: 0.3rem;
 }
 .key-picker-key {
-  background: #2d2d2d;
-  border: 1px solid #404040;
-  color: #ccc;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
   padding: 0.35rem 0.55rem;
   border-radius: 4px;
   cursor: pointer;
