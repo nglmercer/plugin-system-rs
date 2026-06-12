@@ -34,35 +34,103 @@ pub fn define_plugin(item: TokenStream) -> TokenStream {
 }
 
 struct ExportArgs {
+    prefix: Option<String>,
     interfaces: Vec<syn::Path>,
 }
 
 impl syn::parse::Parse for ExportArgs {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let mut interfaces = Vec::new();
-        if !input.is_empty() {
-            let ident: Ident = input.parse()?;
-            if ident != "interfaces" {
-                return Err(syn::Error::new(ident.span(), "expected `interfaces`"));
+        if input.is_empty() {
+            return Ok(ExportArgs {
+                prefix: None,
+                interfaces: Vec::new(),
+            });
+        }
+
+        // Try to parse as a string literal first
+        if input.peek(syn::LitStr) {
+            let lit: syn::LitStr = input.parse()?;
+            let prefix = lit.value();
+
+            // Check for trailing ", interfaces = [...]"
+            if input.peek(syn::Token![,]) {
+                let _comma: syn::Token![,] = input.parse()?;
+                let ident: Ident = input.parse()?;
+                if ident != "interfaces" {
+                    return Err(syn::Error::new(ident.span(), "expected `interfaces`"));
+                }
+                let _eq: syn::Token![=] = input.parse()?;
+                let arr: ExprArray = input.parse()?;
+                let interfaces = arr
+                    .elems
+                    .into_iter()
+                    .filter_map(|expr| {
+                        if let Expr::Path(ep) = expr {
+                            Some(ep.path)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                return Ok(ExportArgs {
+                    prefix: Some(prefix),
+                    interfaces,
+                });
             }
+
+            return Ok(ExportArgs {
+                prefix: Some(prefix),
+                interfaces: Vec::new(),
+            });
+        }
+
+        // Try to parse as `interfaces = [...]`
+        let ident: Ident = input.parse()?;
+        if ident == "interfaces" {
             let _eq: syn::Token![=] = input.parse()?;
             let arr: ExprArray = input.parse()?;
-            for expr in arr.elems {
-                if let Expr::Path(ep) = expr {
-                    interfaces.push(ep.path);
-                } else {
-                    return Err(syn::Error::new_spanned(expr, "expected trait path"));
-                }
-            }
+            let interfaces = arr
+                .elems
+                .into_iter()
+                .filter_map(|expr| {
+                    if let Expr::Path(ep) = expr {
+                        Some(ep.path)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            return Ok(ExportArgs {
+                prefix: None,
+                interfaces,
+            });
         }
-        Ok(ExportArgs { interfaces })
+
+        Err(syn::Error::new(
+            ident.span(),
+            "expected string prefix or `interfaces = [...]`",
+        ))
     }
 }
 
-fn metadata_exports(self_ty: &Type) -> proc_macro2::TokenStream {
+/// Parse the attribute tokens.
+fn parse_export_args(attr: TokenStream) -> syn::Result<ExportArgs> {
+    syn::parse(attr)
+}
+
+fn metadata_exports(self_ty: &Type, prefix: Option<&str>) -> proc_macro2::TokenStream {
+    let meta_fn_name = match prefix {
+        Some(p) => format_ident!("plugin_{}_metadata_json", p),
+        None => format_ident!("plugin_metadata_json"),
+    };
+    let free_fn_name = match prefix {
+        Some(p) => format_ident!("plugin_{}_free_string", p),
+        None => format_ident!("plugin_free_string"),
+    };
+
     quote! {
         #[no_mangle]
-        pub extern "C" fn plugin_metadata_json() -> *mut std::ffi::c_char {
+        pub extern "C" fn #meta_fn_name() -> *mut std::ffi::c_char {
             match plugin_system::serde_json::to_vec(&plugin_system::Plugin::metadata(&<#self_ty>::new())) {
                 Ok(json) => match std::ffi::CString::new(json) {
                     Ok(c_string) => c_string.into_raw(),
@@ -73,7 +141,7 @@ fn metadata_exports(self_ty: &Type) -> proc_macro2::TokenStream {
         }
 
         #[no_mangle]
-        pub unsafe extern "C" fn plugin_free_string(ptr: *mut std::ffi::c_char) {
+        pub unsafe extern "C" fn #free_fn_name(ptr: *mut std::ffi::c_char) {
             if !ptr.is_null() {
                 drop(std::ffi::CString::from_raw(ptr));
             }
@@ -85,7 +153,7 @@ fn generate_plugin_export(
     attr: TokenStream,
     input: ItemImpl,
 ) -> syn::Result<proc_macro2::TokenStream> {
-    let _args: ExportArgs = syn::parse(attr)?;
+    let args = parse_export_args(attr)?;
 
     let (_, trait_path, _) = input.trait_.as_ref().ok_or_else(|| {
         syn::Error::new_spanned(
@@ -108,7 +176,17 @@ fn generate_plugin_export(
 
     let impl_items = &input.items;
     let self_ty = input.self_ty.as_ref();
-    let metadata_export_tokens = metadata_exports(self_ty);
+    let prefix = args.prefix.as_deref();
+    let metadata_export_tokens = metadata_exports(self_ty, prefix);
+
+    let create_fn_name = match prefix {
+        Some(p) => format_ident!("plugin_{}_create", p),
+        None => format_ident!("plugin_create"),
+    };
+    let destroy_fn_name = match prefix {
+        Some(p) => format_ident!("plugin_{}_destroy", p),
+        None => format_ident!("plugin_destroy"),
+    };
 
     Ok(quote! {
         impl #trait_path for #self_ty {
@@ -116,14 +194,14 @@ fn generate_plugin_export(
         }
 
         #[no_mangle]
-        pub extern "C" fn plugin_create() -> *mut () {
+        pub extern "C" fn #create_fn_name() -> *mut () {
             let boxed: Box<dyn plugin_system::Plugin> = Box::new(<#self_ty>::new());
             let outer = Box::new(boxed);
             Box::into_raw(outer) as *mut ()
         }
 
         #[no_mangle]
-        pub unsafe extern "C" fn plugin_destroy(ptr: *mut ()) {
+        pub unsafe extern "C" fn #destroy_fn_name(ptr: *mut ()) {
             if !ptr.is_null() {
                 let outer = Box::from_raw(ptr as *mut Box<dyn plugin_system::Plugin>);
                 drop(outer);
@@ -138,7 +216,7 @@ fn generate_plugin_export_all(
     attr: TokenStream,
     input: ItemImpl,
 ) -> syn::Result<proc_macro2::TokenStream> {
-    let args: ExportArgs = syn::parse(attr)?;
+    let args = parse_export_args(attr)?;
 
     let (_, trait_path, _) = input.trait_.as_ref().ok_or_else(|| {
         syn::Error::new_spanned(
@@ -162,6 +240,7 @@ fn generate_plugin_export_all(
 
     let impl_items = &input.items;
     let impl_attrs = &input.attrs;
+    let prefix = args.prefix.as_deref();
 
     let mut method_exports = Vec::new();
     let mut method_names = Vec::new();
@@ -179,7 +258,10 @@ fn generate_plugin_export_all(
                 continue;
             }
 
-            let export_fn_name = format_ident!("plugin_method_{}", method_name);
+            let export_fn_name = match prefix {
+                Some(p) => format_ident!("plugin_{}_method_{}", p, method_name),
+                None => format_ident!("plugin_method_{}", method_name),
+            };
             method_names.push(method_name_str);
 
             let mut params = Vec::new();
@@ -213,8 +295,8 @@ fn generate_plugin_export_all(
                         let ident = &p.path.segments.last().unwrap().ident;
                         match ident.to_string().as_str() {
                             "String" => quote! { *mut std::ffi::c_char },
-                            "u64" | "u32" | "u16" | "u8" | "i64" | "i32" | "i16" | "i8" | "f64"
-                            | "f32" | "bool" => quote! { #ty },
+                            "u64" | "u32" | "u16" | "u8" | "i64" | "i32" | "i16" | "i8"
+                            | "f64" | "f32" | "bool" => quote! { #ty },
                             _ => quote! { *const std::ffi::c_void },
                         }
                     }
@@ -331,7 +413,16 @@ fn generate_plugin_export_all(
         .collect();
 
     let _all_method_names = method_names;
-    let metadata_export_tokens = metadata_exports(self_ty);
+    let metadata_export_tokens = metadata_exports(self_ty, prefix);
+
+    let create_fn_name = match prefix {
+        Some(p) => format_ident!("plugin_{}_create", p),
+        None => format_ident!("plugin_create"),
+    };
+    let destroy_fn_name = match prefix {
+        Some(p) => format_ident!("plugin_{}_destroy", p),
+        None => format_ident!("plugin_destroy"),
+    };
 
     Ok(quote! {
         #(#impl_attrs)*
@@ -342,14 +433,14 @@ fn generate_plugin_export_all(
         #(#method_exports)*
 
         #[no_mangle]
-        pub extern "C" fn plugin_create() -> *mut () {
+        pub extern "C" fn #create_fn_name() -> *mut () {
             let boxed: Box<dyn plugin_system::Plugin> = Box::new(<#self_ty>::new());
             let outer = Box::new(boxed);
             Box::into_raw(outer) as *mut ()
         }
 
         #[no_mangle]
-        pub unsafe extern "C" fn plugin_destroy(ptr: *mut ()) {
+        pub unsafe extern "C" fn #destroy_fn_name(ptr: *mut ()) {
             if !ptr.is_null() {
                 let outer = Box::from_raw(ptr as *mut Box<dyn plugin_system::Plugin>);
                 drop(outer);
@@ -362,7 +453,7 @@ fn generate_plugin_export_all(
 
 fn generate_define_plugin(struct_type: syn::TypePath) -> syn::Result<proc_macro2::TokenStream> {
     let self_ty = syn::Type::Path(struct_type);
-    let metadata_export_tokens = metadata_exports(&self_ty);
+    let metadata_export_tokens = metadata_exports(&self_ty, None);
 
     Ok(quote! {
         #[no_mangle]

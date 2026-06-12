@@ -13,6 +13,30 @@ type PluginDestroyFn = unsafe extern "C" fn(*mut ());
 type PluginMetadataJsonFn = unsafe extern "C" fn() -> *mut std::ffi::c_char;
 type PluginFreeStringFn = unsafe extern "C" fn(*mut std::ffi::c_char);
 
+/// Derive a symbol prefix from the library filename.
+/// e.g. "libplugin_volume_master.so" -> "volume_master"
+/// The macro generates symbols like "plugin_{prefix}_create", so we need just the suffix.
+fn prefix_from_path(path: &Path) -> Option<String> {
+    let stem = path.file_stem()?.to_str()?;
+
+    let name = if cfg!(target_os = "linux") || cfg!(target_os = "macos") {
+        stem.strip_prefix("lib").unwrap_or(stem)
+    } else {
+        stem
+    };
+
+    // Strip "plugin_" prefix since the macro already adds it
+    let name = name.strip_prefix("plugin_").unwrap_or(name);
+    // Also strip "plugin-" prefix (with dash) for crate names like "plugin-volume-master"
+    let name = name.strip_prefix("plugin-").unwrap_or(name);
+
+    if name.is_empty() {
+        return None;
+    }
+
+    Some(name.replace('-', "_"))
+}
+
 struct LoadedPlugin {
     _lib: libloading::Library,
     path: PathBuf,
@@ -71,7 +95,9 @@ impl PluginManager {
             temp_path.display()
         );
 
-        let actual_name = self.load_plugin(&temp_path)?;
+        let source = loader.source();
+        let original_path = Path::new(&source);
+        let actual_name = self.load_plugin_with_prefix(&temp_path, Some(original_path))?;
         if let Some(loaded) = self.loaded.get_mut(&actual_name) {
             if loaded.temp_path.is_none() {
                 loaded.temp_path = Some(temp_path.clone());
@@ -165,22 +191,68 @@ impl PluginManager {
         }
     }
 
-    fn load_metadata(lib: &libloading::Library, path: &Path) -> Result<PluginMetadata> {
+    fn load_metadata(
+        lib: &libloading::Library,
+        path: &Path,
+        prefix: Option<&str>,
+    ) -> Result<PluginMetadata> {
         if let Some(manifest) = crate::manifest::load_manifest(path).map_err(PluginError::Io)? {
             return Ok(manifest.into());
         }
 
-        let metadata_json_fn: PluginMetadataJsonFn = unsafe {
-            *lib.get(b"plugin_metadata_json")
-                .map_err(|_| PluginError::SymbolNotFound {
-                    symbol: "plugin_metadata_json".to_string(),
-                })?
+        // Try prefixed symbols first, then fallback to unprefixed
+        let (meta_sym, free_sym) = match prefix {
+            Some(p) => (
+                format!("plugin_{}_metadata_json", p),
+                format!("plugin_{}_free_string", p),
+            ),
+            None => (
+                "plugin_metadata_json".to_string(),
+                "plugin_free_string".to_string(),
+            ),
         };
+
+        let metadata_json_fn: PluginMetadataJsonFn = unsafe {
+            let sym = lib.get(meta_sym.as_bytes());
+            let sym = match sym {
+                Ok(s) => s,
+                Err(_) => {
+                    // Fallback to unprefixed
+                    let fallback = match prefix {
+                        Some(_) => "plugin_metadata_json",
+                        None => {
+                            return Err(PluginError::SymbolNotFound { symbol: meta_sym });
+                        }
+                    };
+                    lib.get(fallback.as_bytes()).map_err(|_| {
+                        PluginError::SymbolNotFound {
+                            symbol: meta_sym.clone(),
+                        }
+                    })?
+                }
+            };
+            *sym
+        };
+
         let free_string_fn: PluginFreeStringFn = unsafe {
-            *lib.get(b"plugin_free_string")
-                .map_err(|_| PluginError::SymbolNotFound {
-                    symbol: "plugin_free_string".to_string(),
-                })?
+            let sym = lib.get(free_sym.as_bytes());
+            let sym = match sym {
+                Ok(s) => s,
+                Err(_) => {
+                    let fallback = match prefix {
+                        Some(_) => "plugin_free_string",
+                        None => {
+                            return Err(PluginError::SymbolNotFound { symbol: free_sym });
+                        }
+                    };
+                    lib.get(fallback.as_bytes()).map_err(|_| {
+                        PluginError::SymbolNotFound {
+                            symbol: free_sym.clone(),
+                        }
+                    })?
+                }
+            };
+            *sym
         };
 
         let ptr = unsafe { metadata_json_fn() };
@@ -208,6 +280,14 @@ impl PluginManager {
     }
 
     pub fn load_plugin(&mut self, path: impl AsRef<Path>) -> Result<String> {
+        self.load_plugin_with_prefix(path, None)
+    }
+
+    fn load_plugin_with_prefix(
+        &mut self,
+        path: impl AsRef<Path>,
+        original_path: Option<&Path>,
+    ) -> Result<String> {
         let path = path.as_ref().to_path_buf();
         let path_display = path.display().to_string();
 
@@ -220,21 +300,66 @@ impl PluginManager {
             })?
         };
 
+        // Derive prefix from original path (not temp path which has PID suffix)
+        let prefix_source = original_path.unwrap_or(&path);
+        let prefix = prefix_from_path(prefix_source);
+
+        // Try create symbol: prefixed first, then fallback to unprefixed
         let create: PluginCreateFn = unsafe {
-            *lib.get(b"plugin_create")
-                .map_err(|_| PluginError::SymbolNotFound {
-                    symbol: "plugin_create".to_string(),
-                })?
+            let sym_name = match &prefix {
+                Some(p) => format!("plugin_{}_create", p),
+                None => "plugin_create".to_string(),
+            };
+            let sym = lib.get(sym_name.as_bytes());
+            let sym = match sym {
+                Ok(s) => s,
+                Err(_) => {
+                    let fallback = match &prefix {
+                        Some(_) => "plugin_create",
+                        None => {
+                            return Err(PluginError::SymbolNotFound {
+                                symbol: sym_name,
+                            });
+                        }
+                    };
+                    lib.get(fallback.as_bytes()).map_err(|_| {
+                        PluginError::SymbolNotFound {
+                            symbol: sym_name.clone(),
+                        }
+                    })?
+                }
+            };
+            *sym
         };
 
         let _destroy: PluginDestroyFn = unsafe {
-            *lib.get(b"plugin_destroy")
-                .map_err(|_| PluginError::SymbolNotFound {
-                    symbol: "plugin_destroy".to_string(),
-                })?
+            let sym_name = match &prefix {
+                Some(p) => format!("plugin_{}_destroy", p),
+                None => "plugin_destroy".to_string(),
+            };
+            let sym = lib.get(sym_name.as_bytes());
+            let sym = match sym {
+                Ok(s) => s,
+                Err(_) => {
+                    let fallback = match &prefix {
+                        Some(_) => "plugin_destroy",
+                        None => {
+                            return Err(PluginError::SymbolNotFound {
+                                symbol: sym_name,
+                            });
+                        }
+                    };
+                    lib.get(fallback.as_bytes()).map_err(|_| {
+                        PluginError::SymbolNotFound {
+                            symbol: sym_name.clone(),
+                        }
+                    })?
+                }
+            };
+            *sym
         };
 
-        let metadata = Self::load_metadata(&lib, &path)?;
+        let metadata = Self::load_metadata(&lib, &path, prefix.as_deref())?;
         let name = metadata.name.clone();
 
         log::info!("Plugin metadata: {} v{}", name, metadata.version);

@@ -177,7 +177,7 @@ impl VolumeMasterPlugin {
     }
 }
 
-#[plugin_system::plugin_export]
+#[plugin_system::plugin_export("volume_master")]
 impl Plugin for VolumeMasterPlugin {
     fn metadata(&self) -> PluginMetadata {
         plugin_system::plugin_metadata! {
