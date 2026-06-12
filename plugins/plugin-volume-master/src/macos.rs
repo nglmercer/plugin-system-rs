@@ -29,9 +29,11 @@ impl VolumeControl for MacOSController {
                 mElement: kAudioObjectPropertyElementMain,
             };
 
-            let status = coreaudio_rs::sys::audio_object_get_property_data(
+            let status = coreaudio_rs::sys::AudioObjectGetPropertyData(
                 coreaudio_rs::sys::kAudioObjectSystemObject,
                 &address,
+                0,
+                std::ptr::null(),
                 &mut size,
                 &mut device_id as *mut _ as *mut _,
             );
@@ -48,9 +50,11 @@ impl VolumeControl for MacOSController {
                 mElement: kAudioObjectPropertyElementMain,
             };
 
-            let status = coreaudio_rs::sys::audio_object_get_property_data(
+            let status = coreaudio_rs::sys::AudioObjectGetPropertyData(
                 device_id,
                 &vol_address,
+                0,
+                std::ptr::null(),
                 &mut vol_size,
                 &mut volume as *mut _ as *mut _,
             );
@@ -67,9 +71,11 @@ impl VolumeControl for MacOSController {
                 mElement: kAudioObjectPropertyElementMain,
             };
 
-            let _ = coreaudio_rs::sys::audio_object_get_property_data(
+            let _ = coreaudio_rs::sys::AudioObjectGetPropertyData(
                 device_id,
                 &mute_address,
+                0,
+                std::ptr::null(),
                 &mut mute_size,
                 &mut muted as *mut _ as *mut _,
             );
@@ -98,9 +104,11 @@ impl VolumeControl for MacOSController {
                 mElement: kAudioObjectPropertyElementMain,
             };
 
-            let status = coreaudio_rs::sys::audio_object_get_property_data(
+            let status = coreaudio_rs::sys::AudioObjectGetPropertyData(
                 coreaudio_rs::sys::kAudioObjectSystemObject,
                 &address,
+                0,
+                std::ptr::null(),
                 &mut size,
                 &mut device_id as *mut _ as *mut _,
             );
@@ -116,11 +124,13 @@ impl VolumeControl for MacOSController {
                 mElement: kAudioObjectPropertyElementMain,
             };
 
-            let status = coreaudio_rs::sys::audio_object_set_property_data(
+            let status = coreaudio_rs::sys::AudioObjectSetPropertyData(
                 device_id,
                 &vol_address,
-                &scalar as *const _ as *const _,
+                0,
+                std::ptr::null(),
                 std::mem::size_of::<f32>() as u32,
+                &scalar as *const _ as *const _,
             );
 
             if status != 0 {
@@ -147,9 +157,11 @@ impl VolumeControl for MacOSController {
                 mElement: kAudioObjectPropertyElementMain,
             };
 
-            let status = coreaudio_rs::sys::audio_object_get_property_data(
+            let status = coreaudio_rs::sys::AudioObjectGetPropertyData(
                 coreaudio_rs::sys::kAudioObjectSystemObject,
                 &address,
+                0,
+                std::ptr::null(),
                 &mut size,
                 &mut device_id as *mut _ as *mut _,
             );
@@ -165,11 +177,13 @@ impl VolumeControl for MacOSController {
                 mElement: kAudioObjectPropertyElementMain,
             };
 
-            let status = coreaudio_rs::sys::audio_object_set_property_data(
+            let status = coreaudio_rs::sys::AudioObjectSetPropertyData(
                 device_id,
                 &mute_address,
-                &mute_val as *const _ as *const _,
+                0,
+                std::ptr::null(),
                 std::mem::size_of::<u32>() as u32,
+                &mute_val as *const _ as *const _,
             );
 
             if status != 0 {
