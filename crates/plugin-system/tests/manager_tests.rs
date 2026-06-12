@@ -108,21 +108,6 @@ fn test_get_all_plugin_info() {
 }
 
 #[test]
-fn test_plugins_with_interface() {
-    let mut manager = PluginManager::new();
-    let path = real_plugin_timer_path();
-    if !path.exists() {
-        eprintln!("Skipping test_plugins_with_interface: timer plugin not found");
-        return;
-    }
-    manager.load_plugin(&path).unwrap();
-    let names = manager.plugins_with_interface("Timer");
-    assert_eq!(names, vec!["timer"]);
-    let none = manager.plugins_with_interface("NonExistent");
-    assert!(none.is_empty());
-}
-
-#[test]
 fn test_reload_plugin() {
     let mut manager = PluginManager::new();
     let path = real_plugin_timer_path();

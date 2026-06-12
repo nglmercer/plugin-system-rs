@@ -44,91 +44,15 @@ impl ObsPlugin {
         }
     }
 
-    fn refresh_status(&mut self) {
-        if !self.controller.is_connected() {
-            self.data = ObsData::default();
-            return;
-        }
-
-        let stream = self
-            .runtime
-            .block_on(self.controller.get_stream_status())
-            .unwrap_or_default();
-        let record = self
-            .runtime
-            .block_on(self.controller.get_record_status())
-            .unwrap_or_default();
-        let virtual_cam = self
-            .runtime
-            .block_on(self.controller.get_virtual_cam_status())
-            .unwrap_or(false);
-        let replay_buffer = self
-            .runtime
-            .block_on(self.controller.get_replay_buffer_status())
-            .unwrap_or(false);
-        let current_scene = self
-            .runtime
-            .block_on(self.controller.get_scene_list())
-            .map(|(s, _)| s)
-            .unwrap_or_default();
-        let studio_mode = self
-            .runtime
-            .block_on(self.controller.get_studio_mode())
-            .unwrap_or(false);
-        let stats = self.runtime.block_on(self.controller.get_stats()).ok();
-
-        let conn = self.controller.connection_info();
-        self.data = ObsData {
-            connected: true,
-            host: conn.host.clone(),
-            port: conn.port,
-            stream_active: stream.active,
-            record_active: record.active,
-            record_paused: record.paused,
-            virtual_cam_active: virtual_cam,
-            replay_buffer_active: replay_buffer,
-            current_scene,
-            studio_mode,
-            cpu_usage: stats.as_ref().map(|s| s.cpu_usage).unwrap_or(0.0),
-            memory_usage: stats.as_ref().map(|s| s.memory_usage).unwrap_or(0.0),
-            fps: stats.as_ref().map(|s| s.fps).unwrap_or(0.0),
-        };
-    }
-}
-
-#[plugin_system::plugin_export]
-impl Plugin for ObsPlugin {
-    fn metadata(&self) -> PluginMetadata {
-        plugin_system::plugin_metadata! {
-            name: "obs",
-            version: "0.1.0",
-            authors: ["StreamDeck Core"],
-            dependencies: []
-        }
-    }
-
-    fn on_load(&mut self, _ctx: &PluginContext) {
-        log::info!("OBS Plugin loaded");
-    }
-
-    fn on_unload(&mut self) {
-        log::info!("OBS Plugin unloading");
-        self.runtime.block_on(self.controller.disconnect());
-    }
-
-    fn plugin_type_name(&self) -> &'static str {
-        std::any::type_name::<Self>()
-    }
-
-    fn interface_ids(&self) -> Vec<&'static str> {
+    pub fn interface_ids(&self) -> Vec<&'static str> {
         vec!["ObsControl"]
     }
 
-    fn interface_data(&self) -> Option<serde_json::Value> {
+    pub fn interface_data(&self) -> Option<serde_json::Value> {
         serde_json::to_value(&self.data).ok()
     }
 
-    fn handle_command(
+    pub fn handle_command(
         &mut self,
         method: &str,
         args: serde_json::Value,
@@ -311,5 +235,81 @@ impl Plugin for ObsPlugin {
             }
             _ => None,
         }
+    }
+
+    fn refresh_status(&mut self) {
+        if !self.controller.is_connected() {
+            self.data = ObsData::default();
+            return;
+        }
+
+        let stream = self
+            .runtime
+            .block_on(self.controller.get_stream_status())
+            .unwrap_or_default();
+        let record = self
+            .runtime
+            .block_on(self.controller.get_record_status())
+            .unwrap_or_default();
+        let virtual_cam = self
+            .runtime
+            .block_on(self.controller.get_virtual_cam_status())
+            .unwrap_or(false);
+        let replay_buffer = self
+            .runtime
+            .block_on(self.controller.get_replay_buffer_status())
+            .unwrap_or(false);
+        let current_scene = self
+            .runtime
+            .block_on(self.controller.get_scene_list())
+            .map(|(s, _)| s)
+            .unwrap_or_default();
+        let studio_mode = self
+            .runtime
+            .block_on(self.controller.get_studio_mode())
+            .unwrap_or(false);
+        let stats = self.runtime.block_on(self.controller.get_stats()).ok();
+
+        let conn = self.controller.connection_info();
+        self.data = ObsData {
+            connected: true,
+            host: conn.host.clone(),
+            port: conn.port,
+            stream_active: stream.active,
+            record_active: record.active,
+            record_paused: record.paused,
+            virtual_cam_active: virtual_cam,
+            replay_buffer_active: replay_buffer,
+            current_scene,
+            studio_mode,
+            cpu_usage: stats.as_ref().map(|s| s.cpu_usage).unwrap_or(0.0),
+            memory_usage: stats.as_ref().map(|s| s.memory_usage).unwrap_or(0.0),
+            fps: stats.as_ref().map(|s| s.fps).unwrap_or(0.0),
+        };
+    }
+}
+
+#[plugin_system::plugin_export]
+impl Plugin for ObsPlugin {
+    fn metadata(&self) -> PluginMetadata {
+        plugin_system::plugin_metadata! {
+            name: "obs",
+            version: "0.1.0",
+            authors: ["StreamDeck Core"],
+            dependencies: []
+        }
+    }
+
+    fn on_load(&mut self, _ctx: &PluginContext) {
+        log::info!("OBS Plugin loaded");
+    }
+
+    fn on_unload(&mut self) {
+        log::info!("OBS Plugin unloading");
+        self.runtime.block_on(self.controller.disconnect());
+    }
+
+    fn plugin_type_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
     }
 }

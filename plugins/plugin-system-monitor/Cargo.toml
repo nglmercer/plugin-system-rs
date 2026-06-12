@@ -3,8 +3,12 @@ name = "plugin-system-monitor"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = ["ffi"]
+ffi = []
+
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "lib"]
 
 [dependencies]
 plugin-system = { path = "../../crates/plugin-system" }

@@ -6,7 +6,6 @@ use crate::traits::Plugin;
 pub struct PluginRegistry {
     plugins: HashMap<String, Arc<RwLock<Box<dyn Plugin>>>>,
     type_index: HashMap<std::any::TypeId, String>,
-    interfaces: HashMap<String, Vec<String>>,
 }
 
 impl PluginRegistry {
@@ -14,7 +13,6 @@ impl PluginRegistry {
         Self {
             plugins: HashMap::new(),
             type_index: HashMap::new(),
-            interfaces: HashMap::new(),
         }
     }
 
@@ -23,14 +21,6 @@ impl PluginRegistry {
         let name = meta.name.clone();
         let type_id = (*plugin).type_id();
 
-        let iface_ids = plugin.interface_ids();
-        for iface in &iface_ids {
-            self.interfaces
-                .entry(iface.to_string())
-                .or_default()
-                .push(name.clone());
-        }
-
         self.type_index.insert(type_id, name.clone());
         self.plugins.insert(name, Arc::new(RwLock::new(plugin)));
     }
@@ -38,9 +28,6 @@ impl PluginRegistry {
     pub fn unregister(&mut self, name: &str) -> Option<Arc<RwLock<Box<dyn Plugin>>>> {
         if let Some(arc) = self.plugins.remove(name) {
             self.type_index.retain(|_, n| n != name);
-            for providers in self.interfaces.values_mut() {
-                providers.retain(|n| n != name);
-            }
             Some(arc)
         } else {
             None
@@ -60,13 +47,6 @@ impl PluginRegistry {
         self.plugins.get(name).cloned()
     }
 
-    pub fn get_by_interface(&self, interface_name: &str) -> Vec<String> {
-        self.interfaces
-            .get(interface_name)
-            .cloned()
-            .unwrap_or_default()
-    }
-
     pub fn plugin_names(&self) -> Vec<String> {
         self.plugins.keys().cloned().collect()
     }
@@ -81,10 +61,6 @@ impl PluginRegistry {
 
     pub fn is_empty(&self) -> bool {
         self.plugins.is_empty()
-    }
-
-    pub fn list_interfaces(&self) -> HashMap<String, Vec<String>> {
-        self.interfaces.clone()
     }
 
     pub fn iter_plugins(&self) -> impl Iterator<Item = (&String, &Arc<RwLock<Box<dyn Plugin>>>)> {

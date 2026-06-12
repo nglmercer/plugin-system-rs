@@ -119,6 +119,24 @@ impl KeySimulatorPlugin {
         Self
     }
 
+    pub fn interface_ids(&self) -> Vec<&'static str> {
+        vec!["KeySimulator"]
+    }
+
+    pub fn simulate_keys_plugin(&mut self, keys: &[String]) -> plugin_system::Result<()> {
+        KeySimulator::simulate_keys(self, keys)
+            .map_err(|e| plugin_system::PluginError::PluginNotFound { name: e })
+    }
+
+    pub fn listen_for_combo_plugin(&self, timeout_ms: u64) -> plugin_system::Result<String> {
+        self.listen_for_combo(timeout_ms)
+            .map_err(|e| plugin_system::PluginError::PluginNotFound { name: e })
+    }
+
+    pub fn reset_recording_state_plugin(&self) {
+        Self::reset_recording_state();
+    }
+
     pub fn reset_recording_state() {
         LISTENING.store(false, Ordering::SeqCst);
     }
@@ -424,23 +442,5 @@ impl Plugin for KeySimulatorPlugin {
 
     fn plugin_type_name(&self) -> &'static str {
         std::any::type_name::<Self>()
-    }
-
-    fn interface_ids(&self) -> Vec<&'static str> {
-        vec!["KeySimulator"]
-    }
-
-    fn simulate_keys(&mut self, keys: &[String]) -> plugin_system::Result<()> {
-        KeySimulator::simulate_keys(self, keys)
-            .map_err(|e| plugin_system::PluginError::PluginNotFound { name: e })
-    }
-
-    fn listen_for_combo(&self, timeout_ms: u64) -> plugin_system::Result<String> {
-        self.listen_for_combo(timeout_ms)
-            .map_err(|e| plugin_system::PluginError::PluginNotFound { name: e })
-    }
-
-    fn reset_recording_state(&self) {
-        Self::reset_recording_state();
     }
 }

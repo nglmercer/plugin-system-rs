@@ -1,7 +1,5 @@
 use std::any::Any;
 
-use crate::error::Result;
-
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PluginDependency {
     pub name: String,
@@ -31,36 +29,6 @@ pub trait Plugin: Any + Send + Sync {
     fn on_unload(&mut self);
 
     fn plugin_type_name(&self) -> &'static str;
-
-    fn interface_ids(&self) -> Vec<&'static str> {
-        Vec::new()
-    }
-
-    fn interface_data(&self) -> Option<serde_json::Value> {
-        None
-    }
-
-    fn handle_command(
-        &mut self,
-        _method: &str,
-        _args: serde_json::Value,
-    ) -> Option<serde_json::Value> {
-        None
-    }
-
-    fn simulate_keys(&mut self, _keys: &[String]) -> Result<()> {
-        Err(crate::error::PluginError::PluginNotFound {
-            name: "simulate_keys not supported".to_string(),
-        })
-    }
-
-    fn listen_for_combo(&self, _timeout_ms: u64) -> Result<String> {
-        Err(crate::error::PluginError::PluginNotFound {
-            name: "listen_for_combo not supported".to_string(),
-        })
-    }
-
-    fn reset_recording_state(&self) {}
 }
 
 impl dyn Plugin {
@@ -70,9 +38,5 @@ impl dyn Plugin {
 
     pub fn downcast_mut<T: Plugin + 'static>(&mut self) -> Option<&mut T> {
         (self as &mut dyn Any).downcast_mut::<T>()
-    }
-
-    pub fn has_interface(&self, interface_name: &str) -> bool {
-        self.interface_ids().contains(&interface_name)
     }
 }

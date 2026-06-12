@@ -495,48 +495,6 @@ impl PluginManager {
             })
     }
 
-    pub fn plugins_with_interface(&self, interface_name: &str) -> Vec<String> {
-        let registry = self.registry.read().ok();
-        registry
-            .map(|reg| reg.get_by_interface(interface_name))
-            .unwrap_or_default()
-    }
-
-    pub fn list_all_interfaces(&self) -> HashMap<String, Vec<String>> {
-        let registry = self.registry.read().ok();
-        registry
-            .map(|reg| reg.list_interfaces())
-            .unwrap_or_default()
-    }
-
-    pub fn call_interface_method<R>(
-        &self,
-        plugin_name: &str,
-        interface_name: &str,
-        f: impl FnOnce(&dyn Plugin) -> R,
-    ) -> Result<R> {
-        let registry = self.read_registry(self.registry.read(), "PluginRegistry")?;
-        let plugin_arc =
-            registry
-                .get_by_name(plugin_name)
-                .ok_or_else(|| PluginError::PluginNotFound {
-                    name: plugin_name.to_string(),
-                })?;
-        let guard = self.read_plugin(plugin_arc.read(), plugin_name)?;
-        let plugin_ref: &dyn Plugin = &**guard;
-
-        if !plugin_ref.has_interface(interface_name) {
-            return Err(PluginError::PluginNotFound {
-                name: format!(
-                    "Plugin '{}' does not implement interface '{}'",
-                    plugin_name, interface_name
-                ),
-            });
-        }
-
-        Ok(f(plugin_ref))
-    }
-
     pub fn get_plugin_info(&self, name: &str) -> Result<crate::plugin_info::PluginInfo> {
         let registry = self.read_registry(self.registry.read(), "PluginRegistry")?;
         let plugin_arc = registry
@@ -547,14 +505,12 @@ impl PluginManager {
         let guard = self.read_plugin(plugin_arc.read(), name)?;
         let plugin_ref: &dyn Plugin = &**guard;
         let meta = plugin_ref.metadata();
-        let interfaces = plugin_ref.interface_ids();
         let dep_names = meta.dependencies_names();
         Ok(crate::plugin_info::PluginInfo {
             name: meta.name,
             version: meta.version,
             authors: meta.authors,
             dependencies: dep_names,
-            interfaces: interfaces.into_iter().map(|s| s.to_string()).collect(),
             public_methods: Vec::new(),
         })
     }
@@ -587,56 +543,15 @@ impl PluginManager {
             let plugin_ref: &dyn Plugin = &**guard;
             let meta = plugin_ref.metadata();
             let dep_names = meta.dependencies_names();
-            let interfaces = plugin_ref.interface_ids();
             infos.push(crate::plugin_info::PluginInfo {
                 name: meta.name,
                 version: meta.version,
                 authors: meta.authors,
                 dependencies: dep_names,
-                interfaces: interfaces.into_iter().map(|s| s.to_string()).collect(),
                 public_methods: Vec::new(),
             });
         }
         infos
-    }
-
-    pub fn has_interface(&self, plugin_name: &str, interface_name: &str) -> bool {
-        let registry = match self.registry.read() {
-            Ok(r) => r,
-            Err(poisoned) => {
-                log::error!("PluginRegistry poisoned in has_interface");
-                poisoned.into_inner()
-            }
-        };
-        if let Some(plugin_arc) = registry.get_by_name(plugin_name) {
-            let guard = match plugin_arc.read() {
-                Ok(p) => p,
-                Err(poisoned) => {
-                    log::error!("Plugin '{}' lock poisoned in has_interface", plugin_name);
-                    poisoned.into_inner()
-                }
-            };
-            let plugin_ref: &dyn Plugin = &**guard;
-            plugin_ref.has_interface(interface_name)
-        } else {
-            false
-        }
-    }
-
-    pub fn get_plugin_interfaces(&self, name: &str) -> Result<Vec<String>> {
-        let registry = self.read_registry(self.registry.read(), "PluginRegistry")?;
-        let plugin_arc = registry
-            .get_by_name(name)
-            .ok_or_else(|| PluginError::PluginNotFound {
-                name: name.to_string(),
-            })?;
-        let guard = self.read_plugin(plugin_arc.read(), name)?;
-        let plugin_ref: &dyn Plugin = &**guard;
-        Ok(plugin_ref
-            .interface_ids()
-            .into_iter()
-            .map(|s| s.to_string())
-            .collect())
     }
 }
 

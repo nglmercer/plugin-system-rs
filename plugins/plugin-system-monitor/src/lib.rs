@@ -39,6 +39,14 @@ impl SystemMonitorPlugin {
         }
     }
 
+    pub fn interface_ids(&self) -> Vec<&'static str> {
+        vec!["SystemMonitor"]
+    }
+
+    pub fn interface_data(&self) -> Option<serde_json::Value> {
+        serde_json::to_value(&self.stats).ok()
+    }
+
     fn read_cpu_times() -> Option<(u64, u64)> {
         let content = std::fs::read_to_string("/proc/stat").ok()?;
         let line = content.lines().next()?;
@@ -244,13 +252,5 @@ impl Plugin for SystemMonitorPlugin {
 
     fn plugin_type_name(&self) -> &'static str {
         std::any::type_name::<Self>()
-    }
-
-    fn interface_ids(&self) -> Vec<&'static str> {
-        vec!["SystemMonitor"]
-    }
-
-    fn interface_data(&self) -> Option<serde_json::Value> {
-        serde_json::to_value(&self.stats).ok()
     }
 }

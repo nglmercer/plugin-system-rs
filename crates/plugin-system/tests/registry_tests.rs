@@ -4,7 +4,6 @@ use plugin_system::PluginRegistry;
 #[derive(Default)]
 struct DummyPlugin {
     name: &'static str,
-    interfaces: Vec<&'static str>,
 }
 
 impl Plugin for DummyPlugin {
@@ -22,9 +21,6 @@ impl Plugin for DummyPlugin {
     fn plugin_type_name(&self) -> &'static str {
         std::any::type_name::<Self>()
     }
-    fn interface_ids(&self) -> Vec<&'static str> {
-        self.interfaces.clone()
-    }
 }
 
 #[test]
@@ -38,10 +34,7 @@ fn test_registry_new_is_empty() {
 #[test]
 fn test_register_and_get_by_name() {
     let mut registry = PluginRegistry::new();
-    let plugin = DummyPlugin {
-        name: "alpha",
-        interfaces: vec![],
-    };
+    let plugin = DummyPlugin { name: "alpha" };
     registry.register(Box::new(plugin));
     assert!(!registry.is_empty());
     assert_eq!(registry.len(), 1);
@@ -51,30 +44,9 @@ fn test_register_and_get_by_name() {
 }
 
 #[test]
-fn test_get_by_interface() {
-    let mut registry = PluginRegistry::new();
-    let plugin_a = DummyPlugin {
-        name: "plugin_a",
-        interfaces: vec!["Timer"],
-    };
-    let plugin_b = DummyPlugin {
-        name: "plugin_b",
-        interfaces: vec!["KeySimulator"],
-    };
-    registry.register(Box::new(plugin_a));
-    registry.register(Box::new(plugin_b));
-    assert_eq!(registry.get_by_interface("Timer"), vec!["plugin_a"]);
-    assert_eq!(registry.get_by_interface("KeySimulator"), vec!["plugin_b"]);
-    assert!(registry.get_by_interface("Missing").is_empty());
-}
-
-#[test]
 fn test_unregister() {
     let mut registry = PluginRegistry::new();
-    let plugin = DummyPlugin {
-        name: "beta",
-        interfaces: vec![],
-    };
+    let plugin = DummyPlugin { name: "beta" };
     registry.register(Box::new(plugin));
     assert!(registry.contains("beta"));
     let removed = registry.unregister("beta");
@@ -86,14 +58,8 @@ fn test_unregister() {
 #[test]
 fn test_iter_plugins() {
     let mut registry = PluginRegistry::new();
-    let plugin_a = DummyPlugin {
-        name: "p1",
-        interfaces: vec![],
-    };
-    let plugin_b = DummyPlugin {
-        name: "p2",
-        interfaces: vec![],
-    };
+    let plugin_a = DummyPlugin { name: "p1" };
+    let plugin_b = DummyPlugin { name: "p2" };
     registry.register(Box::new(plugin_a));
     registry.register(Box::new(plugin_b));
     let names: Vec<_> = registry

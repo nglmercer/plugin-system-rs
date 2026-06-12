@@ -1,4 +1,5 @@
 use axum::{extract::State, Json};
+use plugin_system_monitor::SystemMonitorPlugin;
 use serde::{Deserialize, Serialize};
 
 use crate::{response::ApiResponse, state::AppState};
@@ -34,8 +35,8 @@ pub(crate) async fn get_system_stats(
 
     let stats = if let Ok(plugin_arc) = manager.get_plugin_arc("system-monitor") {
         let plugin = plugin_arc.read().expect("plugin lock poisoned");
-        if plugin.has_interface("SystemMonitor") {
-            if let Some(data) = plugin.interface_data() {
+        if let Some(sys) = plugin.downcast_ref::<SystemMonitorPlugin>() {
+            if let Some(data) = sys.interface_data() {
                 serde_json::from_value(data).unwrap_or_else(|_| SystemStats::default())
             } else {
                 SystemStats::default()

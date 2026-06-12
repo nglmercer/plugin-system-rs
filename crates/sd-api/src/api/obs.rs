@@ -1,4 +1,5 @@
 use axum::{extract::State, Json};
+use plugin_obs::ObsPlugin;
 use serde::{Deserialize, Serialize};
 
 use crate::{response::ApiResponse, state::AppState};
@@ -104,9 +105,9 @@ pub(crate) async fn get_obs_status(
 
     if let Ok(plugin_arc) = manager.get_plugin_arc("obs") {
         let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-        if plugin.has_interface("ObsControl") {
+        if let Some(obs) = plugin.downcast_mut::<ObsPlugin>() {
             let args = serde_json::json!({});
-            if let Some(data) = plugin.handle_command("get_status", args) {
+            if let Some(data) = obs.handle_command("get_status", args) {
                 return Json(ApiResponse::success(ObsStatusResponse {
                     connected: data
                         .get("connected")
@@ -173,13 +174,13 @@ pub(crate) async fn connect_obs(
 
     if let Ok(plugin_arc) = manager.get_plugin_arc("obs") {
         let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-        if plugin.has_interface("ObsControl") {
+        if let Some(obs) = plugin.downcast_mut::<ObsPlugin>() {
             let args = serde_json::json!({
                 "host": req.host,
                 "port": req.port,
                 "password": req.password
             });
-            if let Some(result) = plugin.handle_command("connect", args) {
+            if let Some(result) = obs.handle_command("connect", args) {
                 if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
                     return Json(ApiResponse::success("Connected to OBS".to_string()));
                 } else {
@@ -202,9 +203,9 @@ pub(crate) async fn disconnect_obs(State(state): State<AppState>) -> Json<ApiRes
 
     if let Ok(plugin_arc) = manager.get_plugin_arc("obs") {
         let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-        if plugin.has_interface("ObsControl") {
+        if let Some(obs) = plugin.downcast_mut::<ObsPlugin>() {
             let args = serde_json::json!({});
-            if plugin.handle_command("disconnect", args).is_some() {
+            if obs.handle_command("disconnect", args).is_some() {
                 return Json(ApiResponse::success("Disconnected from OBS".to_string()));
             }
         }
@@ -219,9 +220,9 @@ pub(crate) async fn start_stream(State(state): State<AppState>) -> Json<ApiRespo
 
     if let Ok(plugin_arc) = manager.get_plugin_arc("obs") {
         let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-        if plugin.has_interface("ObsControl") {
+        if let Some(obs) = plugin.downcast_mut::<ObsPlugin>() {
             let args = serde_json::json!({});
-            if let Some(result) = plugin.handle_command("start_stream", args) {
+            if let Some(result) = obs.handle_command("start_stream", args) {
                 if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
                     return Json(ApiResponse::success("Stream started".to_string()));
                 } else {
@@ -244,9 +245,9 @@ pub(crate) async fn stop_stream(State(state): State<AppState>) -> Json<ApiRespon
 
     if let Ok(plugin_arc) = manager.get_plugin_arc("obs") {
         let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-        if plugin.has_interface("ObsControl") {
+        if let Some(obs) = plugin.downcast_mut::<ObsPlugin>() {
             let args = serde_json::json!({});
-            if let Some(result) = plugin.handle_command("stop_stream", args) {
+            if let Some(result) = obs.handle_command("stop_stream", args) {
                 if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
                     return Json(ApiResponse::success("Stream stopped".to_string()));
                 } else {
@@ -269,9 +270,9 @@ pub(crate) async fn start_record(State(state): State<AppState>) -> Json<ApiRespo
 
     if let Ok(plugin_arc) = manager.get_plugin_arc("obs") {
         let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-        if plugin.has_interface("ObsControl") {
+        if let Some(obs) = plugin.downcast_mut::<ObsPlugin>() {
             let args = serde_json::json!({});
-            if let Some(result) = plugin.handle_command("start_record", args) {
+            if let Some(result) = obs.handle_command("start_record", args) {
                 if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
                     return Json(ApiResponse::success("Recording started".to_string()));
                 } else {
@@ -294,9 +295,9 @@ pub(crate) async fn stop_record(State(state): State<AppState>) -> Json<ApiRespon
 
     if let Ok(plugin_arc) = manager.get_plugin_arc("obs") {
         let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-        if plugin.has_interface("ObsControl") {
+        if let Some(obs) = plugin.downcast_mut::<ObsPlugin>() {
             let args = serde_json::json!({});
-            if let Some(result) = plugin.handle_command("stop_record", args) {
+            if let Some(result) = obs.handle_command("stop_record", args) {
                 if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
                     return Json(ApiResponse::success("Recording stopped".to_string()));
                 } else {
@@ -321,9 +322,9 @@ pub(crate) async fn toggle_record_pause(
 
     if let Ok(plugin_arc) = manager.get_plugin_arc("obs") {
         let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-        if plugin.has_interface("ObsControl") {
+        if let Some(obs) = plugin.downcast_mut::<ObsPlugin>() {
             let args = serde_json::json!({});
-            if let Some(result) = plugin.handle_command("toggle_record_pause", args) {
+            if let Some(result) = obs.handle_command("toggle_record_pause", args) {
                 if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
                     return Json(ApiResponse::success("Record pause toggled".to_string()));
                 } else {
@@ -348,9 +349,9 @@ pub(crate) async fn get_scenes(
 
     if let Ok(plugin_arc) = manager.get_plugin_arc("obs") {
         let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-        if plugin.has_interface("ObsControl") {
+        if let Some(obs) = plugin.downcast_mut::<ObsPlugin>() {
             let args = serde_json::json!({});
-            if let Some(data) = plugin.handle_command("get_scenes", args) {
+            if let Some(data) = obs.handle_command("get_scenes", args) {
                 let current_scene = data
                     .get("current_scene")
                     .and_then(|v| v.as_str())
@@ -392,9 +393,9 @@ pub(crate) async fn set_current_scene(
 
     if let Ok(plugin_arc) = manager.get_plugin_arc("obs") {
         let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-        if plugin.has_interface("ObsControl") {
+        if let Some(obs) = plugin.downcast_mut::<ObsPlugin>() {
             let args = serde_json::json!({"scene_name": req.scene_name});
-            if let Some(result) = plugin.handle_command("set_scene", args) {
+            if let Some(result) = obs.handle_command("set_scene", args) {
                 if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
                     return Json(ApiResponse::success("Scene changed".to_string()));
                 } else {
@@ -419,9 +420,9 @@ pub(crate) async fn get_inputs(
 
     if let Ok(plugin_arc) = manager.get_plugin_arc("obs") {
         let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-        if plugin.has_interface("ObsControl") {
+        if let Some(obs) = plugin.downcast_mut::<ObsPlugin>() {
             let args = serde_json::json!({});
-            if let Some(data) = plugin.handle_command("get_inputs", args) {
+            if let Some(data) = obs.handle_command("get_inputs", args) {
                 let inputs = data
                     .get("inputs")
                     .and_then(|s| s.as_array())
@@ -466,9 +467,9 @@ pub(crate) async fn set_input_volume(
 
     if let Ok(plugin_arc) = manager.get_plugin_arc("obs") {
         let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-        if plugin.has_interface("ObsControl") {
+        if let Some(obs) = plugin.downcast_mut::<ObsPlugin>() {
             let args = serde_json::json!({"input_name": req.input_name, "volume": req.volume});
-            if let Some(result) = plugin.handle_command("set_input_volume", args) {
+            if let Some(result) = obs.handle_command("set_input_volume", args) {
                 if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
                     return Json(ApiResponse::success("Input volume set".to_string()));
                 } else {
@@ -494,9 +495,9 @@ pub(crate) async fn set_input_mute(
 
     if let Ok(plugin_arc) = manager.get_plugin_arc("obs") {
         let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-        if plugin.has_interface("ObsControl") {
+        if let Some(obs) = plugin.downcast_mut::<ObsPlugin>() {
             let args = serde_json::json!({"input_name": req.input_name, "muted": req.muted});
-            if let Some(result) = plugin.handle_command("set_input_mute", args) {
+            if let Some(result) = obs.handle_command("set_input_mute", args) {
                 if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
                     return Json(ApiResponse::success("Input mute set".to_string()));
                 } else {
@@ -519,9 +520,9 @@ pub(crate) async fn toggle_virtual_cam(State(state): State<AppState>) -> Json<Ap
 
     if let Ok(plugin_arc) = manager.get_plugin_arc("obs") {
         let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-        if plugin.has_interface("ObsControl") {
+        if let Some(obs) = plugin.downcast_mut::<ObsPlugin>() {
             let args = serde_json::json!({});
-            if let Some(result) = plugin.handle_command("toggle_virtual_cam", args) {
+            if let Some(result) = obs.handle_command("toggle_virtual_cam", args) {
                 if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
                     return Json(ApiResponse::success("Virtual camera toggled".to_string()));
                 } else {
@@ -544,9 +545,9 @@ pub(crate) async fn save_replay(State(state): State<AppState>) -> Json<ApiRespon
 
     if let Ok(plugin_arc) = manager.get_plugin_arc("obs") {
         let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-        if plugin.has_interface("ObsControl") {
+        if let Some(obs) = plugin.downcast_mut::<ObsPlugin>() {
             let args = serde_json::json!({});
-            if let Some(result) = plugin.handle_command("save_replay", args) {
+            if let Some(result) = obs.handle_command("save_replay", args) {
                 if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
                     return Json(ApiResponse::success("Replay saved".to_string()));
                 } else {
@@ -571,9 +572,9 @@ pub(crate) async fn get_transitions(
 
     if let Ok(plugin_arc) = manager.get_plugin_arc("obs") {
         let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-        if plugin.has_interface("ObsControl") {
+        if let Some(obs) = plugin.downcast_mut::<ObsPlugin>() {
             let args = serde_json::json!({});
-            if let Some(data) = plugin.handle_command("get_transitions", args) {
+            if let Some(data) = obs.handle_command("get_transitions", args) {
                 let transitions = data
                     .get("transitions")
                     .and_then(|s| s.as_array())
@@ -613,9 +614,9 @@ pub(crate) async fn set_transition(
 
     if let Ok(plugin_arc) = manager.get_plugin_arc("obs") {
         let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-        if plugin.has_interface("ObsControl") {
+        if let Some(obs) = plugin.downcast_mut::<ObsPlugin>() {
             let args = serde_json::json!({"name": req.name});
-            if let Some(result) = plugin.handle_command("set_transition", args) {
+            if let Some(result) = obs.handle_command("set_transition", args) {
                 if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
                     return Json(ApiResponse::success("Transition set".to_string()));
                 } else {
@@ -642,9 +643,9 @@ pub(crate) async fn get_scene_items(
 
     if let Ok(plugin_arc) = manager.get_plugin_arc("obs") {
         let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-        if plugin.has_interface("ObsControl") {
+        if let Some(obs) = plugin.downcast_mut::<ObsPlugin>() {
             let args = serde_json::json!({"scene_name": scene_name});
-            if let Some(data) = plugin.handle_command("get_scene_items", args) {
+            if let Some(data) = obs.handle_command("get_scene_items", args) {
                 let items = data
                     .get("items")
                     .and_then(|s| s.as_array())
@@ -682,13 +683,13 @@ pub(crate) async fn set_scene_item_enabled(
 
     if let Ok(plugin_arc) = manager.get_plugin_arc("obs") {
         let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-        if plugin.has_interface("ObsControl") {
+        if let Some(obs) = plugin.downcast_mut::<ObsPlugin>() {
             let args = serde_json::json!({
                 "scene_name": req.scene_name,
                 "item_id": req.item_id,
                 "enabled": req.enabled
             });
-            if let Some(result) = plugin.handle_command("set_scene_item_enabled", args) {
+            if let Some(result) = obs.handle_command("set_scene_item_enabled", args) {
                 if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
                     return Json(ApiResponse::success("Scene item toggled".to_string()));
                 } else {
@@ -711,9 +712,9 @@ pub(crate) async fn get_studio_mode(State(state): State<AppState>) -> Json<ApiRe
 
     if let Ok(plugin_arc) = manager.get_plugin_arc("obs") {
         let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-        if plugin.has_interface("ObsControl") {
+        if let Some(obs) = plugin.downcast_mut::<ObsPlugin>() {
             let args = serde_json::json!({});
-            if let Some(data) = plugin.handle_command("get_studio_mode", args) {
+            if let Some(data) = obs.handle_command("get_studio_mode", args) {
                 let enabled = data
                     .get("enabled")
                     .and_then(|v| v.as_bool())
@@ -735,9 +736,9 @@ pub(crate) async fn set_studio_mode(
 
     if let Ok(plugin_arc) = manager.get_plugin_arc("obs") {
         let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-        if plugin.has_interface("ObsControl") {
+        if let Some(obs) = plugin.downcast_mut::<ObsPlugin>() {
             let args = serde_json::json!({"enabled": req.enabled});
-            if let Some(result) = plugin.handle_command("set_studio_mode", args) {
+            if let Some(result) = obs.handle_command("set_studio_mode", args) {
                 if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
                     return Json(ApiResponse::success("Studio mode set".to_string()));
                 } else {

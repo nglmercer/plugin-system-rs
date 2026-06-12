@@ -29,6 +29,10 @@ impl TimerPlugin {
     pub fn list_timers(&self) -> Vec<String> {
         self.timers.keys().cloned().collect()
     }
+
+    pub fn interface_ids(&self) -> Vec<&'static str> {
+        vec!["Timer"]
+    }
 }
 
 #[plugin_system::plugin_export]
@@ -52,9 +56,5 @@ impl Plugin for TimerPlugin {
 
     fn plugin_type_name(&self) -> &'static str {
         std::any::type_name::<Self>()
-    }
-
-    fn interface_ids(&self) -> Vec<&'static str> {
-        vec!["Timer"]
     }
 }

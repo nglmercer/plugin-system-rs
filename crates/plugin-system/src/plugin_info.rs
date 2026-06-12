@@ -6,7 +6,6 @@ pub struct PluginInfo {
     pub version: String,
     pub authors: Vec<String>,
     pub dependencies: Vec<String>,
-    pub interfaces: Vec<String>,
     pub public_methods: Vec<String>,
 }
 

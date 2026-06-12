@@ -1,4 +1,5 @@
 use axum::{extract::State, Json};
+use plugin_key_simulator::KeySimulatorPlugin;
 use serde::{Deserialize, Serialize};
 
 use crate::{response::ApiResponse, state::AppState};
@@ -29,8 +30,12 @@ pub(crate) async fn send_hotkey(
         guard
             .with_plugin_mut("key-simulator", |plugin| {
                 plugin
-                    .simulate_keys(&keys_for_sim)
-                    .map_err(|e| e.to_string())
+                    .downcast_mut::<KeySimulatorPlugin>()
+                    .ok_or("Key simulator plugin not available".to_string())
+                    .and_then(|p| {
+                        p.simulate_keys_plugin(&keys_for_sim)
+                            .map_err(|e| e.to_string())
+                    })
             })
             .unwrap_or(Err("Key simulator plugin not available".to_string()))
     })
@@ -86,8 +91,12 @@ pub(crate) async fn record_hotkey(
         guard
             .with_plugin("key-simulator", |plugin| {
                 plugin
-                    .listen_for_combo(req.timeout_ms)
-                    .map_err(|e| e.to_string())
+                    .downcast_ref::<KeySimulatorPlugin>()
+                    .ok_or("Key simulator plugin not available".to_string())
+                    .and_then(|p| {
+                        p.listen_for_combo_plugin(req.timeout_ms)
+                            .map_err(|e| e.to_string())
+                    })
             })
             .unwrap_or(Err("Key simulator plugin not available".to_string()))
     })
@@ -109,7 +118,9 @@ pub(crate) async fn reset_hotkey_recording(
     let pm = state.plugin_manager.plugin_manager().clone();
     let guard = pm.blocking_read();
     let _ = guard.with_plugin("key-simulator", |plugin| {
-        plugin.reset_recording_state();
+        if let Some(p) = plugin.downcast_ref::<KeySimulatorPlugin>() {
+            p.reset_recording_state_plugin();
+        }
     });
     log::info!("[Hotkey] Recording state reset");
     Json(ApiResponse::success("Recording state reset".to_string()))
