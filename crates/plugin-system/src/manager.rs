@@ -224,11 +224,10 @@ impl PluginManager {
                             return Err(PluginError::SymbolNotFound { symbol: meta_sym });
                         }
                     };
-                    lib.get(fallback.as_bytes()).map_err(|_| {
-                        PluginError::SymbolNotFound {
+                    lib.get(fallback.as_bytes())
+                        .map_err(|_| PluginError::SymbolNotFound {
                             symbol: meta_sym.clone(),
-                        }
-                    })?
+                        })?
                 }
             };
             *sym
@@ -245,11 +244,10 @@ impl PluginManager {
                             return Err(PluginError::SymbolNotFound { symbol: free_sym });
                         }
                     };
-                    lib.get(fallback.as_bytes()).map_err(|_| {
-                        PluginError::SymbolNotFound {
+                    lib.get(fallback.as_bytes())
+                        .map_err(|_| PluginError::SymbolNotFound {
                             symbol: free_sym.clone(),
-                        }
-                    })?
+                        })?
                 }
             };
             *sym
@@ -317,16 +315,13 @@ impl PluginManager {
                     let fallback = match &prefix {
                         Some(_) => "plugin_create",
                         None => {
-                            return Err(PluginError::SymbolNotFound {
-                                symbol: sym_name,
-                            });
+                            return Err(PluginError::SymbolNotFound { symbol: sym_name });
                         }
                     };
-                    lib.get(fallback.as_bytes()).map_err(|_| {
-                        PluginError::SymbolNotFound {
+                    lib.get(fallback.as_bytes())
+                        .map_err(|_| PluginError::SymbolNotFound {
                             symbol: sym_name.clone(),
-                        }
-                    })?
+                        })?
                 }
             };
             *sym
@@ -344,16 +339,13 @@ impl PluginManager {
                     let fallback = match &prefix {
                         Some(_) => "plugin_destroy",
                         None => {
-                            return Err(PluginError::SymbolNotFound {
-                                symbol: sym_name,
-                            });
+                            return Err(PluginError::SymbolNotFound { symbol: sym_name });
                         }
                     };
-                    lib.get(fallback.as_bytes()).map_err(|_| {
-                        PluginError::SymbolNotFound {
+                    lib.get(fallback.as_bytes())
+                        .map_err(|_| PluginError::SymbolNotFound {
                             symbol: sym_name.clone(),
-                        }
-                    })?
+                        })?
                 }
             };
             *sym

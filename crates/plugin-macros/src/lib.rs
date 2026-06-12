@@ -295,8 +295,8 @@ fn generate_plugin_export_all(
                         let ident = &p.path.segments.last().unwrap().ident;
                         match ident.to_string().as_str() {
                             "String" => quote! { *mut std::ffi::c_char },
-                            "u64" | "u32" | "u16" | "u8" | "i64" | "i32" | "i16" | "i8"
-                            | "f64" | "f32" | "bool" => quote! { #ty },
+                            "u64" | "u32" | "u16" | "u8" | "i64" | "i32" | "i16" | "i8" | "f64"
+                            | "f32" | "bool" => quote! { #ty },
                             _ => quote! { *const std::ffi::c_void },
                         }
                     }
