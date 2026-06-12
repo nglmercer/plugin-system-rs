@@ -421,7 +421,7 @@ fn map_key_to_rdev(key: &str) -> Option<rdev::Key> {
     })
 }
 
-#[plugin_system::plugin_export("key_simulator")]
+#[plugin_system::plugin_export]
 impl Plugin for KeySimulatorPlugin {
     fn metadata(&self) -> PluginMetadata {
         plugin_system::plugin_metadata! {

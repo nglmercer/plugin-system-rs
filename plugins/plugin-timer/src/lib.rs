@@ -35,7 +35,7 @@ impl TimerPlugin {
     }
 }
 
-#[plugin_system::plugin_export("timer")]
+#[plugin_system::plugin_export]
 impl Plugin for TimerPlugin {
     fn metadata(&self) -> PluginMetadata {
         plugin_system::plugin_metadata! {

@@ -230,7 +230,7 @@ impl SystemMonitor for SystemMonitorPlugin {
     }
 }
 
-#[plugin_system::plugin_export("system_monitor")]
+#[plugin_system::plugin_export]
 impl Plugin for SystemMonitorPlugin {
     fn metadata(&self) -> PluginMetadata {
         plugin_system::plugin_metadata! {

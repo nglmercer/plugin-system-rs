@@ -118,6 +118,43 @@ fn parse_export_args(attr: TokenStream) -> syn::Result<ExportArgs> {
     syn::parse(attr)
 }
 
+/// Derive a prefix from the type name.
+/// e.g. SystemMonitorPlugin -> "system_monitor"
+///      VolumeMasterPlugin -> "volume_master"
+///      ObsPlugin -> "obs"
+fn derive_prefix_from_type(ty: &Type) -> String {
+    let type_name = match ty {
+        Type::Path(p) => p.path.segments.last().map(|s| s.ident.to_string()).unwrap_or_default(),
+        _ => return String::new(),
+    };
+
+    // Strip "Plugin" suffix
+    let name = type_name.strip_suffix("Plugin").unwrap_or(&type_name);
+
+    if name.is_empty() {
+        return String::new();
+    }
+
+    // Convert CamelCase to snake_case
+    let mut result = String::new();
+    for (i, ch) in name.chars().enumerate() {
+        if ch.is_uppercase() {
+            if i > 0 {
+                // Check if previous char was lowercase or if next char is lowercase (for sequences like "HTTPServer")
+                let prev = name.chars().nth(i - 1).unwrap_or(' ');
+                if prev.is_lowercase() || (prev.is_uppercase() && name.chars().nth(i + 1).map_or(false, |c| c.is_lowercase())) {
+                    result.push('_');
+                }
+            }
+            result.push(ch.to_lowercase().next().unwrap());
+        } else {
+            result.push(ch);
+        }
+    }
+
+    result
+}
+
 fn metadata_exports(self_ty: &Type, prefix: Option<&str>) -> proc_macro2::TokenStream {
     let meta_fn_name = match prefix {
         Some(p) => format_ident!("plugin_{}_metadata_json", p),
@@ -176,14 +213,18 @@ fn generate_plugin_export(
 
     let impl_items = &input.items;
     let self_ty = input.self_ty.as_ref();
-    let prefix = args.prefix.as_deref();
-    let metadata_export_tokens = metadata_exports(self_ty, prefix);
+    let resolved_prefix = match args.prefix.as_deref() {
+        Some(p) => p.to_string(),
+        None => derive_prefix_from_type(self_ty),
+    };
+    let prefix_opt = if resolved_prefix.is_empty() { None } else { Some(resolved_prefix.as_str()) };
+    let metadata_export_tokens = metadata_exports(self_ty, prefix_opt);
 
-    let create_fn_name = match prefix {
+    let create_fn_name = match prefix_opt {
         Some(p) => format_ident!("plugin_{}_create", p),
         None => format_ident!("plugin_create"),
     };
-    let destroy_fn_name = match prefix {
+    let destroy_fn_name = match prefix_opt {
         Some(p) => format_ident!("plugin_{}_destroy", p),
         None => format_ident!("plugin_destroy"),
     };
@@ -240,7 +281,11 @@ fn generate_plugin_export_all(
 
     let impl_items = &input.items;
     let impl_attrs = &input.attrs;
-    let prefix = args.prefix.as_deref();
+    let resolved_prefix = match args.prefix.as_deref() {
+        Some(p) => p.to_string(),
+        None => derive_prefix_from_type(self_ty),
+    };
+    let prefix_opt = if resolved_prefix.is_empty() { None } else { Some(resolved_prefix.as_str()) };
 
     let mut method_exports = Vec::new();
     let mut method_names = Vec::new();
@@ -258,7 +303,7 @@ fn generate_plugin_export_all(
                 continue;
             }
 
-            let export_fn_name = match prefix {
+            let export_fn_name = match prefix_opt {
                 Some(p) => format_ident!("plugin_{}_method_{}", p, method_name),
                 None => format_ident!("plugin_method_{}", method_name),
             };
@@ -413,13 +458,13 @@ fn generate_plugin_export_all(
         .collect();
 
     let _all_method_names = method_names;
-    let metadata_export_tokens = metadata_exports(self_ty, prefix);
+    let metadata_export_tokens = metadata_exports(self_ty, prefix_opt);
 
-    let create_fn_name = match prefix {
+    let create_fn_name = match prefix_opt {
         Some(p) => format_ident!("plugin_{}_create", p),
         None => format_ident!("plugin_create"),
     };
-    let destroy_fn_name = match prefix {
+    let destroy_fn_name = match prefix_opt {
         Some(p) => format_ident!("plugin_{}_destroy", p),
         None => format_ident!("plugin_destroy"),
     };

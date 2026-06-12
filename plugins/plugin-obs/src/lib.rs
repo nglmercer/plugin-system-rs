@@ -289,7 +289,7 @@ impl ObsPlugin {
     }
 }
 
-#[plugin_system::plugin_export("obs")]
+#[plugin_system::plugin_export]
 impl Plugin for ObsPlugin {
     fn metadata(&self) -> PluginMetadata {
         plugin_system::plugin_metadata! {
