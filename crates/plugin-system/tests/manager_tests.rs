@@ -135,6 +135,7 @@ fn test_with_plugin_mut() {
     let result = manager.with_plugin_mut("timer", |plugin| {
         plugin.on_load(&plugin_system::PluginContext::new(
             manager.registry().clone(),
+            manager.command_registry().clone(),
         ));
     });
     assert!(result.is_ok());

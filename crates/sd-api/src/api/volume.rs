@@ -99,15 +99,14 @@ fn parse_volume_data(data: serde_json::Value) -> Option<VolumeDataResponse> {
 pub(crate) async fn get_volume_state(
     State(state): State<AppState>,
 ) -> Json<ApiResponse<VolumeDataResponse>> {
-    let plugin_manager = state.plugin_manager.plugin_manager();
-    let manager = plugin_manager.read().await;
+    let pm = state.plugin_manager.plugin_manager();
+    let manager = pm.read().await;
 
+    // First refresh the data
+    let _ = crate::api::helpers::call_plugin_ok(&manager, "volume-master", "refresh", serde_json::json!({})).await;
+
+    // Then read the interface data
     if let Ok(plugin_arc) = manager.get_plugin_arc("volume-master") {
-        // Refresh data before reading
-        {
-            let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-            plugin.handle_command("refresh", serde_json::json!({}));
-        }
         let plugin = plugin_arc.read().expect("plugin lock poisoned");
         if let Some(data) = plugin.interface_data() {
             if let Some(resp) = parse_volume_data(data) {
@@ -122,14 +121,14 @@ pub(crate) async fn get_volume_state(
 pub(crate) async fn get_app_volumes(
     State(state): State<AppState>,
 ) -> Json<ApiResponse<Vec<AppVolumeResponse>>> {
-    let plugin_manager = state.plugin_manager.plugin_manager();
-    let manager = plugin_manager.read().await;
+    let pm = state.plugin_manager.plugin_manager();
+    let manager = pm.read().await;
 
+    // First refresh the data
+    let _ = crate::api::helpers::call_plugin_ok(&manager, "volume-master", "refresh", serde_json::json!({})).await;
+
+    // Then read the interface data
     if let Ok(plugin_arc) = manager.get_plugin_arc("volume-master") {
-        {
-            let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-            plugin.handle_command("refresh", serde_json::json!({}));
-        }
         let plugin = plugin_arc.read().expect("plugin lock poisoned");
         if let Some(data) = plugin.interface_data() {
             let apps = data
@@ -161,102 +160,38 @@ pub(crate) async fn set_master_volume(
     State(state): State<AppState>,
     Json(req): Json<SetVolumeRequest>,
 ) -> Json<ApiResponse<String>> {
-    let plugin_manager = state.plugin_manager.plugin_manager();
-    let manager = plugin_manager.read().await;
-
-    if let Ok(plugin_arc) = manager.get_plugin_arc("volume-master") {
-        let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-        let args = serde_json::json!({"volume": req.volume});
-        if let Some(result) = plugin.handle_command("set_volume", args) {
-            if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
-                return Json(ApiResponse::success("Volume set".to_string()));
-            } else {
-                let error = result
-                    .get("error")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("Unknown error");
-                return Json(ApiResponse::error(error.to_string()));
-            }
-        }
-    }
-
-    Json(ApiResponse::error("Volume plugin not available"))
+    let pm = state.plugin_manager.plugin_manager();
+    let manager = pm.read().await;
+    let args = serde_json::json!({"volume": req.volume});
+    Json(crate::api::helpers::call_plugin_ok_response(&manager, "volume-master", "set_volume", args, "Volume set").await)
 }
 
 pub(crate) async fn set_master_mute(
     State(state): State<AppState>,
     Json(req): Json<SetMuteRequest>,
 ) -> Json<ApiResponse<String>> {
-    let plugin_manager = state.plugin_manager.plugin_manager();
-    let manager = plugin_manager.read().await;
-
-    if let Ok(plugin_arc) = manager.get_plugin_arc("volume-master") {
-        let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-        let args = serde_json::json!({"muted": req.muted});
-        if let Some(result) = plugin.handle_command("set_mute", args) {
-            if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
-                return Json(ApiResponse::success("Mute set".to_string()));
-            } else {
-                let error = result
-                    .get("error")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("Unknown error");
-                return Json(ApiResponse::error(error.to_string()));
-            }
-        }
-    }
-
-    Json(ApiResponse::error("Volume plugin not available"))
+    let pm = state.plugin_manager.plugin_manager();
+    let manager = pm.read().await;
+    let args = serde_json::json!({"muted": req.muted});
+    Json(crate::api::helpers::call_plugin_ok_response(&manager, "volume-master", "set_mute", args, "Mute set").await)
 }
 
 pub(crate) async fn set_app_volume(
     State(state): State<AppState>,
     Json(req): Json<SetAppVolumeRequest>,
 ) -> Json<ApiResponse<String>> {
-    let plugin_manager = state.plugin_manager.plugin_manager();
-    let manager = plugin_manager.read().await;
-
-    if let Ok(plugin_arc) = manager.get_plugin_arc("volume-master") {
-        let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-        let args = serde_json::json!({"app_name": req.app_name, "volume": req.volume});
-        if let Some(result) = plugin.handle_command("set_app_volume", args) {
-            if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
-                return Json(ApiResponse::success("App volume set".to_string()));
-            } else {
-                let error = result
-                    .get("error")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("Unknown error");
-                return Json(ApiResponse::error(error.to_string()));
-            }
-        }
-    }
-
-    Json(ApiResponse::error("Volume plugin not available"))
+    let pm = state.plugin_manager.plugin_manager();
+    let manager = pm.read().await;
+    let args = serde_json::json!({"app_name": req.app_name, "volume": req.volume});
+    Json(crate::api::helpers::call_plugin_ok_response(&manager, "volume-master", "set_app_volume", args, "App volume set").await)
 }
 
 pub(crate) async fn set_app_mute(
     State(state): State<AppState>,
     Json(req): Json<SetAppMuteRequest>,
 ) -> Json<ApiResponse<String>> {
-    let plugin_manager = state.plugin_manager.plugin_manager();
-    let manager = plugin_manager.read().await;
-
-    if let Ok(plugin_arc) = manager.get_plugin_arc("volume-master") {
-        let mut plugin = plugin_arc.write().expect("plugin lock poisoned");
-        let args = serde_json::json!({"app_name": req.app_name, "muted": req.muted});
-        if let Some(result) = plugin.handle_command("set_app_mute", args) {
-            if result.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
-                return Json(ApiResponse::success("App mute set".to_string()));
-            } else {
-                let error = result
-                    .get("error")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("Unknown error");
-                return Json(ApiResponse::error(error.to_string()));
-            }
-        }
-    }
-
-    Json(ApiResponse::error("Volume plugin not available"))
+    let pm = state.plugin_manager.plugin_manager();
+    let manager = pm.read().await;
+    let args = serde_json::json!({"app_name": req.app_name, "muted": req.muted});
+    Json(crate::api::helpers::call_plugin_ok_response(&manager, "volume-master", "set_app_mute", args, "App mute set").await)
 }

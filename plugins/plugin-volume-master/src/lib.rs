@@ -1,4 +1,4 @@
-use plugin_system::{Plugin, PluginContext, PluginMetadata};
+use plugin_system::{command, CommandResult, Plugin, PluginContext, PluginMetadata};
 use serde::{Deserialize, Serialize};
 
 #[cfg(target_os = "linux")]
@@ -85,59 +85,7 @@ impl VolumeMasterPlugin {
         Self { controller, data }
     }
 
-    pub fn interface_ids(&self) -> Vec<&'static str> {
-        vec!["VolumeMaster"]
-    }
-
-    pub fn interface_data(&self) -> Option<serde_json::Value> {
-        serde_json::to_value(&self.data).ok()
-    }
-
-    pub fn handle_command(
-        &mut self,
-        method: &str,
-        args: serde_json::Value,
-    ) -> Option<serde_json::Value> {
-        match method {
-            "refresh" => {
-                self.refresh();
-                Some(serde_json::json!({"ok": true}))
-            }
-            "set_volume" => {
-                let volume = args.get("volume").and_then(|v| v.as_f64()).unwrap_or(50.0) as f32;
-                match self.set_volume(volume) {
-                    Ok(()) => Some(serde_json::json!({"ok": true})),
-                    Err(e) => Some(serde_json::json!({"ok": false, "error": e})),
-                }
-            }
-            "set_mute" => {
-                let muted = args.get("muted").and_then(|v| v.as_bool()).unwrap_or(false);
-                match self.set_muted(muted) {
-                    Ok(()) => Some(serde_json::json!({"ok": true})),
-                    Err(e) => Some(serde_json::json!({"ok": false, "error": e})),
-                }
-            }
-            "set_app_volume" => {
-                let app_name = args.get("app_name").and_then(|v| v.as_str()).unwrap_or("");
-                let volume = args.get("volume").and_then(|v| v.as_f64()).unwrap_or(50.0) as f32;
-                match self.set_app_volume(app_name, volume) {
-                    Ok(()) => Some(serde_json::json!({"ok": true})),
-                    Err(e) => Some(serde_json::json!({"ok": false, "error": e})),
-                }
-            }
-            "set_app_mute" => {
-                let app_name = args.get("app_name").and_then(|v| v.as_str()).unwrap_or("");
-                let muted = args.get("muted").and_then(|v| v.as_bool()).unwrap_or(false);
-                match self.set_app_muted(app_name, muted) {
-                    Ok(()) => Some(serde_json::json!({"ok": true})),
-                    Err(e) => Some(serde_json::json!({"ok": false, "error": e})),
-                }
-            }
-            _ => None,
-        }
-    }
-
-    pub fn refresh(&mut self) {
+    fn refresh_internal(&mut self) {
         if let Ok(state) = self.controller.get_master_volume() {
             self.data.state = state;
         }
@@ -146,34 +94,44 @@ impl VolumeMasterPlugin {
         }
     }
 
-    pub fn set_volume(&mut self, volume: f32) -> Result<(), String> {
-        let clamped = volume.clamp(0.0, 100.0);
+    #[command("refresh")]
+    fn vol_refresh(&mut self) -> CommandResult {
+        self.refresh_internal();
+        Ok(serde_json::json!({"ok": true}))
+    }
+
+    #[command("set_volume")]
+    fn vol_set_volume(&mut self, volume: f64) -> CommandResult {
+        let clamped = (volume as f32).clamp(0.0, 100.0);
         self.controller.set_master_volume(clamped)?;
         self.data.state.master_volume = clamped;
-        Ok(())
+        Ok(serde_json::json!({"ok": true}))
     }
 
-    pub fn set_muted(&mut self, muted: bool) -> Result<(), String> {
+    #[command("set_mute")]
+    fn vol_set_muted(&mut self, muted: bool) -> CommandResult {
         self.controller.set_muted(muted)?;
         self.data.state.muted = muted;
-        Ok(())
+        Ok(serde_json::json!({"ok": true}))
     }
 
-    pub fn set_app_volume(&mut self, app_name: &str, volume: f32) -> Result<(), String> {
-        let clamped = volume.clamp(0.0, 100.0);
-        self.controller.set_app_volume(app_name, clamped)?;
+    #[command("set_app_volume")]
+    fn vol_set_app_volume(&mut self, app_name: String, volume: f64) -> CommandResult {
+        let clamped = (volume as f32).clamp(0.0, 100.0);
+        self.controller.set_app_volume(&app_name, clamped)?;
         if let Some(app) = self.data.apps.iter_mut().find(|a| a.name == app_name) {
             app.volume = clamped;
         }
-        Ok(())
+        Ok(serde_json::json!({"ok": true}))
     }
 
-    pub fn set_app_muted(&mut self, app_name: &str, muted: bool) -> Result<(), String> {
-        self.controller.set_app_muted(app_name, muted)?;
+    #[command("set_app_mute")]
+    fn vol_set_app_muted(&mut self, app_name: String, muted: bool) -> CommandResult {
+        self.controller.set_app_muted(&app_name, muted)?;
         if let Some(app) = self.data.apps.iter_mut().find(|a| a.name == app_name) {
             app.muted = muted;
         }
-        Ok(())
+        Ok(serde_json::json!({"ok": true}))
     }
 }
 
@@ -190,7 +148,7 @@ impl Plugin for VolumeMasterPlugin {
 
     fn on_load(&mut self, _ctx: &PluginContext) {
         log::info!("VolumeMasterPlugin loaded");
-        self.refresh();
+        self.refresh_internal();
     }
 
     fn on_unload(&mut self) {
@@ -201,19 +159,40 @@ impl Plugin for VolumeMasterPlugin {
         std::any::type_name::<Self>()
     }
 
+    fn interface_ids(&self) -> Vec<&'static str> {
+        vec!["VolumeMaster"]
+    }
+
+    fn interface_data(&self) -> Option<serde_json::Value> {
+        serde_json::to_value(&self.data).ok()
+    }
+
     fn handle_command(
         &mut self,
         method: &str,
         args: serde_json::Value,
     ) -> Option<serde_json::Value> {
-        VolumeMasterPlugin::handle_command(self, method, args)
-    }
-
-    fn interface_ids(&self) -> Vec<&'static str> {
-        VolumeMasterPlugin::interface_ids(self)
-    }
-
-    fn interface_data(&self) -> Option<serde_json::Value> {
-        VolumeMasterPlugin::interface_data(self)
+        match method {
+            "refresh" => plugin_system::command_to_json(self.vol_refresh()),
+            "set_volume" => {
+                let volume = args.get("volume").and_then(|v| v.as_f64()).unwrap_or(50.0);
+                plugin_system::command_to_json(self.vol_set_volume(volume))
+            }
+            "set_mute" => {
+                let muted = args.get("muted").and_then(|v| v.as_bool()).unwrap_or(false);
+                plugin_system::command_to_json(self.vol_set_muted(muted))
+            }
+            "set_app_volume" => {
+                let app_name = args.get("app_name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let volume = args.get("volume").and_then(|v| v.as_f64()).unwrap_or(50.0);
+                plugin_system::command_to_json(self.vol_set_app_volume(app_name, volume))
+            }
+            "set_app_mute" => {
+                let app_name = args.get("app_name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let muted = args.get("muted").and_then(|v| v.as_bool()).unwrap_or(false);
+                plugin_system::command_to_json(self.vol_set_app_muted(app_name, muted))
+            }
+            _ => None,
+        }
     }
 }

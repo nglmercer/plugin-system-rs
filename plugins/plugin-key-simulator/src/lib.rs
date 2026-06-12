@@ -1,4 +1,4 @@
-use plugin_system::{Plugin, PluginContext, PluginMetadata};
+use plugin_system::{command, CommandResult, Plugin, PluginContext, PluginMetadata};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex, OnceLock};
@@ -119,29 +119,7 @@ impl KeySimulatorPlugin {
         Self
     }
 
-    pub fn interface_ids(&self) -> Vec<&'static str> {
-        vec!["KeySimulator"]
-    }
-
-    pub fn simulate_keys_plugin(&mut self, keys: &[String]) -> plugin_system::Result<()> {
-        KeySimulator::simulate_keys(self, keys)
-            .map_err(|e| plugin_system::PluginError::PluginNotFound { name: e })
-    }
-
-    pub fn listen_for_combo_plugin(&self, timeout_ms: u64) -> plugin_system::Result<String> {
-        self.listen_for_combo(timeout_ms)
-            .map_err(|e| plugin_system::PluginError::PluginNotFound { name: e })
-    }
-
-    pub fn reset_recording_state_plugin(&self) {
-        Self::reset_recording_state();
-    }
-
-    pub fn reset_recording_state() {
-        LISTENING.store(false, Ordering::SeqCst);
-    }
-
-    pub fn listen_for_combo(&self, timeout_ms: u64) -> Result<String, String> {
+    fn listen_for_combo(&self, timeout_ms: u64) -> Result<String, String> {
         if LISTENING.swap(true, Ordering::SeqCst) {
             return Err("Already recording".to_string());
         }
@@ -223,6 +201,28 @@ impl KeySimulatorPlugin {
         };
 
         result
+    }
+
+    #[command("simulate_keys")]
+    fn key_simulate_keys(&mut self, keys: Vec<String>) -> CommandResult {
+        match self.simulate_keys(&keys) {
+            Ok(()) => Ok(serde_json::json!({"ok": true})),
+            Err(e) => Ok(serde_json::json!({"ok": false, "error": e})),
+        }
+    }
+
+    #[command("listen_for_combo")]
+    fn key_listen_for_combo(&mut self, timeout_ms: u64) -> CommandResult {
+        match self.listen_for_combo(timeout_ms) {
+            Ok(combo) => Ok(serde_json::json!({"combo": combo})),
+            Err(e) => Ok(serde_json::json!({"ok": false, "error": e})),
+        }
+    }
+
+    #[command("reset_recording")]
+    fn key_reset_recording(&mut self) -> CommandResult {
+        LISTENING.store(false, Ordering::SeqCst);
+        Ok(serde_json::json!({"ok": true}))
     }
 }
 
@@ -444,6 +444,10 @@ impl Plugin for KeySimulatorPlugin {
         std::any::type_name::<Self>()
     }
 
+    fn interface_ids(&self) -> Vec<&'static str> {
+        vec!["KeySimulator"]
+    }
+
     fn handle_command(
         &mut self,
         method: &str,
@@ -460,30 +464,14 @@ impl Plugin for KeySimulatorPlugin {
                             .collect()
                     })
                     .unwrap_or_default();
-                match self.simulate_keys_plugin(&keys) {
-                    Ok(()) => Some(serde_json::json!({"ok": true})),
-                    Err(e) => Some(serde_json::json!({"ok": false, "error": e.to_string()})),
-                }
+                plugin_system::command_to_json(self.key_simulate_keys(keys))
             }
             "listen_for_combo" => {
-                let timeout = args
-                    .get("timeout_ms")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(15000);
-                match self.listen_for_combo_plugin(timeout) {
-                    Ok(combo) => Some(serde_json::json!({"combo": combo})),
-                    Err(e) => Some(serde_json::json!({"ok": false, "error": e.to_string()})),
-                }
+                let timeout = args.get("timeout_ms").and_then(|v| v.as_u64()).unwrap_or(15000);
+                plugin_system::command_to_json(self.key_listen_for_combo(timeout))
             }
-            "reset_recording" => {
-                self.reset_recording_state_plugin();
-                Some(serde_json::json!({"ok": true}))
-            }
+            "reset_recording" => plugin_system::command_to_json(self.key_reset_recording()),
             _ => None,
         }
-    }
-
-    fn interface_ids(&self) -> Vec<&'static str> {
-        KeySimulatorPlugin::interface_ids(self)
     }
 }

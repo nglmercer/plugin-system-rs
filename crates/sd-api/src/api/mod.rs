@@ -2,6 +2,7 @@ pub(crate) mod actions;
 pub(crate) mod dashboard;
 pub(crate) mod dashboard_handlers;
 pub(crate) mod devices;
+pub(crate) mod helpers;
 pub(crate) mod hotkeys;
 pub(crate) mod obs;
 pub(crate) mod plugins;

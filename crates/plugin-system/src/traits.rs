@@ -21,6 +21,17 @@ impl PluginMetadata {
     }
 }
 
+/// Result type for command handlers.
+pub type CommandResult = Result<serde_json::Value, String>;
+
+/// Convert a CommandResult to Option<Value> for backward compatibility.
+pub fn command_to_json(result: CommandResult) -> Option<serde_json::Value> {
+    match result {
+        Ok(value) => Some(value),
+        Err(e) => Some(serde_json::json!({"ok": false, "error": e})),
+    }
+}
+
 pub trait Plugin: Any + Send + Sync {
     fn metadata(&self) -> PluginMetadata;
 

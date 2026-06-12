@@ -1,14 +1,19 @@
+use crate::handler::{CommandHandler, SharedCommandRegistry};
 use crate::registry::{PluginRegistry, SharedRegistry};
 use crate::traits::Plugin;
 use std::sync::Arc;
 
 pub struct PluginContext {
     pub registry: SharedRegistry,
+    pub command_registry: SharedCommandRegistry,
 }
 
 impl PluginContext {
-    pub fn new(registry: SharedRegistry) -> Self {
-        Self { registry }
+    pub fn new(registry: SharedRegistry, command_registry: SharedCommandRegistry) -> Self {
+        Self {
+            registry,
+            command_registry,
+        }
     }
 
     pub fn registry(&self) -> std::sync::RwLockReadGuard<'_, PluginRegistry> {
@@ -21,6 +26,24 @@ impl PluginContext {
         self.registry
             .write()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    pub fn command_registry(&self) -> std::sync::RwLockReadGuard<'_, crate::handler::CommandRegistry> {
+        self.command_registry
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    pub fn command_registry_mut(&self) -> std::sync::RwLockWriteGuard<'_, crate::handler::CommandRegistry> {
+        self.command_registry
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    /// Register a command handler for a plugin.
+    pub fn register_handler(&self, plugin_name: &str, handler: Box<dyn CommandHandler>) {
+        let mut registry = self.command_registry_mut();
+        registry.register(plugin_name, handler);
     }
 
     pub fn get_plugin(&self, name: &str) -> Option<Arc<std::sync::RwLock<Box<dyn Plugin>>>> {

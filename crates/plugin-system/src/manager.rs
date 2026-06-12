@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 use crate::context::PluginContext;
 use crate::error::{PluginError, Result};
+use crate::handler::{new_shared_command_registry, SharedCommandRegistry};
 use crate::loader::{FileLoader, PluginLoader};
 use crate::registry::{new_shared_registry, SharedRegistry};
 use crate::traits::{Plugin, PluginMetadata};
@@ -46,6 +47,7 @@ struct LoadedPlugin {
 
 pub struct PluginManager {
     registry: SharedRegistry,
+    command_registry: SharedCommandRegistry,
     loaded: HashMap<String, LoadedPlugin>,
 }
 
@@ -53,12 +55,17 @@ impl PluginManager {
     pub fn new() -> Self {
         Self {
             registry: new_shared_registry(),
+            command_registry: new_shared_command_registry(),
             loaded: HashMap::new(),
         }
     }
 
     pub fn registry(&self) -> SharedRegistry {
         self.registry.clone()
+    }
+
+    pub fn command_registry(&self) -> SharedCommandRegistry {
+        self.command_registry.clone()
     }
 
     pub fn load_plugin_from_loader(
@@ -469,7 +476,7 @@ impl PluginManager {
         self.loaded.insert(name.clone(), loaded_plugin);
 
         {
-            let ctx = PluginContext::new(self.registry.clone());
+            let ctx = PluginContext::new(self.registry.clone(), self.command_registry.clone());
             let registry = self.read_registry(self.registry.read(), "PluginRegistry")?;
             if let Some(plugin_arc) = registry.get_by_name(&name) {
                 let mut plugin = self.write_plugin(plugin_arc.write(), &name)?;
