@@ -37,6 +37,20 @@ export function setToken(value: string | null) {
   }
 }
 
+/**
+ * An API URL with the token in the query string.
+ *
+ * For URLs the browser fetches on its own — `<img src>`, `<a download>`, a
+ * `WebSocket` — which never reach the `fetch` wrapper and cannot carry a
+ * header. Prefer the header everywhere else: a token in a URL ends up in logs
+ * and history.
+ */
+export function authedUrl(path: string): string {
+  if (!token) return path;
+  const separator = path.includes("?") ? "&" : "?";
+  return `${path}${separator}token=${encodeURIComponent(token)}`;
+}
+
 /** Whether a request should carry our credential. */
 function isApiRequest(url: string): boolean {
   let parsed: URL;

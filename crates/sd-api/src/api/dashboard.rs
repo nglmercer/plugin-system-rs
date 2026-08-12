@@ -41,18 +41,13 @@ pub struct DashboardLayout {
     /// Cell width / height. 1 gives square keys like deck hardware.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub aspect: Option<f32>,
-    /// Renamed because the client sends `customCss`. Without this the field
-    /// silently never round-tripped: the server wrote `custom_css`, the
-    /// client read `customCss`, and every saved stylesheet was lost on
-    /// restart. `alias` keeps any snake_case file already on disk loadable.
-    #[serde(
-        default,
-        rename = "customCss",
-        alias = "custom_css",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub custom_css: Option<String>,
 }
+
+// The custom-CSS field is gone. Letting a dashboard carry a stylesheet meant
+// any saved layout could restyle — or hide — the whole app, including the
+// controls needed to undo it, and a layout is synced between devices. Existing
+// files keep loading: an unknown `customCss` key is ignored on read and simply
+// not written back.
 
 impl Default for DashboardLayout {
     fn default() -> Self {
@@ -62,7 +57,6 @@ impl Default for DashboardLayout {
             columns: 4,
             rows: Some(3),
             aspect: Some(1.35),
-            custom_css: None,
         }
     }
 }

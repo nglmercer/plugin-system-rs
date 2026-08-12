@@ -1,3 +1,17 @@
+/* Buttons inherit the page's typography by default.
+ *
+ * Several controls are <button> purely so they are focusable and keyboard
+ * operable — the wizard's step rail, modal close buttons, library tiles. Those
+ * arrived with the user-agent's serif-ish font and default metrics, which is
+ * why they rendered as grey boxes among styled UI. Components still set their
+ * own colours and borders; this only fixes what they should never have had to
+ * think about.
+ */
+button {
+    font: inherit;
+    color: inherit;
+}
+
 /* Layout */
 .app {
     display: flex;
@@ -227,6 +241,10 @@
     max-width: 24rem;
     max-height: 90vh;
     overflow-y: auto;
+    /* Nothing in here may push the dialog sideways. The URL is long and
+       unbreakable, and without this the modal grew a horizontal scrollbar and
+       shoved its own buttons off the right edge. */
+    overflow-x: hidden;
     background: var(--sd-bg-card);
     border: 1px solid var(--sd-border);
     border-radius: 0.75rem;
@@ -241,6 +259,7 @@
 }
 .qr-header h2 {
     margin: 0;
+    min-width: 0;
     font-size: 1.05rem;
     color: var(--sd-text);
     /* Without this the heading wrapped to two lines and shoved the close
@@ -249,6 +268,8 @@
 }
 .qr-close {
     flex: 0 0 auto;
+    appearance: none;
+    -webkit-appearance: none;
     background: transparent;
     border: none;
     color: var(--sd-text-muted);
@@ -267,6 +288,7 @@
     flex-direction: column;
     align-items: center;
     gap: 0.75rem;
+    min-width: 0;
 }
 .qr-image {
     width: 100%;
@@ -297,6 +319,7 @@
 }
 .qr-url-block {
     width: 100%;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
@@ -309,6 +332,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 0.5rem;
 }
 .qr-url-label {
     font-size: 0.6875rem;
@@ -318,6 +342,9 @@
     color: var(--sd-text-muted);
 }
 .qr-reveal-btn {
+    flex: 0 0 auto;
+    appearance: none;
+    -webkit-appearance: none;
     background: transparent;
     border: none;
     color: var(--sd-accent);
@@ -338,6 +365,8 @@
 }
 .qr-copy-btn {
     align-self: stretch;
+    appearance: none;
+    -webkit-appearance: none;
     background: var(--sd-accent);
     color: var(--sd-on-accent);
     border: none;

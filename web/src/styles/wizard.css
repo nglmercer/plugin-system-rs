@@ -35,6 +35,9 @@
   background: var(--bg-input);
   border-bottom: 1px solid #404040;
 }
+/* These are <button>s so they are keyboard-reachable, which means the
+   user-agent border, background and padding have to be turned off explicitly —
+   left on, they render as the grey stretched boxes the step rail became. */
 .wizard-step-indicator {
   flex: 1;
   display: flex;
@@ -43,6 +46,15 @@
   gap: 0.25rem;
   position: relative;
   cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  min-width: 0;
 }
 .wizard-step-indicator:hover .wizard-step-circle {
   border-color: #00d4ff;
@@ -65,6 +77,9 @@
 .wizard-step-indicator.active::after,
 .wizard-step-indicator.done::after { background: #00d4ff; }
 .wizard-step-circle {
+  /* Fixed, and not allowed to be squashed by the flex parent: a "circle" that
+     stretches to fill its column is the stretched-pill look. */
+  flex: 0 0 auto;
   width: 24px;
   height: 24px;
   border-radius: 50%;
@@ -1011,33 +1026,6 @@
   .kv-key {
     max-width: none;
   }
-}
-
-/* CSS Editor Modal */
-.css-editor-hint {
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  margin: 0 0 0.75rem 0;
-}
-.css-editor-textarea {
-  width: 100%;
-  min-height: 300px;
-  background: var(--bg-input);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text);
-  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
-  font-size: 0.85rem;
-  padding: 0.75rem;
-  resize: vertical;
-  tab-size: 2;
-}
-.css-editor-textarea:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-.css-editor-textarea::placeholder {
-  color: var(--text-dim);
 }
 
 /* ── Requirements step ────────────────────────────────────

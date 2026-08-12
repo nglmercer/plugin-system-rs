@@ -55,12 +55,11 @@ export interface DeckToolbarProps {
   columns: number;
   rows: number;
   onGridChange: (patch: { columns?: number; rows?: number }) => void;
-  onOpenCss: () => void;
   onAddWidget: () => void;
 }
 
 export function DeckToolbar(props: DeckToolbarProps) {
-  const { arranging, onToggleArrange, columns, rows, onGridChange, onOpenCss, onAddWidget } = props;
+  const { arranging, onToggleArrange, columns, rows, onGridChange, onAddWidget } = props;
 
   return h(
     "div",
@@ -89,7 +88,6 @@ export function DeckToolbar(props: DeckToolbarProps) {
       },
       arranging ? t("dashboard.done") : t("dashboard.edit"),
     ),
-    h("button", { class: "add-widget-btn", onClick: onOpenCss, title: "Custom CSS" }, "{ }"),
     h(
       "button",
       { class: "add-widget-btn", onClick: onAddWidget },

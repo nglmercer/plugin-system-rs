@@ -1,8 +1,8 @@
 # API Reference
 
 The HTTP API is served by `sd-core` on its bound port (from `data/config.json`,
-defaulting to an ephemeral port when the file is absent). It binds `127.0.0.1`
-unless `host` says otherwise. Real-time events arrive over the WebSocket at
+defaulting to an ephemeral port when the file is absent). It binds all
+interfaces unless `host` says otherwise. Real-time events arrive over the WebSocket at
 `/ws`.
 
 ## Authentication
@@ -11,8 +11,9 @@ Every endpoint below requires the API token. Present it as any one of:
 
 - `Authorization: Bearer <token>` (preferred)
 - `X-SD-Token: <token>`
-- `?token=<token>` in the query string — the only option for the WebSocket,
-  since a browser cannot set headers on the handshake
+- `?token=<token>` in the query string — the only option for the WebSocket and
+  for URLs the browser loads itself (`<img src>`), since neither can carry a
+  header
 
 The token is generated on first run and stored in the user data directory; the
 path and value are printed at startup, and `SD_API_TOKEN` overrides it. A

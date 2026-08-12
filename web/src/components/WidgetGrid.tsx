@@ -11,7 +11,6 @@ import { DeckToolbar } from "./DeckToolbar";
 import { DeckGrid } from "./DeckGrid";
 import { Icons } from "../ui/icons/Icons";
 import { t } from "../lib/i18n";
-import { CssEditor } from "./CssEditor";
 import {
   DEFAULT_GRID,
   Placement,
@@ -50,7 +49,6 @@ export function WidgetGrid() {
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
     visible: false, x: 0, y: 0, widgetId: "",
   });
-  const [showCssEditor, setShowCssEditor] = useState(false);
   const [arranging, setArranging] = useState(false);
   const [page, setPage] = useState(0);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -87,16 +85,6 @@ export function WidgetGrid() {
       document.removeEventListener("contextmenu", handleClickOutside);
     };
   }, [contextMenu.visible]);
-
-  useEffect(() => {
-    let styleEl = document.getElementById("custom-dashboard-css");
-    if (!styleEl) {
-      styleEl = document.createElement("style");
-      styleEl.id = "custom-dashboard-css";
-      document.head.appendChild(styleEl);
-    }
-    styleEl.textContent = layout.customCss || "";
-  }, [layout.customCss]);
 
   useEffect(() => () => {
     if (longPressTimer.current) clearTimeout(longPressTimer.current);
@@ -253,7 +241,6 @@ export function WidgetGrid() {
         columns: layout.columns,
         rows,
         onGridChange: setGrid,
-        onOpenCss: () => setShowCssEditor(true),
         onAddWidget: () => setShowLibrary(true),
       }),
     ),
@@ -308,11 +295,5 @@ export function WidgetGrid() {
         onClose: () => setWizardWidget(null),
       }),
 
-    showCssEditor &&
-      h(CssEditor, {
-        value: layout.customCss || "",
-        onChange: (css: string) => persist({ ...layout, customCss: css }),
-        onClose: () => setShowCssEditor(false),
-      }),
   );
 }

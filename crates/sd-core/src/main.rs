@@ -43,10 +43,8 @@ async fn main() -> Result<()> {
     tracing::info!(
         pid = std::process::id(),
         path = %pid_lock.path().display(),
-        "Acquired pid lock"
+        "acquired pid lock"
     );
-
-    println!("sd-core starting up...");
 
     let shutdown = Arc::new(AtomicBool::new(false));
 
@@ -66,13 +64,13 @@ async fn main() -> Result<()> {
     let profile_manager = Arc::new(ProfileManager::new(events.clone()));
 
     let default_profile_id = profile_manager.create_profile("Default").await;
-    println!("Created default profile: {:?}", default_profile_id);
+    tracing::debug!(profile = ?default_profile_id, "created default profile");
 
     let device_manager = Arc::new(DeviceManager::new(events.clone()));
 
     let virtual_device = Arc::new(VirtualDevice::new("virtual-1", 15, events.clone()));
     device_manager.add_device(virtual_device).await;
-    println!("Added virtual device with 15 buttons");
+    tracing::debug!("added virtual device with 15 buttons");
 
     let plugin_dir = std::env::var("SD_PLUGIN_DIR")
         .ok()
@@ -89,16 +87,13 @@ async fn main() -> Result<()> {
     );
 
     match plugin_manager.load_enabled_plugins_from_dir().await {
-        Ok(loaded) => {
-            if loaded.is_empty() {
-                println!("No plugins found in {}", plugin_dir);
-            } else {
-                println!("Loaded {} plugins: {:?}", loaded.len(), loaded);
-            }
+        Ok(loaded) if loaded.is_empty() => {
+            tracing::warn!(dir = %plugin_dir, "no plugins found");
         }
-        Err(e) => {
-            println!("Warning: Failed to load plugins: {}", e);
-        }
+        // The per-plugin "loaded" lines already went to the log; this is the
+        // summary, not a repeat of them.
+        Ok(loaded) => tracing::info!(count = loaded.len(), plugins = ?loaded, "plugins ready"),
+        Err(e) => tracing::error!(error = %e, "failed to load plugins"),
     }
 
     let dashboard_config = Arc::new(RwLock::new(load_dashboard_config()));
@@ -136,40 +131,27 @@ async fn main() -> Result<()> {
     let port = actual_addr.port();
     http_port.store(port, Ordering::Relaxed);
 
-    let local_http_url = format!("http://127.0.0.1:{port}");
-    let local_ws_url = format!("ws://127.0.0.1:{port}/ws");
+    // A short banner on stdout, deliberately separate from the log: this is the
+    // handful of things someone starting the daemon needs to read, and burying
+    // them in INFO lines they have already scrolled past does not work.
+    let reachable = if actual_addr.ip().is_loopback() {
+        format!("http://127.0.0.1:{port} (this machine only)")
+    } else {
+        format!("http://{local_ip}:{port}  ·  http://127.0.0.1:{port}")
+    };
 
-    println!("\nStarting HTTP server on http://{actual_addr}");
-    println!("Local access: {local_http_url}");
-    println!("Local WebSocket endpoint: {local_ws_url}");
-    println!("Local API docs: {local_http_url}/api");
-
-    if actual_addr.ip().is_loopback() {
+    println!("\n  sd-core is running");
+    println!("  Dashboard: {reachable}");
+    println!("  API token: {}", auth.token());
+    println!("             {}", sd_api::token_path().display());
+    if !actual_addr.ip().is_loopback() {
         println!(
-            "\nBound to loopback: only this machine can reach the API. To expose it on \
-             your network, set \"host\": \"0.0.0.0\" in {}.",
+            "\n  Reachable from your network. The token above is what keeps it yours —\n  \
+             set \"host\": \"127.0.0.1\" in {} to bind this machine only.",
             config::CONFIG_FILE
         );
-    } else {
-        let network_http_url = format!("http://{local_ip}:{port}");
-        println!("Network access: {network_http_url}");
-        println!("Network WebSocket endpoint: ws://{local_ip}:{port}/ws");
-        println!(
-            "\nWARNING: bound to {}, so anyone on your network can reach this API. The \
-             token below is the only thing stopping them from driving your keyboard.",
-            actual_addr.ip()
-        );
     }
-
-    // The token is what a browser on another device needs in order to connect,
-    // so it has to be discoverable. Printing it beats making the user find the
-    // file; the dashboard on this machine fetches it over loopback instead.
-    println!("\nAPI token: {}", auth.token());
-    println!("Token file: {}", sd_api::token_path().display());
-    println!("Remote clients: append ?token=<token> to the dashboard URL.");
-
-    println!("\nSystem tray icon active. Right-click for options.");
-    println!("Press Ctrl+C to stop\n");
+    println!("\n  Ctrl+C to stop\n");
 
     let shutdown_tray = shutdown.clone();
     tray::spawn_tray(shutdown_tray, pid_lock.path().to_path_buf(), port);

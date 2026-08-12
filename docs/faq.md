@@ -47,16 +47,20 @@ one, and the real address is printed at startup). For a one-off override use
 `SD_CORE_BIND_ADDR`:
 
 ```bash
-SD_CORE_BIND_ADDR=127.0.0.1:3001 cargo run --bin sd-core
+SD_CORE_BIND_ADDR=0.0.0.0:3001 cargo run --bin sd-core
 ```
 
 **Q: I can't reach the dashboard from my phone.**
 
-A: sd-core binds loopback by default. Set `"host": "0.0.0.0"` in
-`data/config.json` to accept connections from your network, then scan the QR
-code from the local dashboard — the URL it encodes carries the API token that
-remote clients need. See
+A: sd-core listens on all interfaces by default, so check your firewall first,
+then scan the QR code from the local dashboard — the URL it encodes carries the
+API token that remote clients need. If you set `"host"` in `data/config.json`,
+make sure it is not `127.0.0.1`. See
 [Access and the API token](getting-started.md#access-and-the-api-token).
+
+**Q: How do I stop it listening on the network?**
+
+A: Set `"host": "127.0.0.1"` in `data/config.json`.
 
 **Q: The API returns 401 Unauthorized.**
 

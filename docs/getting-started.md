@@ -77,32 +77,34 @@ SD_CORE_BIND_ADDR=127.0.0.1:8080 ./sd-core
 
 ## Access and the API token
 
-sd-core binds **127.0.0.1 by default**, so only this machine can reach it. That
-is deliberate: the API can inject keystrokes, drive OBS, fetch URLs from the
-host and load plugins, and none of that should be one open port away from the
-rest of your network.
+sd-core binds **all interfaces by default**, so the dashboard is reachable from
+your phone without any configuration — that is what the QR code is for.
 
-Every `/api` and `/ws` request must carry an API token. It is generated on first
-run, stored in your user data directory (the path is printed at startup), and
-can be overridden with `SD_API_TOKEN`. The dashboard on this machine fetches it
-automatically over loopback; you never see it in normal use.
+What protects it is authentication, not unreachability. Every `/api` and `/ws`
+request must carry an API token, generated on first run and stored in your user
+data directory; the path and value are printed at startup, and `SD_API_TOKEN`
+overrides it. The dashboard on this machine fetches the token automatically over
+loopback, so you never see it in normal use.
 
 To reach the dashboard from a phone or another computer:
 
-1. Opt in to network access by setting `host` in `data/config.json`:
-
-   ```json
-   { "port": 8080, "host": "0.0.0.0" }
-   ```
-
-   (or `SD_CORE_BIND_ADDR=0.0.0.0:8080` for one run).
-2. Open the QR code from the local dashboard and scan it. The encoded URL
+1. Open the QR code from the local dashboard and scan it. The encoded URL
    carries the token, so the remote browser authenticates itself.
-3. Or open `http://<your-ip>:<port>/` directly and paste the token printed at
+2. Or open `http://<your-ip>:<port>/` directly and paste the token printed at
    startup when prompted.
 
-Once exposed, the token is the only thing between your network and your
-keyboard. Treat it accordingly.
+**The token is the only thing between your network and your keyboard.** Anyone
+holding it can type on this machine, so treat the QR code and that URL as
+passwords.
+
+To restrict the daemon to this machine, set `host` in `data/config.json`:
+
+```json
+{ "port": 8080, "host": "127.0.0.1" }
+```
+
+(or `SD_CORE_BIND_ADDR=127.0.0.1:8080` for one run). An unparseable `host` falls
+back to loopback rather than staying open.
 
 ## Build from Source
 

@@ -100,7 +100,6 @@ export interface DashboardLayout {
   rows?: number;
   /** Cell width / height. 1 gives square keys like deck hardware. */
   aspect?: number;
-  customCss?: string;
 }
 
 export interface CSSCustomProperties {

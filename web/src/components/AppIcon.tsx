@@ -1,5 +1,6 @@
 import { h } from "preact";
 import { useState } from "preact/hooks";
+import { authedUrl } from "../lib/auth";
 
 /**
  * An application icon, resolved by the host from a freedesktop icon name.
@@ -70,7 +71,11 @@ export function AppIcon({ icon, name, size = 24 }: AppIconProps) {
   return h("img", {
     class: "app-icon",
     style: box,
-    src: `/api/icon/${encodeURIComponent(icon)}`,
+    // The token goes in the query string because the browser loads this URL
+    // itself: an `<img>` request never passes through our fetch wrapper, so
+    // there is no way to give it an Authorization header. Without this every
+    // icon came back 401 and silently fell back to an initial.
+    src: authedUrl(`/api/icon/${encodeURIComponent(icon)}`),
     alt: "",
     loading: "lazy",
     // A 404 is expected for apps with no themed icon; swap to the initial.

@@ -97,7 +97,7 @@ impl PluginManager {
         name: &str,
     ) -> Result<String> {
         let source = loader.source();
-        log::info!("Loading plugin '{}' from {}", name, source);
+        log::debug!("Loading plugin '{}' from {}", name, source);
 
         let bytes = loader.load().map_err(|e| PluginError::PluginLoad {
             name: name.to_string(),
@@ -200,7 +200,7 @@ impl PluginManager {
     pub fn load_plugin(&mut self, path: impl AsRef<Path>) -> Result<String> {
         let path = path.as_ref().to_path_buf();
 
-        log::info!("Loading plugin from {}", path.display());
+        log::debug!("Loading plugin from {}", path.display());
 
         // The sidecar manifest carries the capability grants and resource
         // limits. It is optional: a component with no manifest is still a
@@ -262,13 +262,13 @@ impl PluginManager {
         let boxed: Box<dyn Plugin> = Box::new(plugin);
         self.register_and_load(boxed, metadata, path)?;
 
-        log::info!("Plugin '{}' loaded successfully", name);
+        log::info!("Plugin '{}' loaded", name);
         Ok(name)
     }
 
     pub fn load_plugins_from_dir(&mut self, dir: impl AsRef<Path>) -> Result<Vec<String>> {
         let dir = dir.as_ref();
-        log::info!("Scanning for plugins in {}", dir.display());
+        log::debug!("Scanning for plugins in {}", dir.display());
 
         let mut loaded = Vec::new();
 
