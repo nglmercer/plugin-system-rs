@@ -145,11 +145,7 @@ async fn main() -> Result<()> {
     println!("  API token: {}", auth.token());
     println!("             {}", sd_api::token_path().display());
     if !actual_addr.ip().is_loopback() {
-        println!(
-            "\n  Reachable from your network. The token above is what keeps it yours —\n  \
-             set \"host\": \"127.0.0.1\" in {} to bind this machine only.",
-            config::CONFIG_FILE
-        );
+        println!("  Config: {}", config::CONFIG_FILE);
     }
     println!("\n  Ctrl+C to stop\n");
 
