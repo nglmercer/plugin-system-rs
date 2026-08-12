@@ -316,10 +316,21 @@ export async function toggleRecordPause() {
   return data.success;
 }
 
-export async function fetchObsScenes() {
-  const res = await fetch(`${API_BASE}/obs/scenes`);
+// OBS endpoints answer `{success: false, error}` whenever OBS is closed or
+// not connected yet. Returning `undefined` there hid the reason from the
+// widgets, so surface the server's message as a thrown Error instead.
+async function obsGet<T>(path: string, fallback: T): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`);
   const data = await res.json();
-  return data.data;
+  if (!data.success) throw new Error(data.error || "OBS request failed");
+  return (data.data ?? fallback) as T;
+}
+
+export async function fetchObsScenes() {
+  return obsGet<{ current_scene: string; scenes: { name: string; index: number }[] }>(
+    "/obs/scenes",
+    { current_scene: "", scenes: [] },
+  );
 }
 
 export async function setCurrentScene(sceneName: string) {
@@ -333,9 +344,7 @@ export async function setCurrentScene(sceneName: string) {
 }
 
 export async function fetchObsInputs() {
-  const res = await fetch(`${API_BASE}/obs/inputs`);
-  const data = await res.json();
-  return data.data || [];
+  return obsGet<any[]>("/obs/inputs", []);
 }
 
 export async function setInputVolume(inputName: string, volume: number) {
@@ -371,9 +380,7 @@ export async function saveReplayBuffer() {
 }
 
 export async function fetchObsTransitions() {
-  const res = await fetch(`${API_BASE}/obs/transitions`);
-  const data = await res.json();
-  return data.data || [];
+  return obsGet<any[]>("/obs/transitions", []);
 }
 
 export async function setTransition(name: string) {
@@ -387,9 +394,7 @@ export async function setTransition(name: string) {
 }
 
 export async function fetchObsSceneItems(sceneName: string) {
-  const res = await fetch(`${API_BASE}/obs/scene-items?scene_name=${encodeURIComponent(sceneName)}`);
-  const data = await res.json();
-  return data.data || [];
+  return obsGet<any[]>(`/obs/scene-items?scene_name=${encodeURIComponent(sceneName)}`, []);
 }
 
 export async function setSceneItemEnabled(sceneName: string, itemId: number, enabled: boolean) {

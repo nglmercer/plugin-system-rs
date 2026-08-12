@@ -1,5 +1,6 @@
 import { h } from "preact";
 import { useState, useEffect, useCallback } from "preact/hooks";
+import { usePolling } from "../lib/usePolling";
 import { fetchObsScenes, setCurrentScene, fetchObsTransitions, setTransition, fetchObsSceneItems, setSceneItemEnabled } from "../lib/api";
 
 interface ObsScene {
@@ -28,27 +29,26 @@ export function ObsScenesWidget({ settings }: { settings: Record<string, any> })
   const [error, setError] = useState<string | null>(null);
   const variant = (settings.variant || "compact") as string;
 
+  // Throws on failure so `usePolling` can back off: OBS being closed is a
+  // steady state, and re-asking every two seconds forever only produced log
+  // noise on the server.
   const fetchData = useCallback(async () => {
     try {
       const scenesData = await fetchObsScenes();
-      if (scenesData) {
-        setScenes(scenesData.scenes || []);
-        setCurrentSceneState(scenesData.current_scene || "");
-      }
+      setScenes(scenesData.scenes || []);
+      setCurrentSceneState(scenesData.current_scene || "");
       const transData = await fetchObsTransitions();
-      if (transData) setTransitions(transData);
+      setTransitions(transData);
       setError(null);
-    } catch {
-      setError("Failed to fetch scenes");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to fetch scenes");
+      throw e;
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
-  useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, settings.refreshInterval || 2000);
-    return () => clearInterval(interval);
-  }, [fetchData, settings.refreshInterval]);
+  usePolling(fetchData, settings.refreshInterval || 2000);
 
   useEffect(() => {
     if (variant === "detailed" && currentScene) {

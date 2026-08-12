@@ -1,5 +1,6 @@
 import { h } from "preact";
-import { useState, useEffect, useCallback } from "preact/hooks";
+import { useState, useCallback } from "preact/hooks";
+import { usePolling } from "../lib/usePolling";
 import { fetchObsInputs, setInputVolume, setInputMute } from "../lib/api";
 import { CSSCustomProperties } from "../lib/types";
 
@@ -17,26 +18,21 @@ export function ObsInputsWidget({ settings }: { settings: Record<string, any> })
   const [error, setError] = useState<string | null>(null);
   const variant = (settings.variant || "compact") as string;
 
+  // Rethrows so `usePolling` slows down while OBS is unreachable; the error
+  // text is whatever the API reported ("not connected to OBS").
   const fetchInputs = useCallback(async () => {
     try {
-      const data = await fetchObsInputs();
-      if (data) {
-        setInputs(data);
-        setError(null);
-      } else {
-        setError("OBS plugin not available");
-      }
-    } catch {
-      setError("Failed to fetch inputs");
+      setInputs(await fetchObsInputs());
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to fetch inputs");
+      throw e;
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
-  useEffect(() => {
-    fetchInputs();
-    const interval = setInterval(fetchInputs, settings.refreshInterval || 2000);
-    return () => clearInterval(interval);
-  }, [fetchInputs, settings.refreshInterval]);
+  usePolling(fetchInputs, settings.refreshInterval || 2000);
 
   async function handleMuteToggle(inputName: string, currentlyMuted: boolean) {
     try {
