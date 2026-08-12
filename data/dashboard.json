@@ -76,8 +76,8 @@
       "title": "OBS Scenes",
       "colSpan": 1,
       "rowSpan": 1,
-      "x": 4,
-      "y": 1,
+      "x": 3,
+      "y": 0,
       "page": 0,
       "settings": {
         "refreshInterval": 2000,
@@ -107,9 +107,9 @@
       "title": "OBS Inputs",
       "colSpan": 2,
       "rowSpan": 1,
-      "x": 3,
+      "x": 1,
       "y": 0,
-      "page": 0,
+      "page": 1,
       "settings": {
         "refreshInterval": 2000,
         "variant": "detailed"

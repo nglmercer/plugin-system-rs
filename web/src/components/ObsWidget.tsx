@@ -1,5 +1,5 @@
 import { h } from "preact";
-import { useState, useEffect, useCallback } from "preact/hooks";
+import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import { fetchObsStatus, startStream, stopStream, startRecord, stopRecord, toggleRecordPause, toggleVirtualCam, saveReplayBuffer, connectObs } from "../lib/api";
 
 interface ObsStatus {
@@ -23,6 +23,12 @@ export function ObsWidget({ settings }: { settings: Record<string, any> }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const variant = (settings.variant || "compact") as string;
+  /**
+   * Auto-connect is attempted once per mount, never per poll: a dashboard
+   * widget should come up live without a click, but retrying every two
+   * seconds would hammer a deliberately-closed OBS forever.
+   */
+  const autoConnectTried = useRef(false);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -30,8 +36,14 @@ export function ObsWidget({ settings }: { settings: Record<string, any> }) {
       if (data) {
         setStatus(data);
         setError(null);
+        if (!data.connected && !autoConnectTried.current && settings.autoConnect !== false) {
+          autoConnectTried.current = true;
+          void handleConnect();
+        }
       } else {
-        setError("OBS plugin not available");
+        // The plugin answers even while disconnected, so a null here means
+        // the plugin is genuinely missing — not merely not connected to OBS.
+        setError("OBS plugin not loaded");
       }
     } catch {
       setError("Failed to fetch OBS status");
@@ -46,8 +58,15 @@ export function ObsWidget({ settings }: { settings: Record<string, any> }) {
   }, [fetchStatus, settings.refreshInterval]);
 
   async function handleConnect() {
+    // A manual click should retry even after auto-connect gave up.
+    autoConnectTried.current = true;
     try {
-      await connectObs(settings.host || "127.0.0.1", settings.port || 4455, settings.password || "");
+      const ok = await connectObs(
+        settings.host || "127.0.0.1",
+        settings.port || 4455,
+        settings.password || "",
+      );
+      if (!ok) setError("Could not connect to OBS");
       fetchStatus();
     } catch {
       setError("Connection failed");

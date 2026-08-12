@@ -315,6 +315,94 @@ impl ObsPlugin {
         }
     }
 
+    /// Translate OBS's `sceneName`/`sceneIndex` into the `{name, index}` the
+    /// API contract uses.
+    ///
+    /// The wire names are OBS's; the names crossing this boundary are ours.
+    /// Doing the mapping here rather than in `sd-api` keeps the host free of
+    /// obs-websocket vocabulary — the whole reason the protocol lives in the
+    /// guest.
+    fn scenes_payload(v: &serde_json::Value) -> serde_json::Value {
+        let scenes: Vec<serde_json::Value> = v["scenes"]
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .map(|s| {
+                        serde_json::json!({
+                            "name": s["sceneName"].as_str().unwrap_or_default(),
+                            "index": s["sceneIndex"].as_i64().unwrap_or(0),
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        serde_json::json!({
+            "current_scene": v["currentProgramSceneName"].as_str().unwrap_or_default(),
+            "scenes": scenes,
+        })
+    }
+
+    fn inputs_payload(v: &serde_json::Value) -> serde_json::Value {
+        let inputs: Vec<serde_json::Value> = v["inputs"]
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .map(|i| {
+                        serde_json::json!({
+                            "name": i["inputName"].as_str().unwrap_or_default(),
+                            "kind": i["inputKind"].as_str().unwrap_or_default(),
+                            "uuid": i["inputUuid"].as_str().unwrap_or_default(),
+                            // GetInputList does not carry mute or volume;
+                            // fetching them would be one request per input.
+                            // Reported as defaults rather than omitted, so the
+                            // response still satisfies the contract.
+                            "muted": false,
+                            "volume": 0.0,
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        serde_json::Value::Array(inputs)
+    }
+
+    fn transitions_payload(v: &serde_json::Value) -> serde_json::Value {
+        let items: Vec<serde_json::Value> = v["transitions"]
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .map(|t| {
+                        serde_json::json!({
+                            "name": t["transitionName"].as_str().unwrap_or_default(),
+                            "kind": t["transitionKind"].as_str().unwrap_or_default(),
+                            "duration": t["transitionDuration"].as_u64().unwrap_or(0),
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        serde_json::Value::Array(items)
+    }
+
+    fn scene_items_payload(v: &serde_json::Value) -> serde_json::Value {
+        let items: Vec<serde_json::Value> = v["sceneItems"]
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .map(|i| {
+                        serde_json::json!({
+                            "id": i["sceneItemId"].as_i64().unwrap_or(0),
+                            "name": i["sourceName"].as_str().unwrap_or_default(),
+                            "enabled": i["sceneItemEnabled"].as_bool().unwrap_or(false),
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        serde_json::Value::Array(items)
+    }
+
     fn arg_str(args: &serde_json::Value, key: &str) -> Result<String, CommandError> {
         args.get(key)
             .and_then(|v| v.as_str())
@@ -436,8 +524,7 @@ impl Guest for ObsPlugin {
             "save_replay" => simple!("SaveReplayBuffer"),
 
             "get_scenes" => match Self::request("GetSceneList", None) {
-                Ok(v) => serde_json::json!({ "ok": true, "scenes": v["scenes"],
-                                             "current": v["currentProgramSceneName"] }),
+                Ok(v) => Self::scenes_payload(&v),
                 Err(e) => failed(e),
             },
 
@@ -456,7 +543,7 @@ impl Guest for ObsPlugin {
             }
 
             "get_inputs" => match Self::request("GetInputList", None) {
-                Ok(v) => serde_json::json!({ "ok": true, "inputs": v["inputs"] }),
+                Ok(v) => Self::inputs_payload(&v),
                 Err(e) => failed(e),
             },
 
@@ -491,7 +578,7 @@ impl Guest for ObsPlugin {
             }
 
             "get_transitions" => match Self::request("GetSceneTransitionList", None) {
-                Ok(v) => serde_json::json!({ "ok": true, "transitions": v["transitions"] }),
+                Ok(v) => Self::transitions_payload(&v),
                 Err(e) => failed(e),
             },
 
@@ -512,7 +599,7 @@ impl Guest for ObsPlugin {
                     "GetSceneItemList",
                     Some(serde_json::json!({ "sceneName": scene })),
                 ) {
-                    Ok(v) => serde_json::json!({ "ok": true, "items": v["sceneItems"] }),
+                    Ok(v) => Self::scene_items_payload(&v),
                     Err(e) => failed(e),
                 }
             }
@@ -607,6 +694,63 @@ mod tests {
             ObsPlugin::split_url("ws://host:notaport"),
             ("host".to_string(), 4455)
         );
+    }
+
+    /// OBS speaks `sceneName`; the API contract says `name`. A drift here is
+    /// exactly the class of bug that surfaced as "plugin not available".
+    #[test]
+    fn translates_obs_scene_names_to_the_api_contract() {
+        let obs = serde_json::json!({
+            "currentProgramSceneName": "Escena",
+            "scenes": [
+                {"sceneName": "Escena", "sceneIndex": 0, "sceneUuid": "abc"},
+                {"sceneName": "Second", "sceneIndex": 1, "sceneUuid": "def"}
+            ]
+        });
+        let out = ObsPlugin::scenes_payload(&obs);
+        assert_eq!(out["current_scene"], "Escena");
+        assert_eq!(out["scenes"][0]["name"], "Escena");
+        assert_eq!(out["scenes"][0]["index"], 0);
+        assert_eq!(out["scenes"][1]["name"], "Second");
+        assert_eq!(out["scenes"][1]["index"], 1);
+    }
+
+    /// The list endpoints return a bare array, not a wrapper object.
+    #[test]
+    fn list_payloads_are_arrays() {
+        let inputs = ObsPlugin::inputs_payload(&serde_json::json!({
+            "inputs": [{"inputName": "Mic", "inputKind": "pulse_input", "inputUuid": "u1"}]
+        }));
+        assert!(inputs.is_array());
+        assert_eq!(inputs[0]["name"], "Mic");
+        assert_eq!(inputs[0]["kind"], "pulse_input");
+
+        let transitions = ObsPlugin::transitions_payload(&serde_json::json!({
+            "transitions": [{"transitionName": "Fade", "transitionKind": "fade_transition",
+                             "transitionDuration": 300}]
+        }));
+        assert!(transitions.is_array());
+        assert_eq!(transitions[0]["name"], "Fade");
+        assert_eq!(transitions[0]["duration"], 300);
+
+        let items = ObsPlugin::scene_items_payload(&serde_json::json!({
+            "sceneItems": [{"sceneItemId": 7, "sourceName": "Cam", "sceneItemEnabled": true}]
+        }));
+        assert!(items.is_array());
+        assert_eq!(items[0]["id"], 7);
+        assert_eq!(items[0]["name"], "Cam");
+        assert_eq!(items[0]["enabled"], true);
+    }
+
+    /// A server that omits a list must yield an empty array, not null — the
+    /// contract says sequence.
+    #[test]
+    fn missing_lists_become_empty_arrays() {
+        let empty = serde_json::json!({});
+        assert_eq!(ObsPlugin::inputs_payload(&empty), serde_json::json!([]));
+        assert_eq!(ObsPlugin::transitions_payload(&empty), serde_json::json!([]));
+        assert_eq!(ObsPlugin::scene_items_payload(&empty), serde_json::json!([]));
+        assert_eq!(ObsPlugin::scenes_payload(&empty)["scenes"], serde_json::json!([]));
     }
 
     #[test]
