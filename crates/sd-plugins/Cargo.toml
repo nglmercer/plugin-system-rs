@@ -9,6 +9,7 @@ sd-events = { path = "../sd-events" }
 sd-actions = { path = "../sd-actions" }
 sd-paths = { path = "../sd-paths" }
 plugin-system = { path = "../plugin-system" }
+sd-caps = { path = "../sd-caps" }
 tokio = { version = "1", features = ["sync"] }
 log = "0.4"
 serde = { version = "1", features = ["derive"] }

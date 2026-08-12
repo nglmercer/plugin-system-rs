@@ -47,6 +47,121 @@ interface host {
     -> result<string, string>;
 }
 
+/// Read-only view of the machine. The host owns the `sysinfo` dependency;
+/// the guest keeps the polling policy and the shape it hands to widgets.
+interface system-info {
+  record system-stats {
+    cpu-usage: f64,
+    cpu-model: string,
+    cpu-cores: u32,
+    memory-total: u64,
+    memory-used: u64,
+    swap-total: u64,
+    swap-used: u64,
+    /// 1, 5 and 15 minute load averages. Zeroed on platforms without them.
+    /// Spelled out because a WIT identifier segment cannot be a bare digit.
+    load-avg-one: f64,
+    load-avg-five: f64,
+    load-avg-fifteen: f64,
+    uptime-seconds: u64,
+    process-count: u32,
+    thread-count: u32,
+  }
+
+  /// Sample the machine. Blocking: the host may sleep briefly to compute a
+  /// meaningful CPU delta, which is why this is a capability call rather than
+  /// something the guest could fake.
+  get-stats: func() -> result<system-stats, string>;
+}
+
+/// Master and per-application volume.
+///
+/// This is where the ~1200 lines of PulseAudio / COM / CoreAudio code live
+/// now. The guest keeps the command surface and the cached state it reports
+/// to widgets; it cannot reach an audio device on its own.
+interface audio {
+  record volume-state {
+    volume: f32,
+    muted: bool,
+    device-name: string,
+  }
+
+  record app-volume {
+    /// Stable-enough identifier to address the stream again; on most
+    /// platforms this is the application name.
+    id: string,
+    name: string,
+    volume: f32,
+    muted: bool,
+    pid: option<u32>,
+  }
+
+  /// Whether this host can control audio at all, and whether it can do so
+  /// per application. Lets the guest report "not supported" rather than
+  /// surfacing an error for every call.
+  record support {
+    master: bool,
+    per-app: bool,
+  }
+
+  get-support: func() -> support;
+  get-master: func() -> result<volume-state, string>;
+  set-master: func(volume: f32) -> result<_, string>;
+  set-master-mute: func(muted: bool) -> result<_, string>;
+  list-apps: func() -> result<list<app-volume>, string>;
+  set-app-volume: func(id: string, volume: f32) -> result<_, string>;
+  set-app-mute: func(id: string, muted: bool) -> result<_, string>;
+}
+
+/// Synthetic keyboard input.
+///
+/// The most dangerous capability here by some margin: a plugin granted
+/// `input` can type anything into whatever window has focus. Grant it
+/// deliberately.
+interface input {
+  /// Press and release a single named key, e.g. "F5", "a", "Escape".
+  send-key: func(key: string) -> result<_, string>;
+
+  /// Press `key` while holding `modifiers` (e.g. ["ctrl", "shift"]), then
+  /// release everything in reverse order.
+  send-hotkey: func(modifiers: list<string>, key: string) -> result<_, string>;
+
+  /// Type a literal string.
+  send-text: func(text: string) -> result<_, string>;
+
+  /// Block until the user presses a chord, then return it as a combo string
+  /// like "ctrl+shift+a". Gives up after `timeout-ms`.
+  ///
+  /// Note this reads the keyboard globally, not just this application's
+  /// window — the same grant that lets a plugin type also lets it watch.
+  record-hotkey: func(timeout-ms: u32) -> result<string, string>;
+
+  /// Abandon an in-progress recording, so a client that navigated away does
+  /// not leave the listener wedged until its timeout.
+  reset-recording: func();
+}
+
+/// Outbound WebSocket client.
+///
+/// Connections are addressed by an opaque handle rather than a WIT
+/// `resource`: the guest is single-threaded and short-lived per call, and a
+/// handle keeps the host free to own the socket and its runtime.
+interface websocket {
+  /// Open a connection. Returns a handle valid until `close`.
+  connect: func(url: string) -> result<u32, string>;
+
+  /// Send a text frame.
+  send: func(handle: u32, message: string) -> result<_, string>;
+
+  /// Receive the next text frame, waiting up to `timeout-ms`.
+  /// `ok(none)` means the timeout elapsed with nothing queued.
+  receive: func(handle: u32, timeout-ms: u32) -> result<option<string>, string>;
+
+  is-connected: func(handle: u32) -> bool;
+
+  close: func(handle: u32) -> result<_, string>;
+}
+
 /// Implemented by the guest. Mirrors the host-side `Plugin` trait so a
 /// component and a native plugin are interchangeable above the loader.
 interface guest {
@@ -75,6 +190,16 @@ interface guest {
 }
 
 world streamdeck-plugin {
+  /// Always available.
   import host;
+
+  /// Capabilities. Every guest links against these, but the host refuses any
+  /// call a plugin's manifest did not declare under `capabilities`, so
+  /// importing one is not the same as being granted it.
+  import system-info;
+  import audio;
+  import input;
+  import websocket;
+
   export guest;
 }

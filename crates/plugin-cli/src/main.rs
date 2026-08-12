@@ -235,6 +235,18 @@ fn discover_plugins(workspace_root: &Path) -> Result<Vec<PluginInfo>> {
             continue;
         };
 
+        // Test fixtures live alongside real plugins but must never be staged
+        // into `plugins/`, or the app would load them at startup.
+        let is_fixture = package
+            .metadata
+            .get("sd-plugins")
+            .and_then(|m| m.get("fixture"))
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        if is_fixture {
+            continue;
+        }
+
         plugins.push(PluginInfo {
             name: package.name.clone(),
             dir_name: entry.file_name().to_string_lossy().into_owned(),
@@ -961,6 +973,30 @@ fn build_one_plugin(
     std::fs::create_dir_all(&plugins_dir)?;
     let dst = plugins_dir.join(&artifact);
     std::fs::copy(&src, &dst).context(format!("Failed to copy {} to plugins/", artifact))?;
+
+    // A plugin declares its capability grants and resource limits in a
+    // `plugin.manifest.json` beside its Cargo.toml. Stage it under the
+    // artifact's stem, which is where the loader looks for it.
+    let manifest_src = plugin_dir.join("plugin.manifest.json");
+    if manifest_src.exists() {
+        let stem = dst
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or(&plugin.lib_name);
+        let manifest_dst = plugins_dir.join(format!("{stem}.manifest.json"));
+        std::fs::copy(&manifest_src, &manifest_dst)
+            .context(format!("Failed to stage manifest for {}", plugin.name))?;
+    } else {
+        // Not fatal — a plugin needing no capabilities does not need one —
+        // but silence here would make a forgotten manifest look like a
+        // capability bug at runtime.
+        println!(
+            "    {} no plugin.manifest.json; {} will be granted no capabilities",
+            "note:".yellow(),
+            plugin.name
+        );
+    }
+
     Ok(Some(dst))
 }
 

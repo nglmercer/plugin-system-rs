@@ -94,6 +94,23 @@ impl SdPluginManager {
         self
     }
 
+    /// Register the host capability providers plugins may be granted.
+    ///
+    /// Must be called before loading: a plugin's capabilities are fixed when
+    /// its wasmtime store is built. Without this, plugins load but every
+    /// capability call is refused — which is the correct default for an
+    /// embedder that has not opted in.
+    pub async fn with_capabilities(
+        self,
+        capabilities: plugin_system::HostCapabilities,
+    ) -> Self {
+        self.plugin_manager
+            .write()
+            .await
+            .set_capabilities(capabilities);
+        self
+    }
+
     pub async fn load_enabled_plugins_from_dir(&self) -> Result<Vec<String>, String> {
         let state = PluginState::load().map_err(|e| e.to_string())?;
         self.load_enabled_plugins_from_dir_with_state(&state)

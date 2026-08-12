@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+use crate::capabilities::HostCapabilities;
 use crate::context::PluginContext;
 use crate::error::{PluginError, Result};
 use crate::handler::{new_shared_command_registry, SharedCommandRegistry};
@@ -29,6 +30,10 @@ pub struct PluginManager {
     loaded: HashMap<String, LoadedPlugin>,
     /// Created lazily on the first plugin, and shared by all of them.
     wasm_runtime: Option<std::sync::Arc<crate::wasm::WasmRuntime>>,
+    /// What this host can offer plugins beyond the sandbox. Empty by default:
+    /// a `PluginManager` with no providers registered grants nothing, which is
+    /// the right default for a test or an embedder that has not opted in.
+    capabilities: HostCapabilities,
 }
 
 impl PluginManager {
@@ -38,7 +43,20 @@ impl PluginManager {
             command_registry: new_shared_command_registry(),
             loaded: HashMap::new(),
             wasm_runtime: None,
+            capabilities: HostCapabilities::new(),
         }
+    }
+
+    /// Register the capability providers this host offers.
+    ///
+    /// Only affects plugins loaded afterwards: an instance's capabilities are
+    /// fixed when its store is built, so call this before loading.
+    pub fn set_capabilities(&mut self, capabilities: HostCapabilities) {
+        self.capabilities = capabilities;
+    }
+
+    pub fn capabilities(&self) -> &HostCapabilities {
+        &self.capabilities
     }
 
     pub fn registry(&self) -> SharedRegistry {
@@ -200,7 +218,7 @@ impl PluginManager {
             }
         };
 
-        let plugin = WasmPlugin::load(&runtime, bytes, manifest)?;
+        let plugin = WasmPlugin::load(&runtime, bytes, manifest, self.capabilities.clone())?;
 
         let metadata = plugin.metadata_ref().clone();
         let name = metadata.name.clone();

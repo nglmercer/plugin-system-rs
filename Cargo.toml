@@ -7,6 +7,7 @@ members = [
     "crates/sd-profiles",
     "crates/sd-devices",
     "crates/sd-paths",
+    "crates/sd-caps",
     "crates/sd-api",
     "crates/sd-plugins",
     "crates/sd-core",
@@ -18,6 +19,10 @@ exclude = [
     # link into a host binary. Build them with `sd-plugins build`, or
     # `cargo build` from inside the plugin's directory.
     "plugins/plugin-timer-wasm",
+    "plugins/plugin-system-monitor-wasm",
+    "plugins/plugin-volume-master-wasm",
+    "plugins/plugin-key-simulator-wasm",
+    "plugins/plugin-obs-wasm",
     "plugins/plugin-misbehaving-wasm",
     "target",
     "data",

@@ -78,9 +78,13 @@ async fn main() -> Result<()> {
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| resolve_plugin_dir().to_string_lossy().into_owned());
 
+    // Capabilities must be registered before any plugin loads: an instance's
+    // grants are fixed when its wasmtime store is built.
     let plugin_manager = Arc::new(
         SdPluginManager::new(events.clone(), action_registry.clone())
-            .with_plugin_dir(plugin_dir.clone()),
+            .with_plugin_dir(plugin_dir.clone())
+            .with_capabilities(sd_caps::default_capabilities())
+            .await,
     );
 
     match plugin_manager.load_enabled_plugins_from_dir().await {

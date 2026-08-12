@@ -1,0 +1,9 @@
+{
+  "name": "volume-master",
+  "version": "0.1.0",
+  "authors": ["StreamDeck Core"],
+  "abi": "wasm-component",
+  "interfaces": ["VolumeMaster"],
+  "capabilities": ["audio"],
+  "limits": { "memory_mb": 32, "call_timeout_ms": 5000 }
+}

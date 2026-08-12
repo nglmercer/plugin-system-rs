@@ -22,6 +22,7 @@
 //! and stays up.
 #![forbid(unsafe_code)]
 
+pub mod capabilities;
 pub mod context;
 pub mod error;
 pub mod handler;
@@ -34,6 +35,10 @@ pub mod registry;
 pub mod traits;
 pub mod wasm;
 
+pub use capabilities::{
+    AppVolume, AudioProvider, AudioSupport, HostCapabilities, InputProvider, SystemInfoProvider,
+    SystemStats, VolumeState, WebSocketProvider,
+};
 pub use context::PluginContext;
 pub use error::{PluginError, Result};
 pub use handler::{

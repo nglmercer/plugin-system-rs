@@ -10,3 +10,9 @@ crate-type = ["cdylib"]
 
 [dependencies]
 wit-bindgen = "0.46"
+
+# Not a shippable plugin: it exists to misbehave on demand so the host's
+# containment guarantees can be tested. The build CLI skips it so it never
+# lands in `plugins/` alongside the real ones.
+[package.metadata.sd-plugins]
+fixture = true

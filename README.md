@@ -88,10 +88,15 @@ streamdeck/
 │   ├── sd-plugins/         Plugin manager integration
 │   ├── sd-core/            Main binary
 │   └── plugin-cli/         Build CLI tool (sd-plugins)
+│   ├── sd-caps/            Native capability providers (audio, input, …)
 ├── plugins/            (outside the cargo workspace — built for wasm32-wasip2)
-│   ├── plugin-timer-wasm/       Timer/countdown plugin
-│   └── plugin-misbehaving-wasm/ Fixture that misbehaves on demand, for the
-│                                containment tests
+│   ├── plugin-timer-wasm/          Timer/countdown
+│   ├── plugin-system-monitor-wasm/ CPU/memory/load stats
+│   ├── plugin-volume-master-wasm/  Master + per-app volume
+│   ├── plugin-key-simulator-wasm/  Key simulation and hotkey recording
+│   ├── plugin-obs-wasm/            OBS Studio over obs-websocket 5.x
+│   └── plugin-misbehaving-wasm/    Fixture that misbehaves on demand, for the
+│                                   containment tests
 └── web/                    Preact web UI
 ```
 
@@ -119,11 +124,48 @@ What that buys, none of which was possible with `dlopen`:
   between host and plugin.
 - **One build artifact per plugin** instead of one per OS × arch.
 
-The cost is real and worth stating plainly: a component cannot touch hardware
-directly. Plugins that need the OS — audio, input, system stats, sockets —
-require a corresponding host capability interface, and those do not exist yet.
-See [`docs/wasi-migration.md`](docs/wasi-migration.md) for the plan and
-[Platform Support](#platform-support) for what that currently means.
+### Capabilities
+
+A component has no ambient authority — no filesystem, no network, no device
+access. Anything a plugin needs from the machine arrives through a **host
+capability**, declared in its sidecar manifest and enforced on every call:
+
+| Capability | What it grants |
+|---|---|
+| `system-info` | CPU, memory, swap, load average, process counts |
+| `audio` | Master and per-application volume |
+| `input` | Synthetic keystrokes, and recording a hotkey |
+| `websocket` | Outbound WebSocket connections |
+
+```json
+{
+  "name": "obs",
+  "abi": "wasm-component",
+  "capabilities": ["websocket"],
+  "limits": { "memory_mb": 64, "call_timeout_ms": 15000 }
+}
+```
+
+Three rules make the list mean something:
+
+- **Undeclared is unreachable.** A plugin that omits `audio` gets an error from
+  every audio call, even though the host has a working backend.
+- **A misspelled capability fails at load**, not silently at first use.
+- **Granting is not availability.** A host built without a backend reports the
+  capability as unsupported; the plugin is told which half is missing.
+
+Be clear about what this costs: the native code did not disappear, it changed
+owner. The PulseAudio, COM, CoreAudio and `rdev` code that used to live inside
+plugins now lives in `sd-caps` and is compiled into the host. What changed is
+that it is host code under the project's control, rather than something loaded
+out of a `.so` at runtime and trusted with the whole process — and plugins on
+top of it are sandboxed, portable, and individually revocable.
+
+`input` deserves particular care: it can type into whatever window has focus
+and watch everything typed. Grant it deliberately.
+
+The migration is documented in
+[`docs/wasi-migration.md`](docs/wasi-migration.md).
 
 ## Quick Start
 
@@ -378,14 +420,26 @@ cannot be renamed by editing its sidecar.
 
 ## Platform Support
 
-| Plugin | Linux | Windows | macOS |
-|--------|-------|---------|-------|
-| plugin-timer | ✓ | ✓ | ✓ |
-| plugin-system-monitor | ✓ | ✗ | ✗ |
-| plugin-key-simulator | ✓ | ✓ | ✓ |
-| plugin-volume-master | ✓ | ✓ | ✓ |
-| plugin-volume-master (per-app) | ✓ | ✓ | ✗ |
-| plugin-obs | ✓ | ✓ | ✓ |
+Every plugin ships as a single `.wasm` that runs everywhere. What varies is
+the **host capability** behind it, since that is the part that touches the OS.
+
+| Capability | Backend | Linux | Windows | macOS |
+|---|---|---|---|---|
+| `system-info` | `sysinfo` | ✓ | ✓ | ✓ |
+| `audio` (master) | PulseAudio / COM / CoreAudio | ✓ | ✓ | ✓ |
+| `audio` (per-app) | PulseAudio / COM | ✓ | ✓ | ✗ |
+| `input` | `rdev` | ✓ | ✓ | ✓ |
+| `websocket` | `tungstenite` | ✓ | ✓ | ✓ |
+
+A capability the host cannot serve is reported as unsupported rather than
+failing every call, so a plugin can grey out a control instead of erroring —
+`audio.get-support()` exists for exactly that.
+
+On Linux, `input` needs read access to `/dev/input/event*`:
+
+```bash
+sudo usermod -a -G input $USER && newgrp input
+```
 
 ## FAQ
 
@@ -393,11 +447,15 @@ cannot be renamed by editing its sidecar.
 
 **Q: I built the plugin but it doesn't appear in the plugin list.**
 
-A: Make sure you copied the `.so` file to the `plugins/` directory:
+A: Build and stage it, which puts the `.wasm` and its manifest in `plugins/`:
 ```bash
-cp target/debug/libplugin_obs.so plugins/
+sd-plugins build --release
 ```
 Then restart the server or call `POST /api/plugins/reload`.
+
+Native `.so` / `.dll` / `.dylib` plugins are no longer loadable at all — the
+loader only accepts `.wasm`. A leftover shared library in `plugins/` is
+ignored silently.
 
 ### OBS connection fails?
 
@@ -414,7 +472,10 @@ A: Check these:
 
 **Q: The App Volume widget shows "Not supported".**
 
-A: macOS doesn't expose per-app volume control through public APIs. The volume plugin only supports master volume on macOS. Per-app volume is available on Linux (via PulseAudio/PipeWire) and Windows (via CoreAudio).
+A: macOS doesn't expose per-app volume control through public APIs, so the
+host's `audio` capability reports `per_app: false` there and the plugin renders
+the control as unavailable. Per-app volume works on Linux (PulseAudio/PipeWire)
+and Windows (COM).
 
 ### Port conflicts?
 
@@ -444,12 +505,12 @@ A: Yes, using `cargo-zigbuild`:
 # Install cargo-zigbuild
 cargo install cargo-zigbuild
 
-# Build for Windows x64
-cargo zigbuild --release --target x86_64-pc-windows-gnu -p plugin-obs
-
-# Build for Windows ARM64
-cargo zigbuild --release --target aarch64-pc-windows-gnullvm -p plugin-obs
+# Build the host for Windows x64
+cargo zigbuild --release --target x86_64-pc-windows-gnu -p sd-core
 ```
+
+Plugins need no cross-compilation: one `.wasm` runs on every platform. Only
+the host binary has a target matrix now.
 
 ### How to add custom widgets?
 
@@ -469,10 +530,15 @@ See `docs/system-plugins.md` for detailed instructions.
 
 **Q: The OBS widgets show an error even though OBS is connected.**
 
-A: The OBS plugin needs to be loaded. Check:
-1. `libplugin_obs.so` exists in `plugins/` directory
-2. The plugin appears in `GET /api/plugins` response
-3. Restart the server after copying the plugin
+A: The OBS plugin needs to be loaded and granted the `websocket` capability.
+Check:
+1. `plugin_obs_wasm.wasm` and `plugin_obs_wasm.manifest.json` both exist in
+   `plugins/` — the manifest is what carries the grant
+2. The plugin appears in `GET /api/plugins`
+3. Restart the server after staging the plugin
+
+If the widget reports a capability error rather than a connection error, the
+manifest is missing or does not list `websocket`.
 
 ### Hotkey recording doesn't work?
 
@@ -568,7 +634,7 @@ cargo build -p sd-plugins-cli
 ./target/debug/sd-plugins build --release --with-web --with-core
 
 # Build specific plugin
-./target/debug/sd-plugins build -p plugin-obs
+./target/debug/sd-plugins build -p plugin-obs-wasm
 
 # Watch plugins + auto-rebuild + run command
 ./target/debug/sd-plugins dev -- cargo run --bin sd-core

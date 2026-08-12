@@ -120,7 +120,7 @@ Signing is **opt-in** via environment variables:
 |---------|--------|------|
 | `SD_SIGN_WINDOWS_PFX` + `SD_SIGN_WINDOWS_PASSWORD` | `.exe`, `.dll` | `signtool` |
 | `SD_SIGN_WINDOWS_TIMESTAMP` (optional) | signing timestamp URL, default `http://timestamp.digicert.com` | |
-| `SD_SIGN_MACOS_IDENTITY` | `sd-core` binary + `libplugin_*.dylib` | `codesign --options runtime` |
+| `SD_SIGN_MACOS_IDENTITY` | `sd-core` binary | `codesign --options runtime` |
 | `SD_SIGN_GPG_KEY_ID` | `.deb` (via `dpkg-sig`) and `.rpm` (via `rpm --addsign`) | |
 
 When set, `sd-plugins pkg` signs files after the format build but before
@@ -158,7 +158,9 @@ make package-platform PLATFORM=linux-x64 VERSION=0.1.0
 
 When `sd-core` starts it must locate three things:
 
-* The **plugins** directory (`plugin_*.dll` / `libplugin_*.so` / `*.dylib`).
+* The **plugins** directory (`plugin_*.wasm` plus their `*.manifest.json`
+  sidecars). These are identical in every platform bundle — a component is not
+  built per target — so the same files are staged into each archive.
 * The **web frontend** (`index.html` and assets).
 * A writable directory for **per-user state** (PID lock file, plugin-state
   json, uploaded plugins).

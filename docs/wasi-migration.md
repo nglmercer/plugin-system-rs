@@ -1,10 +1,16 @@
 # FFI → WASI Migration Plan
 
-> **Status: Phases 0 and 1 are implemented and merged on `feat/wasi-migration`.**
-> A real component plugin loads and runs in `sd-core` today. Phase 2 (macro
-> parity) is next; Phase 3 (capabilities) is the decision point described in
-> §9. See [§8 Implementation notes](#8-implementation-notes-phases-01) for
-> what the build taught us that this plan got wrong.
+> **Status: complete. Phases 0–5 are implemented on `feat/wasi-migration`.**
+>
+> All five first-party plugins ship as WASI components, the four host
+> capabilities they need exist, and the native FFI backends have been deleted
+> outright — `plugin-system` is now `#![forbid(unsafe_code)]` with no feature
+> gate. Phase 2 (macro parity) was **dropped rather than done**: with the
+> native ABI gone there is no macro to keep at parity, and guests use
+> `wit-bindgen` directly.
+>
+> See [§10 Outcome](#10-outcome) for what actually shipped and where this plan
+> was wrong.
 
 Migrating the plugin ABI from `libloading` + Rust-vtable FFI to WebAssembly
 components running on WASI Preview 2.
@@ -328,7 +334,7 @@ process under `dlopen`:
 | Unbounded allocation | Hits the store's memory ceiling; traps |
 | Filesystem access | No preopened directories exist to reach |
 
-End-to-end, `sd-core --features wasm` discovers `plugin_timer.wasm`, loads it,
+End-to-end, `sd-core` discovers `plugin_timer.wasm`, loads it,
 and serves it through the unchanged API:
 
 ```console
@@ -364,3 +370,59 @@ single-artifact distribution are transformative there. If plugins will only
 ever be the five first-party ones shipped in the same binary, Phase 0 plus
 promoting `c-flat` to the only supported ABI achieves most of the stability
 benefit for a fraction of the work.
+
+
+## 10. Outcome
+
+What shipped, and how it differs from the plan above.
+
+### Delivered
+
+| Phase | Plan | Outcome |
+|---|---|---|
+| 0 — Prep | Tighten the boundary | Done as written |
+| 1 — Runtime + pilot | wasmtime + timer | Done as written |
+| 2 — Macro parity | `#[plugin_export]` grows a wasm branch | **Dropped.** With the native ABI deleted there is nothing to be at parity *with*; guests call `wit-bindgen` directly and `plugin-macros` was removed entirely |
+| 3 — Capabilities | One capability per PR | All four done: `system-info`, `audio`, `input`, `websocket` |
+| 4 — Packaging | Drop the per-platform matrix | Done; plugins are staged from `plugins/` into every bundle |
+| 5 — Retire FFI | Feature-gate, then delete | Done, including deleting the five native plugin crates |
+
+### Corrections to this plan
+
+- **`websocket` beat `obs-transport`.** §4 offered wrapping `obws` host-side as
+  the simpler fallback. The generic socket won: the obs-websocket 5.x handshake
+  is SHA256 + base64, both of which compile to `wasm32-wasip2` cleanly, so the
+  entire protocol stayed guest-side. The plugin is real logic, not a shim, and
+  the host gained a transport reusable by anything else.
+- **Capability enforcement is at call time, not link time.** §5 said a plugin
+  that never declared `audio` "cannot import it". In practice every guest links
+  against the whole world — a component's imports are fixed at build time and
+  the world is shared — so the grant is checked on each call instead. The
+  observable behaviour is the same; the mechanism is not what was predicted.
+- **`load-avg-1` is not a legal WIT identifier.** A segment cannot be a bare
+  digit. The fields are `load-avg-one` / `-five` / `-fifteen`.
+- **Audio support is probed, not declared.** A Linux host with no PulseAudio
+  socket compiles identically to one with a working sound server, so
+  `get-support` reports the result of a real call rather than a compile-time
+  constant.
+- **The temp-file dance did not need replacing, only deleting.** wasmtime
+  compiles from a byte slice, so the PID-stamped scratch files, the stale-file
+  sweeper and the ENOSPC diagnostics around them are all gone.
+
+### The §9 recommendation, revisited
+
+§9 advised doing Phases 0–2 and reassessing. That advice was sound for the
+question it was answering, but the decision taken was to complete the
+migration, and the honest post-hoc assessment is mixed:
+
+- **`obs` and `system-monitor` justify the boundary.** Both keep real logic
+  guest-side and gain genuine containment.
+- **`volume-master` and `key-simulator` are thin**, exactly as §4 warned. Most
+  of what they were is now `sd-caps`. They remain plugins because their command
+  surface and widget contract are their own, and because the capabilities
+  underneath are reusable — but a built-in module would have been a defensible
+  call.
+
+The native code did not go away; it changed owner. What was bought is that it
+is now host code under this project's control, while anything loaded at runtime
+is sandboxed, portable as a single artifact, and individually revocable.

@@ -163,14 +163,16 @@ Per-input volume and mute controls.
 
 ## Building
 
-```bash
-# Build all plugins
-cargo build --release -p plugin-timer -p plugin-system-monitor -p plugin-key-simulator -p plugin-volume-master -p plugin-obs
+Every plugin is a WASI component. The CLI builds each for `wasm32-wasip2` and
+stages the `.wasm` plus its manifest into `plugins/`:
 
-# Copy to plugins directory
-mkdir -p plugins
-cp target/release/libplugin_*.so plugins/
+```bash
+rustup target add wasm32-wasip2
+cargo build -p sd-plugins-cli
+./target/debug/sd-plugins build --release
 ```
+
+One artifact per plugin, identical on every platform.
 
 ## API Endpoints
 
@@ -272,7 +274,7 @@ To create a new system plugin:
 3. Set up `Cargo.toml`:
    ```toml
    [package]
-   name = "plugin-name"
+   name = "plugin-name-wasm"
    version = "0.1.0"
    edition = "2021"
 
@@ -280,62 +282,76 @@ To create a new system plugin:
    crate-type = ["cdylib"]
 
    [dependencies]
-   plugin-system = { path = "../../crates/plugin-system" }
-   log = "0.4"
-   serde = { version = "1", features = ["derive"] }
+   # The guest does not depend on `plugin-system`: that crate is the host.
+   # The WIT contract is the only thing shared.
+   wit-bindgen = "0.46"
    serde_json = "1"
    ```
 
-4. Implement the plugin:
+4. Implement the WIT `guest` interface:
    ```rust
-   use plugin_system::{Plugin, PluginMetadata};
+   wit_bindgen::generate!({
+       path: "../../crates/plugin-system/wit",
+       world: "streamdeck-plugin",
+   });
 
-   pub struct MyPlugin;
+   use exports::streamdeck::plugin::guest::Guest;
+   use streamdeck::plugin::types::{CommandError, Dependency, Metadata};
 
-   #[plugin_system::plugin_export]
-   impl Plugin for MyPlugin {
-       fn metadata(&self) -> PluginMetadata {
-           plugin_system::plugin_metadata! {
-               name: "my-plugin",
-               version: "0.1.0",
-               authors: ["You"],
-               dependencies: []
+   struct MyPlugin;
+
+   impl Guest for MyPlugin {
+       fn get_metadata() -> Metadata {
+           Metadata {
+               name: "my-plugin".into(),
+               version: "0.1.0".into(),
+               authors: vec!["You".into()],
+               dependencies: Vec::<Dependency>::new(),
            }
        }
 
-       fn on_load(&mut self, _ctx: &plugin_system::PluginContext) {
-           log::info!("MyPlugin loaded");
+       fn on_load() {}
+       fn on_unload() {}
+
+       fn interface_ids() -> Vec<String> {
+           vec!["MyInterface".into()]
        }
 
-       fn on_unload(&mut self) {
-           log::info!("MyPlugin unloading");
-       }
-
-       fn plugin_type_name(&self) -> &'static str {
-           std::any::type_name::<Self>()
-       }
-
-       fn interface_ids(&self) -> Vec<&'static str> {
-           vec!["MyInterface"]
-       }
-
-       fn interface_data(&self) -> Option<serde_json::Value> {
+       fn interface_data() -> Option<String> {
            None
        }
 
-       fn handle_command(&mut self, method: &str, args: serde_json::Value) -> Option<serde_json::Value> {
-           match method {
-               "my_command" => Some(serde_json::json!({"ok": true})),
-               _ => None,
+       fn handle_command(method: String, args_json: String) -> Result<String, CommandError> {
+           let _args: serde_json::Value = serde_json::from_str(&args_json)
+               .map_err(|e| CommandError::InvalidArgs(e.to_string()))?;
+           match method.as_str() {
+               "my_command" => Ok(r#"{"ok":true}"#.into()),
+               other => Err(CommandError::NotFound(other.into())),
            }
        }
    }
+
+   export!(MyPlugin);
    ```
 
-5. Build and copy:
+5. Declare any capabilities in `plugin.manifest.json`, beside `Cargo.toml`:
+   ```json
+   {
+     "name": "my-plugin",
+     "version": "0.1.0",
+     "abi": "wasm-component",
+     "interfaces": ["MyInterface"],
+     "capabilities": [],
+     "limits": { "memory_mb": 32, "call_timeout_ms": 5000 }
+   }
+   ```
+
+   A capability not listed here is refused at call time, even when the host
+   provides it. Available names: `system-info`, `audio`, `input`, `websocket`.
+
+6. Build and stage:
    ```bash
-   cargo build -p plugin-name
-   cp target/debug/libplugin_name.so plugins/
+   ./target/debug/sd-plugins build -p plugin-name-wasm
    ```
 
 ## Widget Integration
@@ -351,14 +367,17 @@ To add a widget for your plugin in the web UI:
 
 ## Platform Support
 
-| Plugin | Linux | Windows | macOS |
-|--------|-------|---------|-------|
-| plugin-timer | ✓ | ✓ | ✓ |
-| plugin-system-monitor | ✓ | ✗ | ✗ |
-| plugin-key-simulator | ✓ | ✓ | ✓ |
-| plugin-volume-master | ✓ | ✓ | ✓ |
-| plugin-volume-master (per-app) | ✓ | ✓ | ✗ |
-| plugin-obs | ✓ | ✓ | ✓ |
+Plugins themselves are platform-independent — one `.wasm` runs everywhere.
+What varies is the host capability each one depends on:
+
+| Capability | Used by | Linux | Windows | macOS |
+|---|---|---|---|---|
+| (none) | timer | ✓ | ✓ | ✓ |
+| `system-info` | system-monitor | ✓ | ✓ | ✓ |
+| `audio` (master) | volume-master | ✓ | ✓ | ✓ |
+| `audio` (per-app) | volume-master | ✓ | ✓ | ✗ |
+| `input` | key-simulator | ✓ | ✓ | ✓ |
+| `websocket` | obs | ✓ | ✓ | ✓ |
 
 ## OBS WebSocket Setup
 
@@ -371,11 +390,20 @@ To add a widget for your plugin in the web UI:
 7. Configure the widget with your OBS host/port/password
 8. Click "Connect" in the widget
 
-The OBS plugin uses the `obws` crate (v0.15) which implements the OBS WebSocket 5.x protocol.
+The OBS plugin implements the obs-websocket 5.x protocol itself — the identify
+handshake, request correlation and all request types live in the component. The
+host grants only a plain `websocket` transport, so OBS traffic is parsed inside
+the sandbox rather than by the host. (`obws` and its tokio runtime are gone;
+components are single-threaded and the capability is synchronous.)
 
 ## Notes
 
-- Plugin `.so` files are loaded from the `plugins/` directory at startup
+- Plugin `.wasm` files are loaded from the `plugins/` directory at startup,
+  together with their `*.manifest.json` sidecars
+- Native `.so` / `.dll` / `.dylib` plugins are no longer loadable and are
+  ignored if present
 - Use `POST /api/plugins/reload` to hot-reload plugins without restarting
 - Plugin data is accessible via `GET /api/plugins/:name`
-- Commands are dispatched via `handle_command()` trait method
+- Commands are dispatched via the WIT `handle-command` export
+- A plugin that hangs, panics or leaks fails on its own: the host returns an
+  error and stays up

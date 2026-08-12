@@ -1,0 +1,9 @@
+{
+  "name": "key-simulator",
+  "version": "0.1.0",
+  "authors": ["StreamDeck Core"],
+  "abi": "wasm-component",
+  "interfaces": ["KeySimulator"],
+  "capabilities": ["input"],
+  "limits": { "memory_mb": 32, "call_timeout_ms": 30000 }
+}

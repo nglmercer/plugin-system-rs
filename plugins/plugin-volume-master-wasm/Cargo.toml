@@ -1,0 +1,13 @@
+[package]
+name = "plugin-volume-master-wasm"
+version = "0.1.0"
+edition = "2021"
+description = "Master and per-application volume control, as a WASI Preview 2 component"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wit-bindgen = "0.46"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

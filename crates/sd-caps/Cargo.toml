@@ -1,0 +1,48 @@
+[package]
+name = "sd-caps"
+version = "0.1.0"
+edition = "2021"
+description = "Native host capability providers for WASI component plugins"
+
+[features]
+# Capabilities are added here as each is implemented.
+default = ["system-info", "audio", "input", "websocket"]
+system-info = ["sysinfo"]
+# Platform audio backends are selected by target, so the feature only
+# needs to switch the module on; each target block pulls its own crate.
+audio = []
+input = ["rdev"]
+websocket = ["tungstenite", "url"]
+
+[dependencies]
+plugin-system = { path = "../plugin-system" }
+log = "0.4"
+sysinfo = { version = "0.33.1", optional = true, default-features = false, features = [
+    "system",
+] }
+rdev = { version = "0.5", optional = true }
+tungstenite = { version = "0.24", optional = true, features = ["rustls-tls-native-roots"] }
+url = { version = "2", optional = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libpulse-binding = "2.30"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.58", features = [
+    "Win32_Media_Audio",
+    "Win32_Media_Audio_Endpoints",
+    "Win32_System_Com",
+    "Win32_Foundation",
+    "Win32_Media_KernelStreaming",
+    "Win32_UI_Shell",
+    "Win32_UI_Shell_PropertiesSystem",
+    "Win32_System_Threading",
+    "Win32_Devices_FunctionDiscovery",
+] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+coreaudio_rs = { package = "coreaudio-rs", version = "0.11" }
+
+[dev-dependencies]
+tempfile = "3"
+serde_json = "1"

@@ -1,0 +1,9 @@
+{
+  "name": "obs",
+  "version": "0.1.0",
+  "authors": ["StreamDeck Core"],
+  "abi": "wasm-component",
+  "interfaces": ["ObsControl"],
+  "capabilities": ["websocket"],
+  "limits": { "memory_mb": 64, "call_timeout_ms": 15000 }
+}
