@@ -1,9 +1,0 @@
-{
-  "name": "system-monitor",
-  "version": "0.1.0",
-  "authors": ["StreamDeck Core"],
-  "abi": "wasm-component",
-  "interfaces": ["SystemMonitor"],
-  "capabilities": ["system-info"],
-  "limits": { "memory_mb": 32, "call_timeout_ms": 5000 }
-}

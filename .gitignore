@@ -41,3 +41,7 @@ data/plugin-state.json
 
 # wasm plugin crates are outside the workspace and build into their own target/
 plugins/*-wasm/target/
+# Staged build output: `sd-plugins build` copies each component and its
+# manifest here. The sources live in plugins/<crate>/.
+plugins/*.wasm
+plugins/*.manifest.json

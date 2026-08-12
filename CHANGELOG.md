@@ -7,6 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — plugin ABI is now WebAssembly only (breaking)
+
+The native FFI plugin backends are gone. A plugin is a WASI Preview 2
+component; nothing else loads.
+
+- **Removed the Rust trait-object and `c-flat` ABIs**, `libloading`, the
+  `dlopen` loader, symbol-prefix parsing, and the PID-stamped temp-file dance
+  that existed only to work around `dlopen`. `plugin-system` is now
+  `#![forbid(unsafe_code)]` with no feature gate.
+- **Removed the `plugin-macros` crate.** It existed solely to emit
+  `#[no_mangle] extern "C"` glue. Guests use `wit-bindgen` against
+  `crates/plugin-system/wit/plugin.wit` directly.
+- **Removed the `native-ffi`, `file-loader` and `wasm` cargo features.** The
+  wasm backend is unconditional; there is nothing left to gate.
+- **A manifest declaring `abi: "native"` or `"c-flat"` is now a load error**
+  that names the removed ABI and points at the replacement, rather than a
+  silent reinterpretation. Manifests with no `abi` key default to
+  `wasm-component` (previously `native`).
+- Plugin discovery accepts only `.wasm`. Leftover `.so` / `.dll` / `.dylib`
+  files in `plugins/` are ignored.
+
+### Added — host capabilities
+
+A component has no ambient authority, so anything touching the machine is a
+host capability, declared per plugin and enforced on every call.
+
+- New crate **`sd-caps`** with four providers: `system-info` (`sysinfo`),
+  `audio` (PulseAudio / COM / CoreAudio), `input` (`rdev`), and `websocket`
+  (`tungstenite`). This is where the platform code that used to live inside
+  plugins now lives.
+- `capabilities` in a plugin's sidecar manifest is now enforced: an undeclared
+  capability is refused even when the host provides it, an unknown capability
+  name fails at load, and a declared-but-unavailable one fails at the call with
+  a message distinguishing the two cases.
+- `PluginManager::set_capabilities` lets an embedder choose what to offer;
+  the default is nothing.
+
+### Changed — all five plugins ported to components
+
+Same names, same commands, same JSON: `sd-api` and the web UI were not
+modified. Each now ships as one `.wasm` for every platform instead of six
+per-platform shared libraries.
+
+- `timer`, `system-monitor`, `volume-master`, `key-simulator`, `obs`
+- `obs` implements the obs-websocket 5.x protocol itself — identify handshake,
+  request correlation, all request types — over a plain `websocket` grant.
+  `obws` and its tokio runtime are gone.
+- Plugins declare grants in a `plugin.manifest.json` beside their `Cargo.toml`,
+  staged automatically by `sd-plugins build`.
+
+### Changed — build and packaging
+
+- `sd-plugins build` compiles plugins for `wasm32-wasip2` and stages the
+  `.wasm` plus its manifest. `--target` now only affects the `sd-core` binary.
+- Release bundles stage the same plugin files on every platform; plugins have
+  dropped out of the per-platform artifact matrix.
+- `sd-plugins list`/`clean` handle the out-of-workspace plugin crates, and skip
+  crates marked `[package.metadata.sd-plugins] fixture = true`.
+
+### Removed
+- `docs/PLUGIN-DOWNCAST-FIX.md` — documented a `TypeId` mismatch between `lib`
+  and `cdylib` builds, which cannot occur without dynamic loading.
+
 ### Added
 - System tray icon with multiplatform support (Linux/Windows/macOS)
 - QR code in web UI for mobile access
@@ -45,7 +108,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Initial release
-- Plugin system with libloading
+- Plugin system with libloading (removed in Unreleased; see above)
 - Web UI with Preact + TypeScript
 - System monitor, timer, key simulator plugins
 - Virtual StreamDeck device
