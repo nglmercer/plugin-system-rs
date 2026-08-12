@@ -7,11 +7,6 @@ edition = "2021"
 name = "sd-core"
 path = "src/main.rs"
 
-[features]
-default = []
-# Load WebAssembly component plugins in addition to native ones.
-wasm = ["sd-plugins/wasm"]
-
 [dependencies]
 sd-types = { path = "../sd-types" }
 sd-events = { path = "../sd-events" }

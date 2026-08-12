@@ -9,7 +9,6 @@
 //! cargo build --manifest-path plugins/plugin-timer-wasm/Cargo.toml \
 //!     --target wasm32-wasip2 --release
 //! ```
-#![cfg(feature = "wasm")]
 
 use plugin_system::PluginManager;
 use std::path::PathBuf;

@@ -94,7 +94,8 @@ enum Commands {
         #[arg(short, long)]
         package: Vec<String>,
 
-        /// Target triple for cross-compilation
+        /// Target triple for the sd-core binary. Plugins ignore this: they
+        /// are always built for wasm32-wasip2.
         #[arg(short, long)]
         target: Option<String>,
 
@@ -195,57 +196,65 @@ fn find_workspace_root() -> Result<PathBuf> {
     Ok(metadata.workspace_root.into_std_path_buf())
 }
 
+/// The target every plugin is built for.
+const WASM_TARGET: &str = "wasm32-wasip2";
+
+/// Find the plugin crates under `plugins/`.
+///
+/// These are deliberately outside the cargo workspace — their `wit-bindgen`
+/// glue emits wasm-only imports that cannot link into a host binary, so a
+/// workspace-wide `cargo build` would fail on them. That means workspace
+/// metadata cannot see them and the directory has to be walked directly, with
+/// one `cargo metadata` call per crate to read its name and version.
 fn discover_plugins(workspace_root: &Path) -> Result<Vec<PluginInfo>> {
-    let metadata = MetadataCommand::new()
-        .current_dir(workspace_root)
-        .exec()
-        .context("Failed to read Cargo workspace metadata")?;
+    let plugins_dir = workspace_root.join("plugins");
+    if !plugins_dir.exists() {
+        return Ok(Vec::new());
+    }
 
     let mut plugins = Vec::new();
 
-    for package in &metadata.packages {
-        let manifest_str = package.manifest_path.to_string();
-        if manifest_str.contains("/plugins/plugin-") || manifest_str.contains("\\plugins\\plugin-")
-        {
-            let is_cdylib = package
-                .targets
-                .iter()
-                .any(|t| t.kind.iter().any(|k| k == "cdylib" || k == "lib"));
-
-            if is_cdylib {
-                let dir_name = package
-                    .manifest_path
-                    .parent()
-                    .unwrap()
-                    .file_name()
-                    .unwrap()
-                    .to_string();
-
-                let lib_name = package.name.replace('-', "_");
-
-                plugins.push(PluginInfo {
-                    name: package.name.clone(),
-                    dir_name,
-                    lib_name,
-                    version: package.version.to_string(),
-                    manifest_path: package.manifest_path.clone().into_std_path_buf(),
-                });
-            }
+    for entry in std::fs::read_dir(&plugins_dir)
+        .with_context(|| format!("Failed to read {}", plugins_dir.display()))?
+    {
+        let entry = entry?;
+        let dir = entry.path();
+        let manifest_path = dir.join("Cargo.toml");
+        if !manifest_path.is_file() {
+            continue;
         }
+
+        let metadata = MetadataCommand::new()
+            .manifest_path(&manifest_path)
+            .no_deps()
+            .exec()
+            .with_context(|| format!("Failed to read metadata for {}", manifest_path.display()))?;
+
+        // `no_deps` on a standalone crate yields exactly that crate.
+        let Some(package) = metadata.packages.first() else {
+            continue;
+        };
+
+        plugins.push(PluginInfo {
+            name: package.name.clone(),
+            dir_name: entry.file_name().to_string_lossy().into_owned(),
+            lib_name: package.name.replace('-', "_"),
+            version: package.version.to_string(),
+            manifest_path,
+        });
     }
 
     plugins.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(plugins)
 }
 
-fn get_plugin_lib_filename(lib_name: &str, target: &str) -> String {
-    if target.contains("windows") {
-        format!("{}.dll", lib_name)
-    } else if target.contains("apple") || target.contains("darwin") {
-        format!("lib{}.dylib", lib_name)
-    } else {
-        format!("lib{}.so", lib_name)
-    }
+/// The artifact filename for a plugin.
+///
+/// One name, every platform. This used to take a target triple and return
+/// `.so` / `.dylib` / `.dll`, which is why a release had to carry six copies
+/// of each plugin.
+fn plugin_artifact_filename(lib_name: &str) -> String {
+    format!("{}.wasm", lib_name)
 }
 
 fn get_host_target() -> Result<String> {
@@ -288,11 +297,17 @@ fn cmd_build(
     let workspace_root = find_workspace_root()?;
     let plugins = discover_plugins(&workspace_root)?;
 
+    // `--target` now only affects the host binary. Plugins are always built
+    // for `wasm32-wasip2`: one artifact runs everywhere, which is the reason
+    // the native ABIs were dropped.
     let target_triple = target.unwrap_or_else(|| get_host_target().unwrap_or_default());
     let profile_flag = if release { "--release" } else { "" };
 
     println!("{}", "=== StreamDeck Plugin Builder ===".cyan().bold());
-    println!("Target: {}", target_triple.yellow());
+    println!("Plugin target: {}", WASM_TARGET.yellow());
+    if with_core {
+        println!("Core target:   {}", target_triple.yellow());
+    }
     println!("Mode: {}", if release { "release" } else { "debug" });
     println!();
 
@@ -369,47 +384,25 @@ fn cmd_build(
     for plugin in &plugins_to_build {
         print!("Building {}... ", plugin.name.cyan());
 
-        let mut args = vec!["build"];
-        if !profile_flag.is_empty() {
-            args.push(profile_flag);
-        }
-        if target_triple != get_host_target().unwrap_or_default() {
-            args.push("--target");
-            args.push(&target_triple);
-        }
-        args.push("--lib");
-        args.push("-p");
-        args.push(&plugin.name);
-
-        let status = Command::new("cargo")
-            .args(&args)
-            .current_dir(&workspace_root)
-            .status()
-            .context(format!("Failed to build {}", plugin.name))?;
-
-        if status.success() {
-            println!("{}", "OK".green());
-            built += 1;
-
-            // Copy plugin to plugins/ directory
-            let lib_filename = get_plugin_lib_filename(&plugin.lib_name, &target_triple);
-            let profile = if release { "release" } else { "debug" };
-            let src_dir = if target_triple == get_host_target().unwrap_or_default() {
-                workspace_root.join(format!("target/{}", profile))
-            } else {
-                workspace_root.join(format!("target/{}/{}", target_triple, profile))
-            };
-            let src = src_dir.join(&lib_filename);
-            let dst = workspace_root.join("plugins").join(&lib_filename);
-
-            if src.exists() {
-                std::fs::copy(&src, &dst)
-                    .context(format!("Failed to copy {} to plugins/", lib_filename))?;
+        match build_one_plugin(&workspace_root, plugin, release) {
+            Ok(Some(dst)) => {
+                println!("{}", "OK".green());
                 println!("    -> {}", dst.display());
+                built += 1;
             }
-        } else {
-            println!("{}", "FAILED".red());
-            failed += 1;
+            Ok(None) => {
+                println!("{}", "OK".green());
+                println!(
+                    "    {} cargo succeeded but no artifact was produced",
+                    "warning:".yellow()
+                );
+                built += 1;
+            }
+            Err(e) => {
+                println!("{}", "FAILED".red());
+                eprintln!("    {e:#}");
+                failed += 1;
+            }
         }
     }
 
@@ -472,7 +465,24 @@ fn cmd_clean() -> Result<()> {
         println!("  {}", "target/ cleaned".green());
     }
 
-    // Remove plugin binaries from plugins/
+    // Plugin crates are outside the workspace, so `cargo clean` above did not
+    // touch them; each has its own target directory.
+    for plugin in discover_plugins(&workspace_root)? {
+        let plugin_dir = plugin
+            .manifest_path
+            .parent()
+            .expect("manifest path always has a parent");
+        let status = Command::new("cargo")
+            .args(["clean"])
+            .current_dir(plugin_dir)
+            .status();
+        if matches!(status, Ok(s) if s.success()) {
+            println!("  {} target/ cleaned", plugin.name);
+        }
+    }
+
+    // Remove staged plugin artifacts from plugins/. Stale native libraries
+    // from before the migration are swept up too, since nothing can load them.
     let plugins_dir = workspace_root.join("plugins");
     if plugins_dir.exists() {
         for entry in std::fs::read_dir(&plugins_dir)? {
@@ -480,7 +490,7 @@ fn cmd_clean() -> Result<()> {
             let path = entry.path();
             if let Some(ext) = path.extension() {
                 let ext_str = ext.to_string_lossy();
-                if ext_str == "so" || ext_str == "dylib" || ext_str == "dll" {
+                if matches!(ext_str.as_ref(), "wasm" | "so" | "dylib" | "dll") {
                     std::fs::remove_file(&path)?;
                     println!("  Removed {}", path.display());
                 }
@@ -693,7 +703,6 @@ fn cmd_check() -> Result<()> {
 
 fn cmd_dev(release: bool, command: Vec<String>) -> Result<()> {
     let workspace_root = find_workspace_root()?;
-    let target_triple = get_host_target()?;
 
     println!("{}", "=== StreamDeck Dev Mode ===".cyan().bold());
     println!("Watching plugins for changes...");
@@ -702,7 +711,7 @@ fn cmd_dev(release: bool, command: Vec<String>) -> Result<()> {
 
     // Initial build of all plugins
     println!("{}", "Building plugins...".yellow());
-    build_all_plugins(&workspace_root, &target_triple, release)?;
+    build_all_plugins(&workspace_root, release)?;
     println!();
 
     // Spawn the user's command
@@ -761,7 +770,7 @@ fn cmd_dev(release: bool, command: Vec<String>) -> Result<()> {
                 }
 
                 // Rebuild affected plugins
-                match build_plugins(&workspace_root, &target_triple, release, &affected) {
+                match build_plugins(&workspace_root, release, &affected) {
                     Ok(()) => {
                         last_build = std::time::Instant::now();
 
@@ -816,11 +825,6 @@ fn get_watch_dirs(workspace_root: &Path) -> Vec<PathBuf> {
         dirs.push(system_src);
     }
 
-    let macros_src = workspace_root.join("crates/plugin-macros/src");
-    if macros_src.exists() {
-        dirs.push(macros_src);
-    }
-
     dirs
 }
 
@@ -853,8 +857,7 @@ fn determine_affected_plugins(paths: &[PathBuf]) -> Vec<String> {
         let path_str = path.to_string_lossy();
 
         // Changes in shared crates affect ALL plugins
-        if path_str.contains("crates/plugin-system/") || path_str.contains("crates/plugin-macros/")
-        {
+        if path_str.contains("crates/plugin-system/") {
             rebuild_all = true;
             break;
         }
@@ -886,18 +889,13 @@ fn extract_plugin_name(path: &str) -> Option<String> {
     None
 }
 
-fn build_all_plugins(workspace_root: &Path, target_triple: &str, release: bool) -> Result<()> {
+fn build_all_plugins(workspace_root: &Path, release: bool) -> Result<()> {
     let plugins = discover_plugins(workspace_root)?;
     let plugins_refs: Vec<&PluginInfo> = plugins.iter().collect();
-    build_plugins_with_info(workspace_root, target_triple, release, &plugins_refs)
+    build_plugins_with_info(workspace_root, release, &plugins_refs)
 }
 
-fn build_plugins(
-    workspace_root: &Path,
-    target_triple: &str,
-    release: bool,
-    affected: &[String],
-) -> Result<()> {
+fn build_plugins(workspace_root: &Path, release: bool, affected: &[String]) -> Result<()> {
     let all_plugins = discover_plugins(workspace_root)?;
 
     let plugins_to_build: Vec<&PluginInfo> = if affected.contains(&"__all__".to_string()) {
@@ -913,62 +911,74 @@ fn build_plugins(
         return Ok(());
     }
 
-    build_plugins_with_info(workspace_root, target_triple, release, &plugins_to_build)
+    build_plugins_with_info(workspace_root, release, &plugins_to_build)
+}
+
+/// Build one plugin to `wasm32-wasip2` and stage the artifact in `plugins/`.
+///
+/// Returns the staged path, or `None` when cargo succeeded but the expected
+/// artifact was not where it should be.
+fn build_one_plugin(
+    workspace_root: &Path,
+    plugin: &PluginInfo,
+    release: bool,
+) -> Result<Option<PathBuf>> {
+    // Plugins live outside the cargo workspace, so each is built from its own
+    // directory rather than selected with `-p`.
+    let plugin_dir = plugin
+        .manifest_path
+        .parent()
+        .expect("manifest path always has a parent");
+
+    let mut args = vec!["build", "--target", WASM_TARGET, "--lib"];
+    if release {
+        args.push("--release");
+    }
+
+    let status = Command::new("cargo")
+        .args(&args)
+        .current_dir(plugin_dir)
+        .status()
+        .context(format!("Failed to build {}", plugin.name))?;
+
+    if !status.success() {
+        anyhow::bail!("Failed to build {}", plugin.name);
+    }
+
+    let artifact = plugin_artifact_filename(&plugin.lib_name);
+    let profile = if release { "release" } else { "debug" };
+    let src = plugin_dir
+        .join("target")
+        .join(WASM_TARGET)
+        .join(profile)
+        .join(&artifact);
+
+    if !src.exists() {
+        return Ok(None);
+    }
+
+    let plugins_dir = workspace_root.join("plugins");
+    std::fs::create_dir_all(&plugins_dir)?;
+    let dst = plugins_dir.join(&artifact);
+    std::fs::copy(&src, &dst).context(format!("Failed to copy {} to plugins/", artifact))?;
+    Ok(Some(dst))
 }
 
 fn build_plugins_with_info(
     workspace_root: &Path,
-    target_triple: &str,
     release: bool,
     plugins: &[&PluginInfo],
 ) -> Result<()> {
-    let profile_flag = if release { "--release" } else { "" };
-    let host_target = get_host_target().unwrap_or_default();
     let mut built = 0;
 
     for plugin in plugins {
         print!("  Building {}... ", plugin.name.cyan());
-
-        let mut args = vec!["build"];
-        if !profile_flag.is_empty() {
-            args.push(profile_flag);
-        }
-        if target_triple != host_target {
-            args.push("--target");
-            args.push(target_triple);
-        }
-        args.push("--lib");
-        args.push("-p");
-        args.push(&plugin.name);
-
-        let status = Command::new("cargo")
-            .args(&args)
-            .current_dir(workspace_root)
-            .status()
-            .context(format!("Failed to build {}", plugin.name))?;
-
-        if status.success() {
-            println!("{}", "OK".green());
-            built += 1;
-
-            // Copy plugin to plugins/ directory
-            let lib_filename = get_plugin_lib_filename(&plugin.lib_name, target_triple);
-            let profile = if release { "release" } else { "debug" };
-            let src_dir = if target_triple == host_target {
-                workspace_root.join(format!("target/{}", profile))
-            } else {
-                workspace_root.join(format!("target/{}/{}", target_triple, profile))
-            };
-            let src = src_dir.join(&lib_filename);
-            let dst = workspace_root.join("plugins").join(&lib_filename);
-
-            if src.exists() {
-                std::fs::copy(&src, &dst)
-                    .context(format!("Failed to copy {} to plugins/", lib_filename))?;
+        match build_one_plugin(workspace_root, plugin, release)? {
+            Some(_) => {
+                println!("{}", "OK".green());
+                built += 1;
             }
-        } else {
-            println!("{}", "FAILED".red());
-            anyhow::bail!("Failed to build {}", plugin.name);
+            None => println!("{} (artifact missing)", "OK".green()),
         }
     }
 

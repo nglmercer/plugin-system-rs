@@ -27,7 +27,8 @@ pub struct Staged {
 /// stage/
 ///   sd-core[.exe]                  <- the core binary
 ///   plugins/
-///     libplugin_*.so|.dll|.dylib  <- plugin shared libraries
+///     plugin_*.wasm                <- plugin components (same on every platform)
+///     plugin_*.manifest.json       <- optional sidecar manifests
 ///   web/                           <- web frontend assets
 ///   assets/                        <- platform-specific assets (.desktop, icons, …)
 ///   README.md, LICENSE             <- top-level docs
@@ -101,43 +102,45 @@ pub fn stage_release(
     std::fs::copy(&core_src, &core_dst)
         .with_context(|| format!("copying core binary from {}", core_src.display()))?;
 
-    // 3) Copy plugin .so / .dll / .dylib from the same target dir
-    let lib_ext = lib_extension_for(platform);
-    let lib_prefix = lib_prefix_for(platform);
+    // 3) Copy plugin components, plus any sidecar manifests, from the
+    //    workspace `plugins/` directory.
+    //
+    //    These no longer come out of `target/<triple>/release`: a component is
+    //    not built for the host triple and is identical on every platform, so
+    //    the same files are staged into every bundle in the matrix.
+    let plugin_src_dir = workspace_root.join("plugins");
     let mut plugin_count = 0usize;
-    for entry in WalkDir::new(&target_dir)
-        .max_depth(1)
-        .into_iter()
-        .filter_map(Result::ok)
-    {
-        let path = entry.path();
-        if !path.is_file() {
-            continue;
+    if plugin_src_dir.is_dir() {
+        for entry in WalkDir::new(&plugin_src_dir)
+            .max_depth(1)
+            .into_iter()
+            .filter_map(Result::ok)
+        {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            let fname = match path.file_name().and_then(|s| s.to_str()) {
+                Some(s) => s,
+                None => continue,
+            };
+            let is_component = fname.ends_with(".wasm");
+            let is_manifest = fname.ends_with(".manifest.json");
+            if !is_component && !is_manifest {
+                continue;
+            }
+            let dst = plugins_dir.join(fname);
+            std::fs::copy(path, &dst).with_context(|| format!("copying plugin {}", fname))?;
+            if is_component {
+                plugin_count += 1;
+            }
         }
-        let fname = match path.file_name().and_then(|s| s.to_str()) {
-            Some(s) => s,
-            None => continue,
-        };
-        if !fname.starts_with(lib_prefix) {
-            continue;
-        }
-        if !fname.ends_with(&lib_ext) {
-            continue;
-        }
-        // Skip the sd-core binary (which doesn't start with `libplugin_` on any
-        // platform, but defensively re-check by name).
-        if fname == format!("sd-core{lib_ext}") || fname == "sd-core.exe" {
-            continue;
-        }
-        let dst = plugins_dir.join(fname);
-        std::fs::copy(path, &dst).with_context(|| format!("copying plugin {}", fname))?;
-        plugin_count += 1;
     }
     if plugin_count == 0 {
         eprintln!(
-            "  {} no plugins copied (none found in {})",
+            "  {} no plugins copied (no .wasm found in {}); run `sd-plugins build --release` first",
             "warning:".yellow(),
-            target_dir.display()
+            plugin_src_dir.display()
         );
     } else {
         println!(
@@ -234,26 +237,6 @@ fn core_binary_for(platform: &str) -> (&'static str, &'static str) {
         ("sd-core", ".exe")
     } else {
         ("sd-core", "")
-    }
-}
-
-fn lib_extension_for(platform: &str) -> &'static str {
-    if platform.starts_with("windows") {
-        ".dll"
-    } else if platform.starts_with("macos") {
-        ".dylib"
-    } else {
-        ".so"
-    }
-}
-
-/// On Linux/macOS Rust produces `lib<name>.{so,dylib}`; on Windows the
-/// `lib` prefix is omitted and the file is `<name>.dll`.
-fn lib_prefix_for(platform: &str) -> &'static str {
-    if platform.starts_with("windows") {
-        "plugin_"
-    } else {
-        "libplugin_"
     }
 }
 

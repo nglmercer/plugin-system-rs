@@ -6,7 +6,6 @@ pub struct PluginDependency {
     pub version_req: String,
 }
 
-#[repr(C)]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PluginMetadata {
     pub name: String,
@@ -51,10 +50,10 @@ pub trait Plugin: Any + Send + Sync {
 
     /// Interface ids this plugin implements.
     ///
-    /// Returns owned strings rather than `&'static str` so that plugins whose
-    /// ids are only known at runtime — C-ABI plugins reading them from a
-    /// manifest, or WASM guests returning them across the component boundary —
-    /// can implement this without leaking memory.
+    /// Returns owned strings rather than `&'static str` because a guest's ids
+    /// are only known at runtime: they cross the component boundary as a
+    /// `list<string>`, and nothing on the host side can promise they live
+    /// forever.
     fn interface_ids(&self) -> Vec<String> {
         Vec::new()
     }

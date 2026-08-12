@@ -1,15 +1,8 @@
-use std::path::PathBuf;
 
 use semver::Error as SemverError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum PluginError {
-    #[error("Failed to load library '{path}': {reason}")]
-    LibraryLoad { path: PathBuf, reason: String },
-
-    #[error("Symbol '{symbol}' not found in plugin library")]
-    SymbolNotFound { symbol: String },
-
     #[error("Plugin '{name}' failed to load: {reason}")]
     PluginLoad { name: String, reason: String },
 

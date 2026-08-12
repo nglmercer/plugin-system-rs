@@ -1,4 +1,27 @@
-pub mod cabi;
+//! Plugin framework for WebAssembly component plugins running on WASI
+//! Preview 2.
+//!
+//! # No unsafe code
+//!
+//! This crate contains no `unsafe`, and `forbid(unsafe_code)` makes that a
+//! compile error to violate rather than a claim in a comment.
+//!
+//! That is a direct consequence of having exactly one plugin backend. The
+//! shared-library ABIs this crate used to support — the Rust trait object and
+//! the flat C ABI — both went through `dlopen`, and opening a library,
+//! resolving symbols, and calling through raw function pointers cannot be
+//! checked by the compiler. A plugin built against a different rustc or a
+//! different dependency set produced a vtable the host would happily call and
+//! then crash on, and a misbehaving plugin took the whole process with it.
+//!
+//! WebAssembly needs none of that: the boundary is a versioned WIT contract
+//! and the sandbox is enforced by wasmtime at runtime rather than by the
+//! host's own pointer discipline. A plugin that loops forever hits an epoch
+//! deadline, one that allocates without bound hits its memory ceiling, and one
+//! that panics traps at the boundary — in every case the host returns an error
+//! and stays up.
+#![forbid(unsafe_code)]
+
 pub mod context;
 pub mod error;
 pub mod handler;
@@ -6,11 +29,9 @@ pub mod loader;
 pub mod macros;
 pub mod manager;
 pub mod manifest;
-pub mod platform;
 pub mod plugin_info;
 pub mod registry;
 pub mod traits;
-#[cfg(feature = "wasm")]
 pub mod wasm;
 
 pub use context::PluginContext;
@@ -22,16 +43,10 @@ pub use handler::{
 #[cfg(feature = "url-loader")]
 pub use loader::UrlLoader;
 pub use loader::{FileLoader, MultiLoader, PluginLoader};
-pub use manager::PluginManager;
-pub use platform::{
-    copy_cargo_plugin, copy_plugin, library_extension, library_filename, library_path,
-};
+pub use manager::{PluginManager, PLUGIN_EXTENSION};
 pub use plugin_info::{PluginInfo, PluginResult};
 pub use registry::{new_shared_registry, PluginRegistry, SharedRegistry};
 pub use serde_json;
 pub use traits::{command_to_json, CommandResult, Plugin, PluginDependency, PluginMetadata};
 
-pub use cabi::{is_cabi_manifest, CAbiPlugin};
 pub use manifest::{load_plugin_manifest, Abi, Manifest, PluginManifest, ResourceLimits};
-
-pub use plugin_macros::{command, define_plugin, plugin_export, plugin_interface};

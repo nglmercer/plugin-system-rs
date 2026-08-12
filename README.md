@@ -78,8 +78,7 @@ The server starts on `http://localhost:3000`. Open your browser or scan the QR c
 ```
 streamdeck/
 ├── crates/
-│   ├── plugin-system/      Core plugin framework (native + wasm loaders)
-│   ├── plugin-macros/      Proc macros for plugin exports
+│   ├── plugin-system/      Core plugin framework (WASI component loader)
 │   ├── sd-types/           Shared types (ActionId, ProfileId, etc.)
 │   ├── sd-events/          Event bus for inter-plugin communication
 │   ├── sd-actions/         Action trait + built-in actions
@@ -89,38 +88,42 @@ streamdeck/
 │   ├── sd-plugins/         Plugin manager integration
 │   ├── sd-core/            Main binary
 │   └── plugin-cli/         Build CLI tool (sd-plugins)
-├── plugins/
-│   ├── plugin-timer/       Timer/countdown plugin
-│   ├── plugin-system-monitor/  System resource monitoring
-│   ├── plugin-key-simulator/  Key simulation plugin
-│   ├── plugin-volume-master/  Multiplatform volume control
-│   ├── plugin-obs/         OBS Studio WebSocket control
-│   └── plugin-timer-wasm/  Timer as a WASI component (migration pilot)
+├── plugins/            (outside the cargo workspace — built for wasm32-wasip2)
+│   ├── plugin-timer-wasm/       Timer/countdown plugin
+│   └── plugin-misbehaving-wasm/ Fixture that misbehaves on demand, for the
+│                                containment tests
 └── web/                    Preact web UI
 ```
 
-### Plugin ABIs
+### Plugin ABI
 
-A plugin declares its ABI in a sidecar `<plugin>.manifest.json`; the loader
-dispatches on it, so the three kinds coexist in one `plugins/` directory.
+A plugin is a **WebAssembly component** targeting WASI Preview 2. That is the
+only ABI: the native shared-library backends (a Rust trait object over
+`dlopen`, and a flat C ABI) were removed, along with every use of `unsafe` in
+`plugin-system`, which is now `#![forbid(unsafe_code)]`.
 
 | ABI | Artifact | Notes |
 |-----|----------|-------|
-| `native` (default) | `.so` / `.dll` / `.dylib` | Rust trait object. Fastest, but host and plugin must be built together. |
-| `c-flat` | `.so` / `.dll` / `.dylib` | Flat C ABI, JSON in/out. Stable across compilers and languages. |
-| `wasm-component` | `.wasm` | Sandboxed, one artifact for every platform. Requires `--features wasm`. |
+| `wasm-component` (default) | `.wasm` | Sandboxed. One artifact for every platform. |
 
-WebAssembly plugins run with a memory ceiling and a per-call deadline, and get
-no filesystem, environment, or network access they were not granted — so a
-plugin that hangs, panics, or leaks fails on its own instead of taking down
-the server. Build the host with support for them:
+What that buys, none of which was possible with `dlopen`:
 
-```bash
-cargo build --release -p sd-core --features wasm
-```
+- **A crashing plugin cannot take down the host.** A panic traps at the
+  boundary and comes back as an error.
+- **A hanging plugin is cut off** by a per-call epoch deadline.
+- **A leaking plugin hits its own memory ceiling**, not the machine's.
+- **No ambient authority.** No filesystem, environment, or network access
+  beyond what the manifest was granted.
+- **A stable, versioned contract.** The WIT world replaces the Rust vtable,
+  which broke silently whenever the compiler or dependency versions differed
+  between host and plugin.
+- **One build artifact per plugin** instead of one per OS × arch.
 
-The migration from the native FFI to this backend is documented in
-[`docs/wasi-migration.md`](docs/wasi-migration.md).
+The cost is real and worth stating plainly: a component cannot touch hardware
+directly. Plugins that need the OS — audio, input, system stats, sockets —
+require a corresponding host capability interface, and those do not exist yet.
+See [`docs/wasi-migration.md`](docs/wasi-migration.md) for the plan and
+[Platform Support](#platform-support) for what that currently means.
 
 ## Quick Start
 
@@ -187,7 +190,7 @@ make dev-release CMD="cargo run --release --bin sd-core"
 The `dev` command:
 1. Builds all plugins once
 2. Runs your command (e.g. `cargo run --bin sd-core`)
-3. Watches `plugins/*/src/`, `crates/plugin-system/src/`, `crates/plugin-macros/src/` for changes
+3. Watches `plugins/*/src/` and `crates/plugin-system/src/` for changes
 4. On change: rebuilds affected plugins and restarts your command
 5. Press Ctrl+C to stop
 
@@ -278,56 +281,97 @@ The web UI starts on `http://localhost:5173` and proxies API requests to the bac
 
 ## Creating a Plugin
 
+A plugin is a `cdylib` built for `wasm32-wasip2`, implementing the WIT world in
+[`crates/plugin-system/wit/plugin.wit`](crates/plugin-system/wit/plugin.wit).
+Point `wit-bindgen` at that file rather than vendoring a copy — a contract with
+two definitions is a contract that drifts.
+
+`Cargo.toml`:
+
+```toml
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wit-bindgen = "0.46"
+serde_json = "1"
+```
+
+`src/lib.rs`:
+
 ```rust
-use plugin_system::{Plugin, PluginMetadata};
+wit_bindgen::generate!({
+    path: "../../crates/plugin-system/wit",
+    world: "streamdeck-plugin",
+});
 
-pub struct MyPlugin;
+use exports::streamdeck::plugin::guest::Guest;
+use streamdeck::plugin::types::{CommandError, Metadata};
 
-#[plugin_system::plugin_export]
-impl Plugin for MyPlugin {
-    fn metadata(&self) -> PluginMetadata {
-        plugin_system::plugin_metadata! {
-            name: "my-plugin",
-            version: "0.1.0",
-            authors: ["You"],
-            dependencies: []
+struct MyPlugin;
+
+impl Guest for MyPlugin {
+    fn get_metadata() -> Metadata {
+        Metadata {
+            name: "my-plugin".into(),
+            version: "0.1.0".into(),
+            authors: vec!["You".into()],
+            dependencies: vec![],
         }
     }
 
-    fn on_load(&mut self, _ctx: &plugin_system::PluginContext) {
-        log::info!("MyPlugin loaded");
+    fn on_load() {}
+    fn on_unload() {}
+
+    fn interface_ids() -> Vec<String> {
+        vec!["MyInterface".into()]
     }
 
-    fn on_unload(&mut self) {
-        log::info!("MyPlugin unloading");
-    }
-
-    fn plugin_type_name(&self) -> &'static str {
-        std::any::type_name::<Self>()
-    }
-
-    fn interface_ids(&self) -> Vec<&'static str> {
-        vec!["MyInterface"]
-    }
-
-    fn interface_data(&self) -> Option<serde_json::Value> {
+    fn interface_data() -> Option<String> {
         None
     }
 
-    fn handle_command(&mut self, method: &str, args: serde_json::Value) -> Option<serde_json::Value> {
-        match method {
-            "my_command" => Some(serde_json::json!({"ok": true})),
-            _ => None,
+    fn handle_command(method: String, args_json: String) -> Result<String, CommandError> {
+        let _args: serde_json::Value = serde_json::from_str(&args_json)
+            .map_err(|e| CommandError::InvalidArgs(e.to_string()))?;
+        match method.as_str() {
+            "my_command" => Ok(r#"{"ok":true}"#.into()),
+            other => Err(CommandError::NotFound(other.into())),
         }
     }
 }
+
+export!(MyPlugin);
 ```
+
+Place the crate in `plugins/`, then build and stage it:
+
+```bash
+rustup target add wasm32-wasip2
+sd-plugins build --release
+```
+
+The component lands in `plugins/<crate_name>.wasm`. A sidecar
+`<plugin>.manifest.json` is optional; add one to declare capability grants and
+resource limits:
+
+```json
+{
+  "name": "my-plugin",
+  "version": "0.1.0",
+  "abi": "wasm-component",
+  "capabilities": [],
+  "limits": { "memory_mb": 64, "call_timeout_ms": 5000 }
+}
+```
+
+Identity comes from the guest's `get-metadata`, not the manifest, so a plugin
+cannot be renamed by editing its sidecar.
 
 ## Tech Stack
 
 - **Backend**: Rust, tokio, axum
-- **Plugin System**: libloading + custom proc macros, with an optional
-  WebAssembly component backend (wasmtime / WASI Preview 2)
+- **Plugin System**: WebAssembly components on wasmtime / WASI Preview 2
 - **Frontend**: Preact, TypeScript, Vite
 - **Communication**: REST + WebSocket
 - **OBS Integration**: obws (WebSocket 5.x)

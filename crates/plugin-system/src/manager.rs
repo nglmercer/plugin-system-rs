@@ -1,64 +1,25 @@
 use std::collections::HashMap;
-use std::ffi::CStr;
 use std::path::{Path, PathBuf};
 
 use crate::context::PluginContext;
 use crate::error::{PluginError, Result};
 use crate::handler::{new_shared_command_registry, SharedCommandRegistry};
-use crate::loader::{FileLoader, PluginLoader};
-use crate::manifest::{Abi, PluginManifest};
+use crate::loader::PluginLoader;
+use crate::manifest::PluginManifest;
 use crate::registry::{new_shared_registry, SharedRegistry};
 use crate::traits::{Plugin, PluginMetadata};
 
-type PluginCreateFn = unsafe extern "C" fn() -> *mut ();
-type PluginDestroyFn = unsafe extern "C" fn(*mut ());
-type PluginMetadataJsonFn = unsafe extern "C" fn() -> *mut std::ffi::c_char;
-type PluginFreeStringFn = unsafe extern "C" fn(*mut std::ffi::c_char);
-
-/// Derive a symbol prefix from the library filename.
-/// e.g. "libplugin_volume_master.so" -> "volume_master"
-/// The macro generates symbols like "plugin_{prefix}_create", so we need just the suffix.
-fn prefix_from_path(path: &Path) -> Option<String> {
-    let mut stem = path.file_stem()?.to_str()?;
-
-    // Handle temporary files: .libplugin_system_monitor.14194.1782098148297159306.tmp
-    if stem.starts_with('.') {
-        stem = &stem[1..];
-    }
-    if let Some(tmp_idx) = stem.rfind(".tmp") {
-        let before_tmp = &stem[..tmp_idx];
-        if let Some(last_dot) = before_tmp.rfind('.') {
-            let before_last_dot = &before_tmp[..last_dot];
-            if let Some(pid_dot) = before_last_dot.rfind('.') {
-                stem = &before_last_dot[..pid_dot];
-            }
-        }
-    }
-
-    let name = if cfg!(target_os = "linux") || cfg!(target_os = "macos") {
-        stem.strip_prefix("lib").unwrap_or(stem)
-    } else {
-        stem
-    };
-
-    // Strip "plugin_" prefix since the macro already adds it
-    let name = name.strip_prefix("plugin_").unwrap_or(name);
-    // Also strip "plugin-" prefix (with dash) for crate names like "plugin-volume-master"
-    let name = name.strip_prefix("plugin-").unwrap_or(name);
-
-    if name.is_empty() {
-        return None;
-    }
-
-    Some(name.replace('-', "_"))
-}
+/// The one extension a plugin binary can have.
+///
+/// There is no platform matrix any more: a component is the same file on
+/// every host, which is most of the point of dropping the native ABIs.
+pub const PLUGIN_EXTENSION: &str = "wasm";
 
 struct LoadedPlugin {
-    /// For Rust plugins: keeps the dynamic library loaded.
-    /// For C-ABI plugins: `None` (the `CAbiPlugin` holds the library).
-    _lib: Option<libloading::Library>,
     path: PathBuf,
     metadata: PluginMetadata,
+    /// Set when the bytes came from a loader rather than from disk, so the
+    /// scratch file can be removed on unload.
     temp_path: Option<PathBuf>,
 }
 
@@ -66,8 +27,7 @@ pub struct PluginManager {
     registry: SharedRegistry,
     command_registry: SharedCommandRegistry,
     loaded: HashMap<String, LoadedPlugin>,
-    /// Created lazily on the first wasm plugin, and shared by all of them.
-    #[cfg(feature = "wasm")]
+    /// Created lazily on the first plugin, and shared by all of them.
     wasm_runtime: Option<std::sync::Arc<crate::wasm::WasmRuntime>>,
 }
 
@@ -77,7 +37,6 @@ impl PluginManager {
             registry: new_shared_registry(),
             command_registry: new_shared_command_registry(),
             loaded: HashMap::new(),
-            #[cfg(feature = "wasm")]
             wasm_runtime: None,
         }
     }
@@ -90,58 +49,31 @@ impl PluginManager {
         self.command_registry.clone()
     }
 
+    /// Load a plugin from an arbitrary byte source.
+    ///
+    /// Nothing is written to disk. `dlopen` needed a real file, which is why
+    /// this used to spill the bytes into a PID-stamped scratch file and then
+    /// chase the leftovers; wasmtime compiles from a byte slice, so the whole
+    /// dance is gone. The sidecar manifest is still read from the loader's
+    /// source path, since that is where it lives.
     pub fn load_plugin_from_loader(
         &mut self,
         loader: &dyn PluginLoader,
         name: &str,
     ) -> Result<String> {
-        log::info!("Loading plugin '{}' from {}", name, loader.source());
+        let source = loader.source();
+        log::info!("Loading plugin '{}' from {}", name, source);
 
         let bytes = loader.load().map_err(|e| PluginError::PluginLoad {
             name: name.to_string(),
             reason: e.to_string(),
         })?;
 
-        let ext = if cfg!(target_os = "linux") {
-            "so"
-        } else if cfg!(target_os = "macos") {
-            "dylib"
-        } else if cfg!(target_os = "windows") {
-            "dll"
-        } else {
-            "so"
-        };
+        let source_path = PathBuf::from(&source);
+        let manifest = detect_manifest(&source_path)?
+            .unwrap_or_else(|| PluginManifest::for_component(name));
 
-        let temp_dir = std::env::temp_dir().join("plugin-system");
-        std::fs::create_dir_all(&temp_dir)?;
-
-        let temp_path = temp_dir.join(format!("{}_{}.{}", name, std::process::id(), ext));
-        if let Err(e) = std::fs::write(&temp_path, &bytes) {
-            let _ = std::fs::remove_file(&temp_path);
-            return Err(e.into());
-        }
-
-        log::info!(
-            "Wrote {} bytes to temp file: {}",
-            bytes.len(),
-            temp_path.display()
-        );
-
-        let source = loader.source();
-        let original_path = Path::new(&source);
-        let actual_name = match self.load_plugin_with_prefix(&temp_path, Some(original_path)) {
-            Ok(name) => name,
-            Err(e) => {
-                let _ = std::fs::remove_file(&temp_path);
-                return Err(e);
-            }
-        };
-        if let Some(loaded) = self.loaded.get_mut(&actual_name) {
-            if loaded.temp_path.is_none() {
-                loaded.temp_path = Some(temp_path.clone());
-            }
-        }
-        Ok(actual_name)
+        self.load_component(&bytes, &manifest, source_path)
     }
 
     fn read_registry<'a>(
@@ -229,222 +161,49 @@ impl PluginManager {
         }
     }
 
-    fn cleanup_stale_temp_files(&self) {
-        let temp_dir = std::env::temp_dir().join("plugin-system");
-        if !temp_dir.exists() {
-            return;
-        }
-        let my_pid = std::process::id();
-        let mut removed = 0u32;
-        if let Ok(entries) = std::fs::read_dir(&temp_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if !path.is_file() {
-                    continue;
-                }
-                // Only remove files that belong to a different PID
-                if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                    // Format: {name}_{pid}.so — extract the PID suffix
-                    if let Some(last_underscore) = stem.rfind('_') {
-                        let pid_str = &stem[last_underscore + 1..];
-                        if let Ok(file_pid) = pid_str.parse::<u32>() {
-                            if file_pid != my_pid {
-                                let _ = std::fs::remove_file(&path);
-                                removed += 1;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        if removed > 0 {
-            log::info!("Cleaned up {} stale temp plugin files", removed);
-        }
-    }
-
-    fn load_metadata(
-        lib: &libloading::Library,
-        path: &Path,
-        prefix: Option<&str>,
-    ) -> Result<PluginMetadata> {
-        if let Some(manifest) = crate::manifest::load_manifest(path).map_err(PluginError::Io)? {
-            return Ok(manifest.into());
-        }
-
-        // Try prefixed symbols first, then fallback to unprefixed
-        let (meta_sym, free_sym) = match prefix {
-            Some(p) => (
-                format!("plugin_{}_metadata_json", p),
-                format!("plugin_{}_free_string", p),
-            ),
-            None => (
-                "plugin_metadata_json".to_string(),
-                "plugin_free_string".to_string(),
-            ),
-        };
-
-        let metadata_json_fn: PluginMetadataJsonFn = unsafe {
-            let sym = lib.get(meta_sym.as_bytes());
-            let sym = match sym {
-                Ok(s) => s,
-                Err(_) => {
-                    // Fallback to unprefixed
-                    let fallback = match prefix {
-                        Some(_) => "plugin_metadata_json",
-                        None => {
-                            return Err(PluginError::SymbolNotFound { symbol: meta_sym });
-                        }
-                    };
-                    lib.get(fallback.as_bytes())
-                        .map_err(|_| PluginError::SymbolNotFound {
-                            symbol: meta_sym.clone(),
-                        })?
-                }
-            };
-            *sym
-        };
-
-        let free_string_fn: PluginFreeStringFn = unsafe {
-            let sym = lib.get(free_sym.as_bytes());
-            let sym = match sym {
-                Ok(s) => s,
-                Err(_) => {
-                    let fallback = match prefix {
-                        Some(_) => "plugin_free_string",
-                        None => {
-                            return Err(PluginError::SymbolNotFound { symbol: free_sym });
-                        }
-                    };
-                    lib.get(fallback.as_bytes())
-                        .map_err(|_| PluginError::SymbolNotFound {
-                            symbol: free_sym.clone(),
-                        })?
-                }
-            };
-            *sym
-        };
-
-        let ptr = unsafe { metadata_json_fn() };
-        if ptr.is_null() {
-            return Err(PluginError::PluginLoad {
-                name: "metadata".to_string(),
-                reason: "plugin_metadata_json returned null".to_string(),
-            });
-        }
-
-        let json = unsafe { CStr::from_ptr(ptr) }
-            .to_str()
-            .map_err(|e| PluginError::PluginLoad {
-                name: "metadata".to_string(),
-                reason: e.to_string(),
-            })?
-            .to_string();
-
-        unsafe { free_string_fn(ptr) };
-
-        serde_json::from_str(&json).map_err(|e| PluginError::PluginLoad {
-            name: "metadata".to_string(),
-            reason: e.to_string(),
-        })
-    }
-
+    /// Load a plugin component from a path.
     pub fn load_plugin(&mut self, path: impl AsRef<Path>) -> Result<String> {
-        self.load_plugin_with_prefix(path, None)
+        let path = path.as_ref().to_path_buf();
+
+        log::info!("Loading plugin from {}", path.display());
+
+        // The sidecar manifest carries the capability grants and resource
+        // limits. It is optional: a component with no manifest is still a
+        // component, it just gets the defaults.
+        let manifest = detect_manifest(&path)?.unwrap_or_else(|| {
+            PluginManifest::for_component(plugin_stem(&path).as_deref().unwrap_or("plugin"))
+        });
+
+        let bytes = std::fs::read(&path).map_err(PluginError::Io)?;
+        self.load_component(&bytes, &manifest, path)
     }
 
-    fn load_plugin_with_prefix(
+    /// Instantiate a component and register it.
+    ///
+    /// `path` is recorded for `reload_plugin` and for reporting; the bytes are
+    /// already in hand, so it is never reopened here.
+    fn load_component(
         &mut self,
-        path: impl AsRef<Path>,
-        original_path: Option<&Path>,
+        bytes: &[u8],
+        manifest: &PluginManifest,
+        path: PathBuf,
     ) -> Result<String> {
-        let path = path.as_ref().to_path_buf();
-        let path_display = path.display().to_string();
+        use crate::wasm::{WasmPlugin, WasmRuntime};
 
-        log::info!("Loading plugin from {}", path_display);
-
-        // Consult the sidecar *.manifest.json before resolving Rust
-        // trait-object symbols: a non-native plugin will not export that
-        // shape, so the ABI has to be decided first.
-        if let Some(manifest) = detect_manifest(original_path.unwrap_or(&path))? {
-            match manifest.abi {
-                Abi::CFlat => {
-                    log::info!("Loading {} via the c-flat ABI", path_display);
-                    return self.load_cabi_plugin(&path, &manifest, original_path);
-                }
-                Abi::WasmComponent => {
-                    log::info!("Loading {} as a WASM component", path_display);
-                    return self.load_wasm_plugin(&path, &manifest);
-                }
-                // Native plugins fall through to symbol resolution below; the
-                // manifest, if present, only supplies metadata.
-                Abi::Native => {}
+        // The engine is shared across plugins and created on first use.
+        let runtime = match &self.wasm_runtime {
+            Some(rt) => rt.clone(),
+            None => {
+                let rt = WasmRuntime::new()?;
+                self.wasm_runtime = Some(rt.clone());
+                rt
             }
-        }
-
-        let lib = unsafe {
-            libloading::Library::new(&path).map_err(|e| PluginError::LibraryLoad {
-                path: path.clone(),
-                reason: e.to_string(),
-            })?
         };
 
-        // Derive prefix from original path (not temp path which has PID suffix)
-        let prefix_source = original_path.unwrap_or(&path);
-        let prefix = prefix_from_path(prefix_source);
+        let plugin = WasmPlugin::load(&runtime, bytes, manifest)?;
 
-        // Try create symbol: prefixed first, then fallback to unprefixed
-        let create: PluginCreateFn = unsafe {
-            let sym_name = match &prefix {
-                Some(p) => format!("plugin_{}_create", p),
-                None => "plugin_create".to_string(),
-            };
-            let sym = lib.get(sym_name.as_bytes());
-            let sym = match sym {
-                Ok(s) => s,
-                Err(_) => {
-                    let fallback = match &prefix {
-                        Some(_) => "plugin_create",
-                        None => {
-                            return Err(PluginError::SymbolNotFound { symbol: sym_name });
-                        }
-                    };
-                    lib.get(fallback.as_bytes())
-                        .map_err(|_| PluginError::SymbolNotFound {
-                            symbol: sym_name.clone(),
-                        })?
-                }
-            };
-            *sym
-        };
-
-        let _destroy: PluginDestroyFn = unsafe {
-            let sym_name = match &prefix {
-                Some(p) => format!("plugin_{}_destroy", p),
-                None => "plugin_destroy".to_string(),
-            };
-            let sym = lib.get(sym_name.as_bytes());
-            let sym = match sym {
-                Ok(s) => s,
-                Err(_) => {
-                    let fallback = match &prefix {
-                        Some(_) => "plugin_destroy",
-                        None => {
-                            return Err(PluginError::SymbolNotFound { symbol: sym_name });
-                        }
-                    };
-                    lib.get(fallback.as_bytes())
-                        .map_err(|_| PluginError::SymbolNotFound {
-                            symbol: sym_name.clone(),
-                        })?
-                }
-            };
-            *sym
-        };
-
-        let metadata = Self::load_metadata(&lib, &path, prefix.as_deref())?;
+        let metadata = plugin.metadata_ref().clone();
         let name = metadata.name.clone();
-
-        log::info!("Plugin metadata: {} v{}", name, metadata.version);
 
         {
             let registry = self.read_registry(self.registry.read(), "PluginRegistry")?;
@@ -458,72 +217,11 @@ impl PluginManager {
             }
         }
 
-        let found_version = self
-            .loaded
-            .get(&name)
-            .map(|p| p.metadata.version.clone())
-            .unwrap_or_default();
-        if !found_version.is_empty() {
-            for dep in &metadata.dependencies {
-                let req = match semver::VersionReq::parse(&dep.version_req) {
-                    Ok(r) => r,
-                    Err(e) => {
-                        return Err(PluginError::InvalidSemverRequirement {
-                            name: name.clone(),
-                            reason: format!("{}: {}", dep.name, e),
-                        });
-                    }
-                };
-                let found = match semver::Version::parse(&found_version) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        return Err(PluginError::InvalidSemverRequirement {
-                            name: name.clone(),
-                            reason: format!("{}: {}", found_version, e),
-                        });
-                    }
-                };
-                if !req.matches(&found) {
-                    return Err(PluginError::VersionIncompatible {
-                        name: name.clone(),
-                        required: dep.version_req.clone(),
-                        found: found_version.clone(),
-                    });
-                }
-            }
-        }
+        // Let the plugin reach its peers now that it is about to be live.
+        plugin.set_peers(self.command_registry.clone());
 
-        let raw_instance = unsafe { create() };
-        let boxed: Box<Box<dyn Plugin>> =
-            unsafe { Box::from_raw(raw_instance as *mut Box<dyn Plugin>) };
-        let instance: Box<dyn Plugin> = *boxed;
-
-        if self.loaded.contains_key(&name) {
-            self.unload_plugin(&name)?;
-        }
-
-        {
-            let mut registry = self.write_registry(self.registry.write(), "PluginRegistry")?;
-            registry.register(instance);
-        }
-
-        let loaded_plugin = LoadedPlugin {
-            _lib: Some(lib),
-            path: path.clone(),
-            metadata,
-            temp_path: None,
-        };
-
-        self.loaded.insert(name.clone(), loaded_plugin);
-
-        {
-            let ctx = PluginContext::new(self.registry.clone(), self.command_registry.clone());
-            let registry = self.read_registry(self.registry.read(), "PluginRegistry")?;
-            if let Some(plugin_arc) = registry.get_by_name(&name) {
-                let mut plugin = self.write_plugin(plugin_arc.write(), &name)?;
-                plugin.on_load(&ctx);
-            }
-        }
+        let boxed: Box<dyn Plugin> = Box::new(plugin);
+        self.register_and_load(boxed, metadata, path)?;
 
         log::info!("Plugin '{}' loaded successfully", name);
         Ok(name)
@@ -533,8 +231,6 @@ impl PluginManager {
         let dir = dir.as_ref();
         log::info!("Scanning for plugins in {}", dir.display());
 
-        self.cleanup_stale_temp_files();
-
         let mut loaded = Vec::new();
 
         if !dir.exists() {
@@ -542,36 +238,19 @@ impl PluginManager {
             return Ok(loaded);
         }
 
-        let expected_ext = if cfg!(target_os = "linux") {
-            "so"
-        } else if cfg!(target_os = "macos") {
-            "dylib"
-        } else if cfg!(target_os = "windows") {
-            "dll"
-        } else {
-            "so"
-        };
-
         for entry in std::fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.is_file() {
-                if let Some(ext) = path.extension() {
-                    if ext == expected_ext {
-                        let loader = FileLoader::new(&path);
-                        let name = path
-                            .file_stem()
-                            .and_then(|s| s.to_str())
-                            .unwrap_or("unknown")
-                            .to_string();
-
-                        match self.load_plugin_from_loader(&loader, &name) {
-                            Ok(name) => loaded.push(name),
-                            Err(e) => {
-                                log::error!("Failed to load {}: {}", path.display(), e);
-                            }
-                        }
-                    }
+            if !path.is_file() {
+                continue;
+            }
+            if path.extension().and_then(|e| e.to_str()) != Some(PLUGIN_EXTENSION) {
+                continue;
+            }
+            match self.load_plugin(&path) {
+                Ok(name) => loaded.push(name),
+                Err(e) => {
+                    log::error!("Failed to load {}: {}", path.display(), e);
                 }
             }
         }
@@ -664,24 +343,26 @@ impl PluginManager {
         self.loaded.get(name).map(|p| p.metadata.clone())
     }
 
+    /// Describe a plugin on disk without instantiating it.
+    ///
+    /// Reads the sidecar manifest. Asking the binary itself would mean
+    /// standing up a wasmtime store and calling `get-metadata`, which is a lot
+    /// of machinery for a listing; a plugin that wants to be described without
+    /// being run ships a manifest.
     pub fn metadata_from_path(path: impl AsRef<Path>) -> Result<PluginMetadata> {
         let path = path.as_ref();
 
-        // Prefer the sidecar manifest. It is the only source available for a
-        // component — `dlopen` cannot open a `.wasm` — and for native plugins
-        // the loader already trusts it over the exported symbols.
-        if let Some(manifest) = detect_manifest(path)? {
-            return Ok(manifest.into());
+        match detect_manifest(path)? {
+            Some(manifest) => Ok(manifest.into()),
+            None => Err(PluginError::PluginLoad {
+                name: path.display().to_string(),
+                reason: format!(
+                    "no sidecar manifest next to {}; a plugin must ship one to be described \
+                     without being instantiated",
+                    path.display()
+                ),
+            }),
         }
-
-        let lib = unsafe {
-            libloading::Library::new(path).map_err(|e| PluginError::LibraryLoad {
-                path: path.to_path_buf(),
-                reason: e.to_string(),
-            })?
-        };
-
-        Self::load_metadata(&lib, path, prefix_from_path(path).as_deref())
     }
 
     pub fn plugin_metadata_from_path(&self, path: impl AsRef<Path>) -> Result<PluginMetadata> {
@@ -787,126 +468,13 @@ impl PluginManager {
         infos
     }
 
-    // ---- C-ABI ("c-flat") plugin loading ----------------------------------
-
-    /// Load a C-ABI plugin via the sidecar manifest.
-    /// Load a WebAssembly component plugin.
-    ///
-    /// The runtime lives behind the `wasm` feature so hosts that only load
-    /// native plugins do not pay for wasmtime. Without it, a `.wasm` plugin
-    /// is reported as unsupported rather than silently skipped.
-    #[cfg(feature = "wasm")]
-    fn load_wasm_plugin(&mut self, path: &Path, manifest: &PluginManifest) -> Result<String> {
-        use crate::wasm::{WasmPlugin, WasmRuntime};
-
-        // The engine is shared across plugins and created on first use, since
-        // most hosts load at least one wasm plugin or none at all.
-        let runtime = match &self.wasm_runtime {
-            Some(rt) => rt.clone(),
-            None => {
-                let rt = WasmRuntime::new()?;
-                self.wasm_runtime = Some(rt.clone());
-                rt
-            }
-        };
-
-        let bytes = std::fs::read(path).map_err(PluginError::Io)?;
-        let plugin = WasmPlugin::load(&runtime, &bytes, manifest)?;
-
-        let metadata = plugin.metadata_ref().clone();
-        let name = metadata.name.clone();
-
-        {
-            let registry = self.read_registry(self.registry.read(), "PluginRegistry")?;
-            for dep in &metadata.dependencies {
-                if !registry.contains(dep.name.as_str()) {
-                    return Err(PluginError::MissingDependency {
-                        plugin: name.clone(),
-                        dependency: dep.name.clone(),
-                    });
-                }
-            }
-        }
-
-        // Let the plugin reach its peers now that it is about to be live.
-        plugin.set_peers(self.command_registry.clone());
-
-        let boxed: Box<dyn Plugin> = Box::new(plugin);
-        self.register_and_load(boxed, metadata, path.to_path_buf(), None)?;
-
-        Ok(name)
-    }
-
-    #[cfg(not(feature = "wasm"))]
-    fn load_wasm_plugin(&mut self, path: &Path, manifest: &PluginManifest) -> Result<String> {
-        Err(PluginError::UnsupportedAbi {
-            name: manifest.name.clone(),
-            abi: "wasm-component",
-            reason: format!(
-                "{} declares the wasm-component ABI, but this host was built without the `wasm` feature",
-                path.display()
-            ),
-        })
-    }
-
-    fn load_cabi_plugin(
-        &mut self,
-        path: &Path,
-        manifest: &PluginManifest,
-        original_path: Option<&Path>,
-    ) -> Result<String> {
-        // Open the library and hand ownership to the CAbiPlugin.
-        let lib =
-            unsafe { libloading::Library::new(path) }.map_err(|e| PluginError::LibraryLoad {
-                path: path.to_path_buf(),
-                reason: e.to_string(),
-            })?;
-
-        // Derive the same prefix the Rust path uses, so prefixed C symbols
-        // (e.g. `plugin_myplugin_handle_command`) are found.
-        let prefix = prefix_from_path(original_path.unwrap_or(path));
-
-        let cabi = crate::cabi::CAbiPlugin::from_library(lib, manifest, prefix.as_deref())
-            .map_err(|e| PluginError::PluginLoad {
-                name: "<c-abi>".into(),
-                reason: e,
-            })?;
-
-        let metadata = cabi.metadata().clone();
-        let name = metadata.name.clone();
-
-        // Dependency check
-        {
-            let registry = self.read_registry(self.registry.read(), "PluginRegistry")?;
-            for dep in &metadata.dependencies {
-                if !registry.contains(dep.name.as_str()) {
-                    return Err(PluginError::MissingDependency {
-                        plugin: name.clone(),
-                        dependency: dep.name.clone(),
-                    });
-                }
-            }
-        }
-
-        let boxed: Box<dyn Plugin> = Box::new(cabi);
-        // CAbiPlugin owns its own library, so no handle is retained here.
-        self.register_and_load(boxed, metadata, path.to_path_buf(), None)?;
-
-        log::info!("C-ABI plugin '{}' loaded successfully", name);
-        Ok(name)
-    }
-
     /// Register an already-constructed plugin, record it as loaded, and run
     /// its `on_load`.
-    ///
-    /// Shared by every non-native backend: whatever produced the
-    /// `Box<dyn Plugin>`, the bookkeeping from here on is identical.
     fn register_and_load(
         &mut self,
         plugin: Box<dyn Plugin>,
         metadata: PluginMetadata,
         path: PathBuf,
-        lib: Option<libloading::Library>,
     ) -> Result<()> {
         let name = metadata.name.clone();
 
@@ -921,7 +489,6 @@ impl PluginManager {
         self.loaded.insert(
             name.clone(),
             LoadedPlugin {
-                _lib: lib,
                 path,
                 metadata,
                 temp_path: None,
@@ -939,19 +506,38 @@ impl PluginManager {
     }
 }
 
-/// Read the sidecar `<lib>.manifest.json`, if any.
+/// Read the sidecar `<plugin>.manifest.json`, if any.
 ///
-/// Returns `Ok(None)` when no manifest is present — the normal case for a
-/// native Rust plugin, which reports its metadata through exported symbols.
-fn detect_manifest(lib_path: &Path) -> Result<Option<PluginManifest>> {
-    let stem = match lib_path.file_stem().and_then(|s| s.to_str()) {
+/// Returns `Ok(None)` when no manifest is present. That is not an error: the
+/// guest's `get-metadata` is the authority on identity either way, and the
+/// manifest only adds capability grants and resource limits on top.
+fn detect_manifest(plugin_path: &Path) -> Result<Option<PluginManifest>> {
+    let stem = match plugin_path.file_stem().and_then(|s| s.to_str()) {
         Some(s) => s,
         None => return Ok(None),
     };
-    crate::manifest::load_plugin_manifest(lib_path).map_err(|e| PluginError::PluginLoad {
+    crate::manifest::load_plugin_manifest(plugin_path).map_err(|e| PluginError::PluginLoad {
         name: stem.to_string(),
         reason: format!("invalid manifest: {e}"),
     })
+}
+
+/// The plugin name implied by a file path.
+///
+/// Only a fallback for a component shipped without a manifest: `get-metadata`
+/// still decides the real name once the guest is instantiated. Strips the
+/// `plugin_`/`plugin-` prefix the build tooling adds, so `plugin_timer.wasm`
+/// implies `timer`.
+fn plugin_stem(path: &Path) -> Option<String> {
+    let stem = path.file_stem()?.to_str()?;
+    let name = stem
+        .strip_prefix("plugin_")
+        .or_else(|| stem.strip_prefix("plugin-"))
+        .unwrap_or(stem);
+    if name.is_empty() {
+        return None;
+    }
+    Some(name.replace('-', "_"))
 }
 
 impl Default for PluginManager {

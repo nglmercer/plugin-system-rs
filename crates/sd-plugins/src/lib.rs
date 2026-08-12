@@ -484,7 +484,7 @@ impl SdPluginManager {
 
     fn plugin_file_path(&self, name: &str) -> PathBuf {
         self.plugin_dir_path()
-            .join(format!("{}.{}", plugin_file_stem(name), plugin_extension()))
+            .join(format!("{}.{}", plugin_file_stem(name), WASM_EXTENSION))
     }
 
     fn temp_plugin_path(&self, filename: &str) -> PathBuf {
@@ -496,7 +496,7 @@ impl SdPluginManager {
             ".{}.{}.tmp.{}",
             stem,
             unique_suffix(),
-            plugin_extension()
+            WASM_EXTENSION
         ))
     }
 
@@ -509,7 +509,7 @@ impl SdPluginManager {
             "{}.{}.bak.{}",
             stem,
             unique_suffix(),
-            plugin_extension()
+            WASM_EXTENSION
         ))
     }
 
@@ -584,56 +584,30 @@ impl SdPluginManager {
     }
 }
 
-/// Extension for WebAssembly component plugins. Unlike the native extensions
-/// this is the same everywhere, which is the point: one artifact per plugin
-/// instead of one per platform.
+/// Extension for WebAssembly component plugins. Unlike the native library
+/// extensions it replaced, this is the same everywhere, which is the point:
+/// one artifact per plugin instead of one per platform.
 const WASM_EXTENSION: &str = "wasm";
 
 /// Whether a directory entry looks like a loadable plugin.
 ///
-/// Accepts the platform's native library extension and `.wasm`. Files with no
-/// extension are accepted too, preserving the previous behaviour.
+/// Only `.wasm`. Files without an extension used to be accepted because a
+/// native library could plausibly be named anything; now that a plugin is a
+/// component, a file that is not named `.wasm` is not a plugin.
 fn is_plugin_file(path: &Path) -> bool {
-    match path.extension().and_then(|ext| ext.to_str()) {
-        Some(ext) => ext == plugin_extension() || ext == WASM_EXTENSION,
-        None => true,
-    }
+    path.extension().and_then(|ext| ext.to_str()) == Some(WASM_EXTENSION)
 }
 
-fn plugin_extension() -> &'static str {
-    if cfg!(target_os = "linux") {
-        "so"
-    } else if cfg!(target_os = "macos") {
-        "dylib"
-    } else if cfg!(target_os = "windows") {
-        "dll"
-    } else {
-        "so"
-    }
-}
-
+/// The plugin name implied by a file stem.
+///
+/// Strips the `plugin_`/`plugin-` prefix the build tooling adds. The `lib`
+/// prefix and the PID-stamped `.tmp` suffixes are gone with the native loader,
+/// which never needed to exist except to work around `dlopen`.
 fn derive_plugin_name(stem: &str) -> String {
-    let mut stem = stem;
-    if stem.starts_with('.') {
-        stem = &stem[1..];
-    }
-    if let Some(tmp_idx) = stem.rfind(".tmp") {
-        let before_tmp = &stem[..tmp_idx];
-        if let Some(last_dot) = before_tmp.rfind('.') {
-            let before_last_dot = &before_tmp[..last_dot];
-            if let Some(pid_dot) = before_last_dot.rfind('.') {
-                stem = &before_last_dot[..pid_dot];
-            }
-        }
-    }
-
-    let name = if cfg!(target_os = "linux") || cfg!(target_os = "macos") {
-        stem.strip_prefix("lib").unwrap_or(stem)
-    } else {
-        stem
-    };
-    let name = name.strip_prefix("plugin_").unwrap_or(name);
-    let name = name.strip_prefix("plugin-").unwrap_or(name);
+    let name = stem
+        .strip_prefix("plugin_")
+        .or_else(|| stem.strip_prefix("plugin-"))
+        .unwrap_or(stem);
     if name.is_empty() {
         stem.to_string()
     } else {
@@ -642,12 +616,7 @@ fn derive_plugin_name(stem: &str) -> String {
 }
 
 fn plugin_file_stem(name: &str) -> String {
-    let normalized = name.replace('-', "_");
-    if cfg!(target_os = "linux") || cfg!(target_os = "macos") {
-        format!("libplugin_{}", normalized)
-    } else {
-        format!("plugin_{}", normalized)
-    }
+    format!("plugin_{}", name.replace('-', "_"))
 }
 
 fn validate_uploaded_filename(filename: &str) -> PluginResult<()> {
@@ -665,11 +634,9 @@ fn validate_uploaded_filename(filename: &str) -> PluginResult<()> {
         .extension()
         .and_then(|ext| ext.to_str())
         .unwrap_or_default();
-    if extension != plugin_extension() && extension != WASM_EXTENSION {
+    if extension != WASM_EXTENSION {
         return Err(PluginResultError::InvalidInput(format!(
-            "Plugin file must use .{} or .{} on this platform",
-            plugin_extension(),
-            WASM_EXTENSION
+            "Plugin file must be a WASI component named .{WASM_EXTENSION}"
         )));
     }
 
@@ -782,24 +749,43 @@ mod tests {
 
     #[test]
     fn derive_plugin_name_strips_prefix() {
-        assert_eq!(derive_plugin_name("libplugin_timer"), "timer");
         assert_eq!(derive_plugin_name("plugin_timer"), "timer");
         assert_eq!(derive_plugin_name("plugin-timer"), "timer");
         assert_eq!(derive_plugin_name("timer"), "timer");
     }
 
+    /// The `lib` prefix was a native-linker convention. A component is named
+    /// whatever the build produced, so `lib` is now part of the name.
+    #[test]
+    fn derive_plugin_name_no_longer_strips_the_lib_prefix() {
+        assert_eq!(derive_plugin_name("libplugin_timer"), "libplugin_timer");
+    }
+
     #[test]
     fn plugin_file_stem_format() {
-        let stem = plugin_file_stem("timer");
-        assert!(stem.contains("timer"));
-        assert!(stem.contains("plugin"));
+        assert_eq!(plugin_file_stem("timer"), "plugin_timer");
+        assert_eq!(plugin_file_stem("volume-master"), "plugin_volume_master");
+    }
+
+    #[test]
+    fn is_plugin_file_accepts_only_components() {
+        assert!(is_plugin_file(Path::new("plugin_timer.wasm")));
+        assert!(!is_plugin_file(Path::new("libplugin_timer.so")));
+        assert!(!is_plugin_file(Path::new("plugin_timer.dll")));
+        assert!(!is_plugin_file(Path::new("libplugin_timer.dylib")));
+        // Extensionless files used to be accepted; a component is always
+        // named `.wasm`, so they no longer are.
+        assert!(!is_plugin_file(Path::new("plugin_timer")));
     }
 
     #[test]
     fn validate_uploaded_filename_rejects_bad_input() {
         assert!(validate_uploaded_filename("").is_err());
-        assert!(validate_uploaded_filename("foo/bar.so").is_err());
+        assert!(validate_uploaded_filename("foo/bar.wasm").is_err());
         assert!(validate_uploaded_filename("foo.txt").is_err());
+        // Native libraries are no longer loadable, so uploading one is an error.
+        assert!(validate_uploaded_filename("libplugin_timer.so").is_err());
+        assert!(validate_uploaded_filename("plugin_timer.wasm").is_ok());
     }
 
     #[test]

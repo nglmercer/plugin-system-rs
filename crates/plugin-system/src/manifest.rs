@@ -35,44 +35,42 @@ impl From<Manifest> for PluginMetadata {
 }
 
 /// Which calling convention the host must use to talk to a plugin binary.
+///
+/// There is exactly one. The variant survives the removal of the native ABIs
+/// so that existing manifests keep parsing and so a future second backend has
+/// somewhere to land — but a manifest naming `native` or `c-flat` is now an
+/// error rather than a different code path, which is the whole point: those
+/// binaries would be loaded with `dlopen` into the host's address space, and
+/// that capability no longer exists.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub enum Abi {
-    /// Rust trait object passed across a `cdylib` boundary. Only sound when
-    /// host and plugin are built by the same compiler with the same
-    /// dependency versions. Default for manifests that do not say otherwise.
-    #[default]
-    #[serde(rename = "native")]
-    Native,
-    /// Flat C ABI: opaque handle plus JSON in/out. Stable across compilers.
-    #[serde(rename = "c-flat", alias = "c_abi")]
-    CFlat,
     /// WebAssembly component running on WASI Preview 2, sandboxed and
     /// portable across every host platform.
+    #[default]
     #[serde(rename = "wasm-component", alias = "wasm")]
     WasmComponent,
 }
 
 impl Abi {
-    /// Parse the `abi` field of a manifest. Unknown values are rejected
-    /// rather than silently treated as native, since guessing wrong means
-    /// calling a foreign binary with the wrong convention.
+    /// Parse the `abi` field of a manifest.
+    ///
+    /// The retired native ABIs are named explicitly in the error rather than
+    /// falling into the generic "unknown abi" branch: someone carrying an old
+    /// manifest forward deserves to be told the ABI was removed, not that it
+    /// was never recognised.
     pub fn parse(s: &str) -> std::result::Result<Self, String> {
         match s.to_ascii_lowercase().replace('_', "-").as_str() {
-            "native" | "rust" => Ok(Abi::Native),
-            "c-flat" | "c-abi" => Ok(Abi::CFlat),
             "wasm-component" | "wasm" | "component" => Ok(Abi::WasmComponent),
+            retired @ ("native" | "rust" | "c-flat" | "c-abi") => Err(format!(
+                "abi `{retired}` was removed: native shared-library plugins are no longer \
+                 loadable. Rebuild the plugin as a WASI component (`abi: \"wasm-component\"`)."
+            )),
             other => Err(format!("unknown abi `{other}`")),
         }
     }
-
-    /// Whether this ABI loads a native shared library into the host process.
-    pub fn is_native_library(&self) -> bool {
-        matches!(self, Abi::Native | Abi::CFlat)
-    }
 }
 
-/// Per-plugin resource ceilings. Only enforceable for sandboxed ABIs; the
-/// native paths parse these but cannot honour them.
+/// Per-plugin resource ceilings, enforced by the wasmtime store.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ResourceLimits {
     /// Maximum linear memory the plugin may allocate, in mebibytes.
@@ -101,9 +99,6 @@ impl Default for ResourceLimits {
 }
 
 /// The full sidecar descriptor (`<plugin>.manifest.json`).
-///
-/// This supersedes the C-ABI-specific manifest: one type describes every ABI,
-/// so the loader can dispatch on `abi` instead of sniffing for a magic value.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PluginManifest {
     pub name: String,
@@ -137,7 +132,7 @@ where
     use serde::Deserialize as _;
     match Option::<String>::deserialize(deserializer)? {
         Some(s) => Abi::parse(&s).map_err(serde::de::Error::custom),
-        None => Ok(Abi::Native),
+        None => Ok(Abi::WasmComponent),
     }
 }
 
@@ -145,6 +140,26 @@ impl PluginManifest {
     /// Whether the plugin asked for a given host capability.
     pub fn grants(&self, capability: &str) -> bool {
         self.capabilities.iter().any(|c| c == capability)
+    }
+
+    /// A default descriptor for a component that shipped without a manifest.
+    ///
+    /// Grants nothing and takes the default limits, so an undeclared plugin is
+    /// the most constrained one rather than the least. `name` is provisional —
+    /// the guest's `get-metadata` overrides it at load, and `interfaces` stays
+    /// empty because the guest reports those too.
+    pub fn for_component(name: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            version: "0.0.0".to_string(),
+            authors: Vec::new(),
+            dependencies: Vec::new(),
+            abi: Abi::WasmComponent,
+            interfaces: Vec::new(),
+            capabilities: Vec::new(),
+            limits: ResourceLimits::default(),
+            config: None,
+        }
     }
 }
 
@@ -241,7 +256,7 @@ mod tests {
             r#"{"name":"plain","version":"1.0.0"}"#,
         );
         let manifest = load_plugin_manifest(&lib).unwrap().unwrap();
-        assert_eq!(manifest.abi, Abi::Native);
+        assert_eq!(manifest.abi, Abi::WasmComponent);
         assert!(manifest.capabilities.is_empty());
         assert_eq!(manifest.limits, ResourceLimits::default());
     }
@@ -283,14 +298,32 @@ mod tests {
     }
 
     #[test]
-    fn c_flat_aliases_are_accepted() {
-        for raw in ["c-flat", "c_abi", "C-Flat"] {
-            assert_eq!(Abi::parse(raw).unwrap(), Abi::CFlat, "parsing {raw}");
+    fn wasm_aliases_are_accepted() {
+        for raw in ["wasm-component", "wasm", "component", "WASM"] {
+            assert_eq!(Abi::parse(raw).unwrap(), Abi::WasmComponent, "parsing {raw}");
+        }
+    }
+
+    /// A manifest left over from the FFI era must fail loudly. Silently
+    /// treating it as a component would mean handing wasmtime a shared
+    /// library and reporting whatever confusing error came back.
+    #[test]
+    fn retired_native_abis_are_rejected_with_an_explanation() {
+        for raw in ["native", "rust", "c-flat", "c_abi", "C-Flat"] {
+            let err = Abi::parse(raw).unwrap_err();
+            assert!(
+                err.contains("was removed"),
+                "parsing {raw} should explain the ABI is gone, got: {err}"
+            );
+            assert!(
+                err.contains("wasm-component"),
+                "parsing {raw} should point at the replacement, got: {err}"
+            );
         }
     }
 
     #[test]
-    fn unknown_abi_is_rejected_rather_than_assumed_native() {
+    fn unknown_abi_is_rejected_rather_than_assumed() {
         let temp = tempfile::tempdir().unwrap();
         let lib = write_manifest(
             temp.path(),
@@ -305,10 +338,12 @@ mod tests {
     }
 
     #[test]
-    fn wasm_abi_is_not_a_native_library() {
-        assert!(Abi::Native.is_native_library());
-        assert!(Abi::CFlat.is_native_library());
-        assert!(!Abi::WasmComponent.is_native_library());
+    fn a_component_without_a_manifest_grants_nothing() {
+        let manifest = PluginManifest::for_component("timer");
+        assert_eq!(manifest.abi, Abi::WasmComponent);
+        assert!(manifest.capabilities.is_empty());
+        assert!(manifest.interfaces.is_empty());
+        assert_eq!(manifest.limits, ResourceLimits::default());
     }
 
     #[test]

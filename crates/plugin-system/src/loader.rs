@@ -100,17 +100,7 @@ impl UrlLoader {
         self.url.hash(&mut hasher);
         let hash = hasher.finish();
 
-        let ext = if cfg!(target_os = "linux") {
-            "so"
-        } else if cfg!(target_os = "macos") {
-            "dylib"
-        } else if cfg!(target_os = "windows") {
-            "dll"
-        } else {
-            "so"
-        };
-
-        format!("plugin_{:016x}.{}", hash, ext)
+        format!("plugin_{:016x}.{}", hash, crate::manager::PLUGIN_EXTENSION)
     }
 
     /// Download the plugin binary.
