@@ -3613,6 +3613,8 @@ dependencies = [
  "sd-plugins",
  "sd-profiles",
  "sd-types",
+ "serde",
+ "serde_json",
  "tao",
  "thiserror 1.0.69",
  "tokio",

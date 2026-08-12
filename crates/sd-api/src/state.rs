@@ -1,3 +1,4 @@
+use std::sync::atomic::AtomicU16;
 use std::sync::Arc;
 
 use sd_actions::ActionRegistry;
@@ -18,4 +19,7 @@ pub struct AppState {
     pub plugin_manager: Arc<SdPluginManager>,
     pub dashboard_config: Arc<RwLock<DashboardLayout>>,
     pub http_client: reqwest::Client,
+    /// The port the HTTP server actually bound, so `/api/local-ip` can report
+    /// the real URL even when `SD_CORE_BIND_ADDR` is overridden.
+    pub http_port: Arc<AtomicU16>,
 }

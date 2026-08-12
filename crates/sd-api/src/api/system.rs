@@ -1,4 +1,5 @@
-use axum::{extract::State, Json};
+use axum::extract::State;
+use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use crate::{response::ApiResponse, state::AppState};
@@ -53,11 +54,13 @@ pub(crate) async fn get_system_stats(
     Json(ApiResponse::success(stats))
 }
 
-pub(crate) async fn get_local_ip() -> Json<ApiResponse<LocalIpInfo>> {
+pub(crate) async fn get_local_ip(
+    State(state): State<AppState>,
+) -> Json<ApiResponse<LocalIpInfo>> {
     let ip = local_ip_address::local_ip()
         .map(|ip| ip.to_string())
         .unwrap_or_else(|_| "127.0.0.1".to_string());
-    let port = 3000u16;
+    let port = state.http_port.load(std::sync::atomic::Ordering::Relaxed);
     let url = format!("http://{}:{}", ip, port);
     Json(ApiResponse::success(LocalIpInfo { ip, port, url }))
 }

@@ -14,7 +14,7 @@ cargo build --release -p sd-plugins-cli
 ./target/release/sd-plugins build --release --with-web --with-core
 
 # Package for the current host using formats from packaging.toml
-./target/release/sd-plugins pkg --version 0.1.0
+./target/release/sd-plugins package --version 0.1.0
 ```
 
 Artifacts land in `releases/<version>/<platform>/` along with a
@@ -22,7 +22,7 @@ Artifacts land in `releases/<version>/<platform>/` along with a
 
 ## Targets
 
-`sd-plugins pkg` accepts one of six platform ids:
+`sd-plugins package` accepts one of six platform ids:
 
 | ID | Default target triple | Default formats |
 |----|----------------------|-----------------|
@@ -36,13 +36,13 @@ Artifacts land in `releases/<version>/<platform>/` along with a
 Override the default formats:
 
 ```bash
-./target/release/sd-plugins pkg --version 0.1.0 --platform linux-x64 --formats deb,rpm,appimage
+./target/release/sd-plugins package --version 0.1.0 --platform linux-x64 --formats deb,rpm,appimage
 ```
 
 Override the platform too:
 
 ```bash
-./target/release/sd-plugins pkg --version 0.1.0 --platform windows-x64 --formats zip,msi,nsis
+./target/release/sd-plugins package --version 0.1.0 --platform windows-x64 --formats zip,msi,nsis
 ```
 
 ## All-platforms mode
@@ -52,7 +52,7 @@ When the workspace already contains prebuilt artifacts in
 platform in one go:
 
 ```bash
-./target/release/sd-plugins pkg --version 0.1.0 --all-platforms --formats tar.gz
+./target/release/sd-plugins package --version 0.1.0 --all-platforms --formats tar.gz
 ```
 
 `sd-plugins` will skip any platform whose target directory doesn't exist and
@@ -64,7 +64,7 @@ Pass `--build` to have `sd-plugins` invoke `cargo build --release --target
 <triple> -p sd-core` and the plugin workspace build before packaging:
 
 ```bash
-./target/release/sd-plugins pkg --version 0.1.0 --platform linux-arm64 --build --formats deb
+./target/release/sd-plugins package --version 0.1.0 --platform linux-arm64 --build --formats deb
 ```
 
 ## Configuration: `packaging.toml`
@@ -123,7 +123,7 @@ Signing is **opt-in** via environment variables:
 | `SD_SIGN_MACOS_IDENTITY` | `sd-core` binary | `codesign --options runtime` |
 | `SD_SIGN_GPG_KEY_ID` | `.deb` (via `dpkg-sig`) and `.rpm` (via `rpm --addsign`) | |
 
-When set, `sd-plugins pkg` signs files after the format build but before
+When set, `sd-plugins package` signs files after the format build but before
 emitting the SHA256 sidecar. CI uses GitHub Actions secrets for the same
 variables.
 
@@ -136,7 +136,7 @@ It:
 2. For each (platform, target) pair:
    - Installs the platform's packaging tools
    - Builds web + core + plugins for the target triple
-   - Runs `sd-plugins pkg` with the right `--platform` and `--formats`
+   - Runs `sd-plugins package` with the right `--platform` and `--formats`
 3. Signs Windows / macOS / Linux artifacts when the corresponding secrets
    are present
 4. Uploads the artifacts and creates a GitHub Release

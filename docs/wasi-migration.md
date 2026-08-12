@@ -267,7 +267,7 @@ One capability per PR, each with a native host implementation and a port:
 
 ### Phase 4 — Packaging
 - `.wasm` plugins drop out of the per-platform matrix in `release.yml` and
-  `sd-plugins pkg`; ship one copy in every bundle.
+  `sd-plugins package`; ship one copy in every bundle.
 - Plugins become genuinely distributable — a downloaded `.wasm` from an
   untrusted source is now a *reasonable* thing to run, which it is not today.
 

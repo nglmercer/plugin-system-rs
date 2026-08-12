@@ -45,3 +45,4 @@ plugins/*-wasm/target/
 # manifest here. The sources live in plugins/<crate>/.
 plugins/*.wasm
 plugins/*.manifest.json
+dashboard.json

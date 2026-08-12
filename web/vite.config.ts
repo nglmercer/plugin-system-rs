@@ -14,6 +14,9 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    // Must match the port in data/config.json (the repo default). The backend
+    // binds an ephemeral port when that config file is removed, which breaks
+    // this proxy — keep the file in place for frontend development.
     proxy: {
       '/api': 'http://localhost:3000',
       '/ws': {

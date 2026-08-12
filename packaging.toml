@@ -1,6 +1,6 @@
 # packaging.toml — StreamDeck Core packaging configuration
 #
-# Loaded by `sd-plugins pkg` to control the per-platform artifact format and
+# Loaded by `sd-plugins package` to control the per-platform artifact format and
 # installer metadata. All fields are optional; sensible defaults are used when
 # omitted.
 

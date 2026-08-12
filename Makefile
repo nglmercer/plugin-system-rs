@@ -188,7 +188,7 @@ ensure-cli:
 .PHONY: package
 package: ensure-cli
 	@test -n '$(VERSION)' || (echo 'VERSION is required, e.g. make package VERSION=0.1.0' && exit 1)
-	@CMD='$(SD_PLUGINS) pkg --version $(VERSION)'; \
+	@CMD='$(SD_PLUGINS) package --version $(VERSION)'; \
 	if [ -n '$(FORMATS)' ]; then CMD="$$CMD --formats $(FORMATS)"; fi; \
 	if [ -n '$(PLATFORM)' ]; then CMD="$$CMD --platform $(PLATFORM)"; fi; \
 	echo "Running: $$CMD"; \
@@ -198,16 +198,16 @@ package: ensure-cli
 .PHONY: package-all
 package-all: ensure-cli
 	@test -n '$(VERSION)' || (echo 'VERSION is required, e.g. make package-all VERSION=0.1.0' && exit 1)
-	$(SD_PLUGINS) pkg --all-platforms --version $(VERSION) $(if $(FORMATS),--formats $(FORMATS),)
+	$(SD_PLUGINS) package --all-platforms --version $(VERSION) $(if $(FORMATS),--formats $(FORMATS),)
 
 .PHONY: package-platform
 package-platform: ensure-cli
 	@test -n '$(PLATFORM)' || (echo 'PLATFORM is required (linux-x64, linux-arm64, windows-x64, windows-arm64, macos-x64, macos-arm64)' && exit 1)
 	@test -n '$(VERSION)' || (echo 'VERSION is required' && exit 1)
-	$(SD_PLUGINS) pkg --platform $(PLATFORM) --version $(VERSION) $(if $(FORMATS),--formats $(FORMATS),)
+	$(SD_PLUGINS) package --platform $(PLATFORM) --version $(VERSION) $(if $(FORMATS),--formats $(FORMATS),)
 
 .PHONY: package-formats
 package-formats: ensure-cli
 	@test -n '$(FORMATS)' || (echo 'FORMATS is required, e.g. FORMATS="deb,rpm,appimage"' && exit 1)
 	@test -n '$(VERSION)' || (echo 'VERSION is required' && exit 1)
-	$(SD_PLUGINS) pkg --version $(VERSION) --formats $(FORMATS) $(if $(PLATFORM),--platform $(PLATFORM),)
+	$(SD_PLUGINS) package --version $(VERSION) --formats $(FORMATS) $(if $(PLATFORM),--platform $(PLATFORM),)

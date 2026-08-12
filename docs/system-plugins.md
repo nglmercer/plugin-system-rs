@@ -176,194 +176,41 @@ One artifact per plugin, identical on every platform.
 
 ## API Endpoints
 
-### Volume
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/volume` | Get master volume state + apps |
-| PUT | `/api/volume/master` | Set master volume |
-| PUT | `/api/volume/mute` | Set master mute |
-| GET | `/api/volume/apps` | List per-app volumes |
-| PUT | `/api/volume/app/volume` | Set app volume |
-| PUT | `/api/volume/app/mute` | Set app mute |
-
-### OBS
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/obs/status` | Get OBS connection + stream/record state |
-| POST | `/api/obs/connect` | Connect to OBS |
-| POST | `/api/obs/disconnect` | Disconnect from OBS |
-| POST | `/api/obs/stream/start` | Start streaming |
-| POST | `/api/obs/stream/stop` | Stop streaming |
-| POST | `/api/obs/record/start` | Start recording |
-| POST | `/api/obs/record/stop` | Stop recording |
-| POST | `/api/obs/record/pause` | Toggle record pause |
-| GET | `/api/obs/scenes` | List scenes |
-| POST | `/api/obs/scenes/current` | Switch scene |
-| GET | `/api/obs/inputs` | List inputs |
-| PUT | `/api/obs/inputs/volume` | Set input volume |
-| PUT | `/api/obs/inputs/mute` | Set input mute |
-| POST | `/api/obs/virtualcam/toggle` | Toggle virtual camera |
-| POST | `/api/obs/replay/save` | Save replay buffer |
-| GET | `/api/obs/transitions` | List transitions |
-| POST | `/api/obs/transitions/current` | Set transition |
-| GET | `/api/obs/scene-items` | List scene items |
-| PUT | `/api/obs/scene-item/enabled` | Toggle source visibility |
-| GET | `/api/obs/studio-mode` | Get studio mode state |
-| POST | `/api/obs/studio-mode` | Set studio mode |
-
-### Plugins
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/plugins` | List loaded plugins |
-| POST | `/api/plugins/reload` | Reload all plugins |
-| GET | `/api/plugins/:name` | Get plugin data |
-| GET | `/api/system-stats` | Get system stats |
+The complete HTTP + WebSocket API (volume, OBS, hotkey, plugins, core) is
+documented in [`api-reference.md`](api-reference.md).
 
 ## Testing
 
-### Unit Tests
+The WASI plugin system has a test suite in the workspace crates:
 
 ```bash
-# Run volume plugin tests
-cargo test -p plugin-volume-master
+# Plugin manager, manifest, capability and WIT tests
+cargo test -p plugin-system
+
+# End-to-end: real .wasm components driving the native backends
+cargo test -p sd-caps --test end_to_end
 ```
 
-Tests cover:
-- Volume parsing from pactl output
-- Sink-input parsing (single, multiple, empty)
-- Edge cases (missing props, unknown apps)
+`crates/sd-caps/tests/end_to_end.rs` loads built components and reaches real
+hardware through a granted capability (audio, input, websocket). It skips
+itself when the plugins have not been built or the host has no backend, so
+run `sd-plugins build --release` first.
 
-### Manual Test Script
+### Manual smoke test
 
-```bash
-./scripts/test-volume.sh
-```
-
-Tests:
-- pactl commands work
-- API endpoints return valid JSON
-- Volume set/mute operations
-
-### E2E Test
-
-1. Start server: `cargo run`
+1. Build the plugins and start the server: `cargo run --bin sd-core`
 2. Open `http://localhost:3000`
-3. Add Volume Control widget
-4. Add App Volume widget
+3. Add a Volume Control widget
+4. Add an App Volume widget
 5. Play audio (e.g., YouTube)
-6. Verify apps appear in App Volume widget
-7. Test slider and mute controls
+6. Verify apps appear in the App Volume widget
+7. Test the slider and mute controls
 
 ## Creating System Plugins
 
-To create a new system plugin:
-
-1. Create a new crate in `plugins/`:
-   ```bash
-   cargo init --lib plugins/plugin-name
-   ```
-
-2. Add to workspace `Cargo.toml`:
-   ```toml
-   members = [
-       # ... existing members
-       "plugins/plugin-name",
-   ]
-   ```
-
-3. Set up `Cargo.toml`:
-   ```toml
-   [package]
-   name = "plugin-name-wasm"
-   version = "0.1.0"
-   edition = "2021"
-
-   [lib]
-   crate-type = ["cdylib"]
-
-   [dependencies]
-   # The guest does not depend on `plugin-system`: that crate is the host.
-   # The WIT contract is the only thing shared.
-   wit-bindgen = "0.46"
-   serde_json = "1"
-   ```
-
-4. Implement the WIT `guest` interface:
-   ```rust
-   wit_bindgen::generate!({
-       path: "../../crates/plugin-system/wit",
-       world: "streamdeck-plugin",
-   });
-
-   use exports::streamdeck::plugin::guest::Guest;
-   use streamdeck::plugin::types::{CommandError, Dependency, Metadata};
-
-   struct MyPlugin;
-
-   impl Guest for MyPlugin {
-       fn get_metadata() -> Metadata {
-           Metadata {
-               name: "my-plugin".into(),
-               version: "0.1.0".into(),
-               authors: vec!["You".into()],
-               dependencies: Vec::<Dependency>::new(),
-           }
-       }
-
-       fn on_load() {}
-       fn on_unload() {}
-
-       fn interface_ids() -> Vec<String> {
-           vec!["MyInterface".into()]
-       }
-
-       fn interface_data() -> Option<String> {
-           None
-       }
-
-       fn handle_command(method: String, args_json: String) -> Result<String, CommandError> {
-           let _args: serde_json::Value = serde_json::from_str(&args_json)
-               .map_err(|e| CommandError::InvalidArgs(e.to_string()))?;
-           match method.as_str() {
-               "my_command" => Ok(r#"{"ok":true}"#.into()),
-               other => Err(CommandError::NotFound(other.into())),
-           }
-       }
-   }
-
-   export!(MyPlugin);
-   ```
-
-5. Declare any capabilities in `plugin.manifest.json`, beside `Cargo.toml`:
-   ```json
-   {
-     "name": "my-plugin",
-     "version": "0.1.0",
-     "abi": "wasm-component",
-     "interfaces": ["MyInterface"],
-     "capabilities": [],
-     "limits": { "memory_mb": 32, "call_timeout_ms": 5000 }
-   }
-   ```
-
-   A capability not listed here is refused at call time, even when the host
-   provides it. Available names: `system-info`, `audio`, `input`, `websocket`.
-
-6. Build and stage:
-   ```bash
-   ./target/debug/sd-plugins build -p plugin-name-wasm
-   ```
-
-## Widget Integration
-
-To add a widget for your plugin in the web UI:
-
-1. Create `web/src/components/MyWidget.tsx`
-2. Add widget type to `web/src/lib/types.ts`
-3. Add widget catalog entry to `web/src/components/widgetHelpers.ts`
-4. Register in `web/src/components/WidgetContent.tsx`
-5. Add CSS styles to `web/src/styles/widgets.css`
-6. Add wizard config in `web/src/components/WidgetWizard.tsx`
+See [`plugin-development.md`](plugin-development.md) for the full guide:
+WIT contract, minimal guest, capability manifest, build & stage, and widget
+integration for the web UI.
 
 ## Platform Support
 

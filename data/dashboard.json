@@ -48,7 +48,7 @@
       "title": "Volume Control",
       "colSpan": 1,
       "rowSpan": 1,
-      "x": 0,
+      "x": 3,
       "y": 1,
       "page": 0,
       "settings": {
@@ -62,7 +62,7 @@
       "title": "App Volume",
       "colSpan": 3,
       "rowSpan": 2,
-      "x": 1,
+      "x": 0,
       "y": 1,
       "page": 0,
       "settings": {
@@ -81,7 +81,7 @@
       "page": 0,
       "settings": {
         "refreshInterval": 2000,
-        "variant": "detailed"
+        "variant": "compact"
       }
     },
     {
@@ -90,7 +90,7 @@
       "title": "OBS Control",
       "colSpan": 1,
       "rowSpan": 1,
-      "x": 0,
+      "x": 3,
       "y": 2,
       "page": 0,
       "settings": {
@@ -105,31 +105,14 @@
       "id": "ktdulyjz",
       "type": "obs-inputs",
       "title": "OBS Inputs",
-      "colSpan": 2,
-      "rowSpan": 1,
-      "x": 1,
+      "colSpan": 3,
+      "rowSpan": 2,
+      "x": 0,
       "y": 0,
       "page": 1,
       "settings": {
         "refreshInterval": 2000,
         "variant": "detailed"
-      }
-    },
-    {
-      "id": "6u938n39",
-      "type": "fetch",
-      "title": "Fetch Data",
-      "colSpan": 1,
-      "rowSpan": 1,
-      "x": 0,
-      "y": 0,
-      "page": 1,
-      "settings": {
-        "method": "GET",
-        "mode": "proxy",
-        "refreshInterval": 30000,
-        "url": "",
-        "variant": "compact"
       }
     }
   ],

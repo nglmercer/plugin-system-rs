@@ -11,11 +11,12 @@ use std::fs::{self, OpenOptions};
 use std::io::{self, Write};
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::RwLock;
 
+mod config;
 mod tray;
 
 #[derive(Debug, Error)]
@@ -101,6 +102,8 @@ async fn main() -> Result<()> {
     }
 
     let dashboard_config = Arc::new(RwLock::new(load_dashboard_config()));
+    let server_config = config::load();
+    let http_port = Arc::new(AtomicU16::new(server_config.bind_port()));
     let state = AppState {
         events: events.clone(),
         action_registry,
@@ -109,6 +112,7 @@ async fn main() -> Result<()> {
         plugin_manager,
         dashboard_config,
         http_client: reqwest::Client::new(),
+        http_port: http_port.clone(),
     };
 
     let events_clone = events.clone();
@@ -116,7 +120,7 @@ async fn main() -> Result<()> {
         events_clone.run().await;
     });
 
-    let bind_addr = bind_addr();
+    let bind_addr = bind_addr(&server_config);
     let local_ip = local_ip_address::local_ip()
         .map(|ip| ip.to_string())
         .unwrap_or_else(|_| "127.0.0.1".to_string());
@@ -125,6 +129,7 @@ async fn main() -> Result<()> {
     let listener = tokio::net::TcpListener::bind(bind_addr).await?;
     let actual_addr = listener.local_addr()?;
     let port = actual_addr.port();
+    http_port.store(port, Ordering::Relaxed);
 
     let local_http_url = format!("http://127.0.0.1:{port}");
     let network_http_url = format!("http://{local_ip}:{port}");
@@ -149,11 +154,16 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-fn bind_addr() -> SocketAddr {
-    std::env::var("SD_CORE_BIND_ADDR")
-        .unwrap_or_else(|_| "0.0.0.0:0".to_string())
-        .parse()
-        .expect("SD_CORE_BIND_ADDR must be a valid SocketAddr like 0.0.0.0:0")
+fn bind_addr(server: &config::ServerConfig) -> SocketAddr {
+    if let Ok(addr) = std::env::var("SD_CORE_BIND_ADDR") {
+        if !addr.is_empty() {
+            return addr
+                .parse()
+                .expect("SD_CORE_BIND_ADDR must be a valid SocketAddr like 0.0.0.0:3000");
+        }
+    }
+    let port = server.bind_port();
+    SocketAddr::from(([0, 0, 0, 0], port))
 }
 
 fn ctrlc_handler(shutdown: Arc<AtomicBool>, pid_lock_path: PathBuf) {
