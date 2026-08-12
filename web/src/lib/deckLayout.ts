@@ -48,10 +48,20 @@ export interface GridSpec {
   /** Pixels between the outermost cells and the page frame. */
   padding: number;
   /**
-   * `cellWidth / cellHeight`. 1 gives square keys like real deck hardware;
-   * above 1 gives landscape cells, which suits widgets carrying text.
+   * `cellWidth / cellHeight`, honoured only when `fit` is `"aspect"`.
+   * 1 gives square keys like real deck hardware.
    */
   aspect: number;
+  /**
+   * How the grid uses the space it is given.
+   *
+   * - `"fill"` (default): cells take the full width *and* the full height,
+   *   deriving each independently. The deck always covers its container with
+   *   no dead band, at the cost of cells not being a fixed shape.
+   * - `"aspect"`: cells keep `aspect` and the grid is letterboxed and
+   *   centred. Right when you want deck-hardware proportions.
+   */
+  fit?: "fill" | "aspect";
 }
 
 /** Everything the renderer needs, derived once per container measurement. */
@@ -75,10 +85,17 @@ export const DEFAULT_GRID: GridSpec = {
   gap: 12,
   padding: 12,
   aspect: 1.35,
+  fit: "fill",
 };
 
 /** Smallest cell we will render before giving up on fitting the height. */
 const MIN_CELL_WIDTH = 72;
+
+/**
+ * Floor for fill mode, so a very short viewport still yields usable rows
+ * rather than slivers. The page scrolls past this point.
+ */
+const MIN_CELL_HEIGHT = 64;
 
 function trackSize(available: number, count: number, gap: number, padding: number): number {
   if (count <= 0) return 0;
@@ -88,36 +105,50 @@ function trackSize(available: number, count: number, gap: number, padding: numbe
 /**
  * Derive cell and page dimensions from the space available.
  *
- * Width is the primary constraint. When `maxHeight` is supplied and the
- * resulting page would overflow it, cells shrink to fit *while preserving
- * `aspect`* — the alternative, squashing cells vertically, makes a deck look
- * broken at exactly the moment space is tight. The grid is then centred
- * horizontally via {@link Geometry.offsetX}.
+ * In `"fill"` mode — the default — width and height are derived independently,
+ * so the grid covers its container exactly in both axes and there is never a
+ * dead band below the last row.
+ *
+ * In `"aspect"` mode, cells keep their shape: width is the primary
+ * constraint, and if the resulting page would exceed `availableHeight` the
+ * cells shrink *while preserving `aspect`* rather than being squashed. The
+ * grid is then centred via {@link Geometry.offsetX}.
  */
 export function computeGeometry(
   containerWidth: number,
   spec: GridSpec = DEFAULT_GRID,
-  maxHeight?: number,
+  availableHeight?: number,
 ): Geometry {
   const columns = Math.max(1, Math.floor(spec.columns));
   const rows = Math.max(1, Math.floor(spec.rows));
   const aspect = spec.aspect > 0 ? spec.aspect : 1;
   const { gap, padding } = spec;
+  const fit = spec.fit ?? "fill";
 
   let cellWidth = Math.max(0, trackSize(containerWidth, columns, gap, padding));
-  let cellHeight = cellWidth / aspect;
+  let cellHeight: number;
 
-  if (maxHeight && maxHeight > 0) {
-    const heightBound = Math.max(0, trackSize(maxHeight, rows, gap, padding));
-    if (heightBound < cellHeight) {
-      // Re-derive width from the height bound so the aspect ratio survives.
-      const scaledWidth = heightBound * aspect;
-      if (scaledWidth >= MIN_CELL_WIDTH) {
-        cellHeight = heightBound;
-        cellWidth = scaledWidth;
+  if (fit === "fill" && availableHeight && availableHeight > 0) {
+    // Height is its own budget; the cells simply take what is there.
+    cellHeight = Math.max(
+      MIN_CELL_HEIGHT,
+      trackSize(availableHeight, rows, gap, padding),
+    );
+  } else {
+    cellHeight = cellWidth / aspect;
+
+    if (availableHeight && availableHeight > 0) {
+      const heightBound = Math.max(0, trackSize(availableHeight, rows, gap, padding));
+      if (heightBound < cellHeight) {
+        // Re-derive width from the height bound so the aspect ratio survives.
+        const scaledWidth = heightBound * aspect;
+        if (scaledWidth >= MIN_CELL_WIDTH) {
+          cellHeight = heightBound;
+          cellWidth = scaledWidth;
+        }
+        // Below MIN_CELL_WIDTH we keep the width-derived size and let the page
+        // scroll: unreadably small keys are worse than a scrollbar.
       }
-      // Below MIN_CELL_WIDTH we keep the width-derived size and let the page
-      // scroll: unreadably small keys are worse than a scrollbar.
     }
   }
 
@@ -130,6 +161,7 @@ export function computeGeometry(
     gap,
     padding,
     aspect,
+    fit,
     cellWidth,
     cellHeight,
     pageWidth,

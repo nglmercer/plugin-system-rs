@@ -19,7 +19,8 @@
     "columns": "Cols",
     "rows": "Filas",
     "page": "Página",
-    "addPage": "Añadir página"
+    "addPage": "Añadir página",
+    "moveToPage": "Mover a página"
   },
   "widget": {
     "library": "Biblioteca de Widgets",

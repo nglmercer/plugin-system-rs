@@ -369,7 +369,11 @@
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
-    max-height: 150px;
+    /* Fills the deck cell instead of a fixed height: the grid decides how
+       tall this widget is, and a hard cap here produced a second
+       scrollbar inside an already-scrolling cell. */
+    flex: 1;
+    min-height: 0;
     overflow-y: auto;
     margin-top: 0.3rem;
     padding-top: 0.3rem;
@@ -568,7 +572,11 @@
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
-    max-height: 200px;
+    /* Fills the deck cell instead of a fixed height: the grid decides how
+       tall this widget is, and a hard cap here produced a second
+       scrollbar inside an already-scrolling cell. */
+    flex: 1;
+    min-height: 0;
     overflow-y: auto;
 }
 .volapps-item {
@@ -659,9 +667,7 @@
     flex-direction: column;
     gap: 0.4rem;
 }
-.volapps-list.detailed {
-    max-height: 300px;
-}
+
 .volapps-item-detailed {
     display: flex;
     flex-direction: column;
@@ -957,7 +963,11 @@
     display: flex;
     flex-direction: column;
     gap: 0.2rem;
-    max-height: 200px;
+    /* Fills the deck cell instead of a fixed height: the grid decides how
+       tall this widget is, and a hard cap here produced a second
+       scrollbar inside an already-scrolling cell. */
+    flex: 1;
+    min-height: 0;
     overflow-y: auto;
 }
 .obsscene-item-btn {
@@ -1142,12 +1152,14 @@
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
-    max-height: 200px;
+    /* Fills the deck cell instead of a fixed height: the grid decides how
+       tall this widget is, and a hard cap here produced a second
+       scrollbar inside an already-scrolling cell. */
+    flex: 1;
+    min-height: 0;
     overflow-y: auto;
 }
-.obsinput-list.detailed {
-    max-height: 300px;
-}
+
 .obsinput-item {
     display: flex;
     flex-direction: column;
@@ -1571,4 +1583,35 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* --- Widget roots fill their deck cell ---------------------------------- */
+
+/* Each widget's outermost element is a flex column that fills the cell, so
+   its scrolling region (if any) has a bounded height to flex into. Without
+   this the region would size to content and overflow the cell instead. */
+.volapps-variant,
+.obsscene-variant,
+.obsinput-variant,
+.obs-variant,
+.vol-variant,
+.sysmon-variant,
+.fetch-variant,
+.clock-variant,
+.action-single-text,
+.action-single-url {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+/* Headers and footers inside a widget keep their natural height; only the
+   list between them flexes. */
+.volapps-header,
+.obsscene-header,
+.obsinput-header,
+.volapps-count {
+  flex-shrink: 0;
 }

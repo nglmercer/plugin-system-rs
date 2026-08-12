@@ -1,48 +1,32 @@
 import { h } from "preact";
-import { useState, useEffect, useRef, useCallback } from "preact/hooks";
+import { useState, useEffect, useRef, useCallback, useMemo } from "preact/hooks";
 import { WidgetType, DashboardLayout, WidgetConfig } from "../lib/types";
-import { DeckGrid } from "./DeckGrid";
-import { DEFAULT_GRID, Placement } from "../lib/deckLayout";
 import { fetchDashboard, saveDashboard } from "../lib/api";
 import { buildDefaultWidget, generateId } from "./widgetHelpers";
 import { WidgetLibrary } from "./WidgetLibrary";
 import { WidgetWizard } from "./WidgetWizard";
 import { WidgetContent } from "./WidgetContent";
+import { WidgetContextMenu } from "./WidgetContextMenu";
+import { DeckToolbar } from "./DeckToolbar";
+import { DeckGrid } from "./DeckGrid";
 import { Icons } from "./Icons";
 import { t } from "../lib/i18n";
 import { CssEditor } from "./CssEditor";
+import {
+  DEFAULT_GRID,
+  Placement,
+  moveWidget,
+  normalizeLayout,
+  pageCount,
+} from "../lib/deckLayout";
 
-/** Small +/- control used by the arrange toolbar. */
-function stepper(
-  value: number,
-  onChange: (next: number) => void,
-  min: number,
-  max: number,
-) {
-  return h(
-    "div",
-    { class: "deck-stepper" },
-    h(
-      "button",
-      {
-        onClick: () => onChange(value - 1),
-        disabled: value <= min,
-        "aria-label": "Decrease",
-      },
-      "-",
-    ),
-    h("span", null, String(value)),
-    h(
-      "button",
-      {
-        onClick: () => onChange(value + 1),
-        disabled: value >= max,
-        "aria-label": "Increase",
-      },
-      "+",
-    ),
-  );
-}
+/**
+ * Dashboard state owner.
+ *
+ * Deliberately thin on rendering: the deck surface, the header controls and
+ * the context menu are their own components, and this one holds the layout,
+ * persists it, and mediates between them.
+ */
 
 interface ContextMenuState {
   visible: boolean;
@@ -51,6 +35,8 @@ interface ContextMenuState {
   widgetId: string;
 }
 
+const LONG_PRESS_MS = 500;
+
 export function WidgetGrid() {
   const [layout, setLayout] = useState<DashboardLayout>({
     widgets: [],
@@ -58,8 +44,6 @@ export function WidgetGrid() {
     rows: DEFAULT_GRID.rows,
     aspect: DEFAULT_GRID.aspect,
   });
-  const [arranging, setArranging] = useState(false);
-  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showLibrary, setShowLibrary] = useState(false);
   const [wizardWidget, setWizardWidget] = useState<string | null>(null);
@@ -67,7 +51,11 @@ export function WidgetGrid() {
     visible: false, x: 0, y: 0, widgetId: "",
   });
   const [showCssEditor, setShowCssEditor] = useState(false);
+  const [arranging, setArranging] = useState(false);
+  const [page, setPage] = useState(0);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const rows = layout.rows ?? DEFAULT_GRID.rows;
 
   useEffect(() => {
     fetchDashboard()
@@ -88,9 +76,7 @@ export function WidgetGrid() {
 
   useEffect(() => {
     function handleClickOutside() {
-      if (contextMenu.visible) {
-        setContextMenu((prev) => ({ ...prev, visible: false }));
-      }
+      if (contextMenu.visible) setContextMenu((prev) => ({ ...prev, visible: false }));
     }
     if (contextMenu.visible) {
       document.addEventListener("click", handleClickOutside);
@@ -102,62 +88,82 @@ export function WidgetGrid() {
     };
   }, [contextMenu.visible]);
 
+  useEffect(() => {
+    let styleEl = document.getElementById("custom-dashboard-css");
+    if (!styleEl) {
+      styleEl = document.createElement("style");
+      styleEl.id = "custom-dashboard-css";
+      document.head.appendChild(styleEl);
+    }
+    styleEl.textContent = layout.customCss || "";
+  }, [layout.customCss]);
+
+  useEffect(() => () => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+  }, []);
+
   function persist(next: DashboardLayout) {
     setLayout(next);
     saveDashboard(next);
   }
 
   /**
+   * Current placements, mirroring what `DeckGrid` derives.
+   *
+   * Needed here too so the context menu knows which page a widget is on and
+   * how many pages exist, without the grid having to report it upward.
+   */
+  const placements = useMemo(
+    () =>
+      normalizeLayout(
+        layout.widgets.map((w) => ({
+          id: w.id, w: w.colSpan, h: w.rowSpan, x: w.x, y: w.y, page: w.page,
+        })),
+        { ...DEFAULT_GRID, columns: layout.columns, rows },
+      ),
+    [layout.widgets, layout.columns, rows],
+  );
+
+  /**
    * Write completed drag/resize results back onto the widgets.
    *
    * The deck hands back placements for *every* widget, not just the one that
-   * moved, because displacing one can re-pack others. Applying the whole map
-   * keeps the saved layout and the rendered one identical.
+   * moved, because displacing one can re-pack others.
    */
-  function handlePlacementsChange(placements: Map<string, Placement>) {
-    persist({
-      ...layout,
-      widgets: layout.widgets.map((w) => {
-        const p = placements.get(w.id);
-        return p
-          ? { ...w, x: p.x, y: p.y, page: p.page, colSpan: p.w, rowSpan: p.h }
-          : w;
-      }),
-    });
-  }
+  const applyPlacements = useCallback(
+    (next: Map<string, Placement>) => {
+      persist({
+        ...layout,
+        widgets: layout.widgets.map((w) => {
+          const p = next.get(w.id);
+          return p ? { ...w, x: p.x, y: p.y, page: p.page, colSpan: p.w, rowSpan: p.h } : w;
+        }),
+      });
+    },
+    [layout],
+  );
 
-  /**
-   * Change the page shape.
-   *
-   * Positions are deliberately left alone: `normalizeLayout` re-packs anything
-   * that no longer fits, on the next render, and keeps everything that still
-   * does. Rewriting coordinates here would discard arrangements that survive
-   * the resize perfectly well.
-   */
   function setGrid(patch: { columns?: number; rows?: number }) {
+    // Positions are left alone: `normalizeLayout` re-packs only what no
+    // longer fits, preserving arrangements that survive the resize.
     persist({ ...layout, ...patch });
   }
 
   function handleAddWidget(type: WidgetType) {
     const widget = buildDefaultWidget(type);
-    persist({ ...layout, widgets: [...layout.widgets, widget] });
+    // New widgets land on the page being viewed, not always page 1.
+    persist({ ...layout, widgets: [...layout.widgets, { ...widget, page }] });
     setShowLibrary(false);
     setWizardWidget(widget.id);
   }
 
   function handleSaveWidget(
     id: string,
-    updates: {
-      title?: string;
-      colSpan?: number;
-      settings?: Record<string, any>;
-    },
+    updates: { title?: string; colSpan?: number; settings?: Record<string, any> },
   ) {
     persist({
       ...layout,
-      widgets: layout.widgets.map((w) =>
-        w.id === id ? { ...w, ...updates } : w,
-      ),
+      widgets: layout.widgets.map((w) => (w.id === id ? { ...w, ...updates } : w)),
     });
     setWizardWidget(null);
   }
@@ -165,6 +171,7 @@ export function WidgetGrid() {
   function handleRemoveWidget(id: string) {
     persist({ ...layout, widgets: layout.widgets.filter((w) => w.id !== id) });
     setWizardWidget(null);
+    setContextMenu((prev) => ({ ...prev, visible: false }));
   }
 
   function handleCloneWidget(id: string) {
@@ -175,13 +182,29 @@ export function WidgetGrid() {
       id: generateId(),
       title: original.title + " (copy)",
       settings: { ...original.settings },
+      // Cleared so the packer finds it a free slot instead of stacking it
+      // exactly on top of the original.
+      x: undefined,
+      y: undefined,
+      page,
     };
     persist({ ...layout, widgets: [...layout.widgets, clone] });
     setContextMenu((prev) => ({ ...prev, visible: false }));
   }
 
-  function handleCssChange(css: string) {
-    persist({ ...layout, customCss: css });
+  function handleMoveToPage(id: string, target: number) {
+    const current = placements.get(id);
+    if (!current) return;
+    applyPlacements(
+      moveWidget(
+        placements,
+        id,
+        { x: current.x, y: current.y, w: current.w, h: current.h, page: target },
+        { ...DEFAULT_GRID, columns: layout.columns, rows },
+      ),
+    );
+    setContextMenu((prev) => ({ ...prev, visible: false }));
+    setPage(target);
   }
 
   function showContextMenu(e: Event, widgetId: string) {
@@ -191,66 +214,26 @@ export function WidgetGrid() {
     const touch = (e as TouchEvent).changedTouches?.[0];
     const clientX = me.clientX ?? touch?.clientX ?? 0;
     const clientY = me.clientY ?? touch?.clientY ?? 0;
-    const menuW = 180;
-    const menuH = 140;
-    const x = Math.min(clientX, window.innerWidth - menuW - 8);
-    const y = Math.min(clientY, window.innerHeight - menuH - 8);
-    setContextMenu({ visible: true, x, y, widgetId });
+    const menuW = 200;
+    const menuH = 260;
+    setContextMenu({
+      visible: true,
+      x: Math.min(clientX, window.innerWidth - menuW - 8),
+      y: Math.min(clientY, window.innerHeight - menuH - 8),
+      widgetId,
+    });
   }
 
-  const handlePointerDown = useCallback((e: Event, widgetId: string) => {
+  const handleWidgetContextMenu = useCallback((e: Event, widgetId: string) => {
     const target = e.target as HTMLElement;
-    if (target.closest(".ctx-menu") || target.closest(".ctx-item")) return;
-
-    if (e.type === "contextmenu") {
-      showContextMenu(e, widgetId);
-      return;
-    }
-
-    longPressTimer.current = setTimeout(() => {
-      showContextMenu(e, widgetId);
-    }, 500);
+    if (target.closest(".ctx-menu")) return;
+    showContextMenu(e, widgetId);
   }, []);
 
-  const handlePointerUp = useCallback(() => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-  }, []);
-
-  const handlePointerMove = useCallback(() => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (longPressTimer.current) clearTimeout(longPressTimer.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    let styleEl = document.getElementById("custom-dashboard-css");
-    if (!styleEl) {
-      styleEl = document.createElement("style");
-      styleEl.id = "custom-dashboard-css";
-      document.head.appendChild(styleEl);
-    }
-    styleEl.textContent = layout.customCss || "";
-    return () => {
-      if (styleEl && styleEl.parentNode) {
-        styleEl.parentNode.removeChild(styleEl);
-      }
-    };
-  }, [layout.customCss]);
-
-  if (loading)
-    return h("div", { class: "dashboard-loading" }, t("dashboard.loading"));
+  if (loading) return h("div", { class: "dashboard-loading" }, t("dashboard.loading"));
 
   const editing = layout.widgets.find((w) => w.id === wizardWidget) || null;
+  const menuTargetPage = placements.get(contextMenu.widgetId)?.page ?? 0;
 
   return h(
     "div",
@@ -259,54 +242,17 @@ export function WidgetGrid() {
       "div",
       { class: "dashboard-header" },
       h("h2", null, t("dashboard.title")),
-      h(
-        "div",
-        { class: "dashboard-header-actions deck-toolbar" },
-        arranging &&
-          h(
-            "div",
-            { class: "deck-toolbar-group" },
-            h("label", null, t("dashboard.columns")),
-            stepper(
-              layout.columns,
-              (v) => setGrid({ columns: v }),
-              1,
-              12,
-            ),
-          ),
-        arranging &&
-          h(
-            "div",
-            { class: "deck-toolbar-group" },
-            h("label", null, t("dashboard.rows")),
-            stepper(
-              layout.rows ?? DEFAULT_GRID.rows,
-              (v) => setGrid({ rows: v }),
-              1,
-              12,
-            ),
-          ),
-        h(
-          "button",
-          {
-            class: `deck-edit-toggle${arranging ? " is-active" : ""}`,
-            onClick: () => setArranging((v) => !v),
-          },
-          arranging ? t("dashboard.done") : t("dashboard.edit"),
-        ),
-        h(
-          "button",
-          { class: "add-widget-btn", onClick: () => setShowCssEditor(true) },
-          "{ }",
-        ),
-        h(
-          "button",
-          { class: "add-widget-btn", onClick: () => setShowLibrary(true) },
-          h(Icons.plus, null),
-          t("dashboard.addWidget"),
-        ),
-      ),
+      h(DeckToolbar, {
+        arranging,
+        onToggleArrange: () => setArranging((v) => !v),
+        columns: layout.columns,
+        rows,
+        onGridChange: setGrid,
+        onOpenCss: () => setShowCssEditor(true),
+        onAddWidget: () => setShowLibrary(true),
+      }),
     ),
+
     layout.widgets.length === 0
       ? h(
           "div",
@@ -318,76 +264,48 @@ export function WidgetGrid() {
       : h(DeckGrid, {
           widgets: layout.widgets,
           columns: layout.columns,
-          rows: layout.rows ?? DEFAULT_GRID.rows,
+          rows,
           aspect: layout.aspect ?? DEFAULT_GRID.aspect,
+          fit: "fill",
           editing: arranging,
           page,
           onPageChange: setPage,
-          onPlacementsChange: handlePlacementsChange,
-          onWidgetContextMenu: (e: Event, id: string) => handlePointerDown(e, id),
+          onPlacementsChange: applyPlacements,
+          onWidgetContextMenu: handleWidgetContextMenu,
           renderWidget: (widget: WidgetConfig) => h(WidgetContent, { widget }),
         }),
+
     contextMenu.visible &&
-      h(
-        "div",
-        {
-          class: "ctx-menu",
-          style: { left: contextMenu.x + "px", top: contextMenu.y + "px" },
+      h(WidgetContextMenu, {
+        x: contextMenu.x,
+        y: contextMenu.y,
+        pages: pageCount(placements.values()),
+        currentPage: menuTargetPage,
+        onEdit: () => {
+          setWizardWidget(contextMenu.widgetId);
+          setContextMenu((prev) => ({ ...prev, visible: false }));
         },
-        h(
-          "button",
-          {
-            class: "ctx-item",
-            onClick: () => {
-              setWizardWidget(contextMenu.widgetId);
-              setContextMenu((prev) => ({ ...prev, visible: false }));
-            },
-          },
-          h(Icons.edit, null),
-          t("widget.context.edit"),
-        ),
-        h(
-          "button",
-          {
-            class: "ctx-item",
-            onClick: () => {
-              handleCloneWidget(contextMenu.widgetId);
-            },
-          },
-          h(Icons.copy, null),
-          t("widget.context.clone"),
-        ),
-        h("div", { class: "ctx-separator" }),
-        h(
-          "button",
-          {
-            class: "ctx-item ctx-danger",
-            onClick: () => {
-              handleRemoveWidget(contextMenu.widgetId);
-              setContextMenu((prev) => ({ ...prev, visible: false }));
-            },
-          },
-          h(Icons.close, null),
-          t("widget.context.delete"),
-        ),
-      ),
-    showLibrary &&
-      h(WidgetLibrary, {
-        onAdd: handleAddWidget,
-        onClose: () => setShowLibrary(false),
+        onClone: () => handleCloneWidget(contextMenu.widgetId),
+        onDelete: () => handleRemoveWidget(contextMenu.widgetId),
+        onMoveToPage: (target) => handleMoveToPage(contextMenu.widgetId, target),
       }),
+
+    showLibrary &&
+      h(WidgetLibrary, { onAdd: handleAddWidget, onClose: () => setShowLibrary(false) }),
+
     editing &&
       h(WidgetWizard, {
         widget: editing,
         columns: layout.columns,
-        onSave: (id, updates) => handleSaveWidget(id, updates),
+        onSave: handleSaveWidget,
         onRemove: () => handleRemoveWidget(editing.id),
         onClose: () => setWizardWidget(null),
       }),
+
     showCssEditor &&
       h(CssEditor, {
         value: layout.customCss || "",
-        onChange: handleCssChange,
+        onChange: (css: string) => persist({ ...layout, customCss: css }),
         onClose: () => setShowCssEditor(false),
       }),
   );

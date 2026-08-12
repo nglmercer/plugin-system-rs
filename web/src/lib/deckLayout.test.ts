@@ -18,7 +18,9 @@ import {
   Placement,
 } from "./deckLayout";
 
-const spec: GridSpec = { columns: 4, rows: 3, gap: 10, padding: 20, aspect: 2 };
+/// Aspect mode for the geometry tests that predate fill mode; fill is
+/// exercised separately below.
+const spec: GridSpec = { columns: 4, rows: 3, gap: 10, padding: 20, aspect: 2, fit: "aspect" };
 
 describe("computeGeometry", () => {
   it("divides the container into equal cells, accounting for gaps and padding", () => {
@@ -76,6 +78,62 @@ describe("computeGeometry", () => {
     expect(geom.rows).toBe(1);
     expect(Number.isFinite(geom.cellWidth)).toBe(true);
     expect(Number.isFinite(geom.cellHeight)).toBe(true);
+  });
+});
+
+describe("computeGeometry fill mode", () => {
+  const fill: GridSpec = { ...spec, fit: "fill" };
+
+  /// The whole point of fill mode: no dead band under the last row.
+  it("covers the container in both axes exactly", () => {
+    const geom = computeGeometry(800, fill, 600);
+    expect(geom.pageWidth).toBeCloseTo(800);
+    expect(geom.pageHeight).toBeCloseTo(600);
+    expect(geom.offsetX).toBeCloseTo(0);
+  });
+
+  it("derives height independently of aspect", () => {
+    const wide = computeGeometry(800, { ...fill, aspect: 5 }, 600);
+    const tall = computeGeometry(800, { ...fill, aspect: 0.2 }, 600);
+    // Aspect is ignored in fill mode, so both fill identically.
+    expect(wide.cellHeight).toBeCloseTo(tall.cellHeight);
+    expect(wide.pageHeight).toBeCloseTo(600);
+    expect(tall.pageHeight).toBeCloseTo(600);
+  });
+
+  /// Exact fill holds for every row count that clears the height floor; at
+  /// 600px with this spec that is up to 7 rows. Beyond it the floor binds and
+  /// the page scrolls instead, which the next test covers.
+  it("fills exactly at any row count above the height floor", () => {
+    for (let rows = 1; rows <= 7; rows++) {
+      const geom = computeGeometry(800, { ...fill, rows }, 600);
+      const total = geom.cellHeight * rows + geom.gap * (rows - 1) + geom.padding * 2;
+      expect(total).toBeCloseTo(600, 6);
+    }
+  });
+
+  it("overflows rather than shrinking past the floor", () => {
+    const geom = computeGeometry(800, { ...fill, rows: 10 }, 600);
+    expect(geom.cellHeight).toBeCloseTo(64);
+    expect(geom.pageHeight).toBeGreaterThan(600);
+  });
+
+  /// A viewport too short for the row count must yield usable cells and let
+  /// the page scroll, rather than collapsing rows into slivers.
+  it("keeps a floor on cell height in a very short viewport", () => {
+    const geom = computeGeometry(800, { ...fill, rows: 12 }, 100);
+    expect(geom.cellHeight).toBeGreaterThanOrEqual(64);
+  });
+
+  it("falls back to aspect when no height is supplied", () => {
+    const geom = computeGeometry(800, fill);
+    expect(geom.cellWidth / geom.cellHeight).toBeCloseTo(fill.aspect);
+  });
+
+  it("is the default when fit is unspecified", () => {
+    const { fit: _omitted, ...noFit } = fill;
+    const geom = computeGeometry(800, noFit as GridSpec, 600);
+    expect(geom.pageHeight).toBeCloseTo(600);
   });
 });
 

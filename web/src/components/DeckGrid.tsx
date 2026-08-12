@@ -15,6 +15,7 @@ import {
   rectToPixels,
   resizeWidget,
 } from "../lib/deckLayout";
+import { DeckPager } from "./DeckPager";
 
 /**
  * A Stream Deck-style widget surface.
@@ -25,7 +26,7 @@ import {
  * widget never reshuffles the rest, and drag/resize are pure arithmetic on a
  * geometry the component already holds.
  *
- * Editing is opt-in. Outside edit mode a widget is a plain interactive
+ * Editing is opt-in. Outside arrange mode a widget is a plain interactive
  * control, so a slider drag is never mistaken for a layout drag.
  */
 
@@ -39,15 +40,16 @@ type Gesture =
       /** Offset from the widget's top-left to the pointer, in px. */
       grabX: number;
       grabY: number;
-      /** Live pixel position, for the dragged element only. */
+      /** Live pixel position, clamped to the page. */
       left: number;
       top: number;
+      /** Page under the pointer when it is over the pager, else null. */
+      dropPage: number | null;
     }
   | {
       kind: "resize";
       id: string;
       pointerId: number;
-      /** Live pixel size of the widget being resized. */
       width: number;
       height: number;
     };
@@ -57,10 +59,11 @@ export interface DeckGridProps {
   columns: number;
   rows: number;
   aspect: number;
+  /** `"fill"` covers the container; `"aspect"` keeps cell proportions. */
+  fit?: "fill" | "aspect";
   gap?: number;
   padding?: number;
   editing: boolean;
-  /** Page shown right now, owned by the parent so toolbars can drive it. */
   page: number;
   onPageChange: (page: number) => void;
   /** Persist new placements. Called once per completed gesture, not per frame. */
@@ -71,13 +74,13 @@ export interface DeckGridProps {
 
 export function DeckGrid(props: DeckGridProps) {
   const {
-    widgets, columns, rows, aspect, editing, page,
+    widgets, columns, rows, aspect, fit, editing, page,
     onPageChange, onPlacementsChange, renderWidget, onWidgetContextMenu,
   } = props;
 
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const [width, setWidth] = useState(0);
-  const [viewportHeight, setViewportHeight] = useState(0);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const pageRef = useRef<HTMLDivElement | null>(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
   const [gesture, setGesture] = useState<Gesture>({ kind: "none" });
 
   const spec: GridSpec = useMemo(
@@ -85,23 +88,28 @@ export function DeckGrid(props: DeckGridProps) {
       columns,
       rows,
       aspect,
+      fit: fit ?? "fill",
       gap: props.gap ?? 12,
       padding: props.padding ?? 12,
     }),
-    [columns, rows, aspect, props.gap, props.padding],
+    [columns, rows, aspect, fit, props.gap, props.padding],
   );
 
-  // Measure the container rather than the window: the deck may sit inside a
-  // sidebar layout, and `window.innerWidth` would overstate the space.
+  /**
+   * Measure the element the page actually occupies.
+   *
+   * Its height comes from CSS (`flex: 1` inside a viewport-height column), so
+   * reading it back gives the deck exactly the space the layout granted —
+   * rather than guessing from `window.innerHeight` minus assorted chrome, which
+   * is what left a dead band at the bottom before.
+   */
   useLayoutEffect(() => {
-    const el = containerRef.current;
+    const el = pageRef.current;
     if (!el) return;
 
     const measure = () => {
-      setWidth(el.clientWidth);
-      // Leave room for the pager beneath the page.
-      const top = el.getBoundingClientRect().top;
-      setViewportHeight(Math.max(240, window.innerHeight - top - 64));
+      const rect = el.getBoundingClientRect();
+      setSize({ width: el.clientWidth, height: rect.height });
     };
 
     measure();
@@ -115,17 +123,10 @@ export function DeckGrid(props: DeckGridProps) {
   }, []);
 
   const geom: Geometry = useMemo(
-    () => computeGeometry(width || 1, spec, viewportHeight),
-    [width, spec, viewportHeight],
+    () => computeGeometry(size.width || 1, spec, size.height || undefined),
+    [size, spec],
   );
 
-  /**
-   * Placements derived from the widgets themselves.
-   *
-   * Recomputed from props rather than held in state, so the parent stays the
-   * single source of truth and a save that fails cannot leave the deck
-   * showing a layout the server does not have.
-   */
   const placements = useMemo(
     () =>
       normalizeLayout(
@@ -144,8 +145,6 @@ export function DeckGrid(props: DeckGridProps) {
 
   const pages = pageCount(placements.values());
 
-  // Deleting the last widget on the final page must not strand the viewer on
-  // a page that no longer exists.
   useEffect(() => {
     if (page > pages - 1) onPageChange(Math.max(0, pages - 1));
   }, [pages, page, onPageChange]);
@@ -157,18 +156,35 @@ export function DeckGrid(props: DeckGridProps) {
 
   // ---- Gestures ----------------------------------------------------------
 
+  /** Keep a dragged box inside the page, so it can never cause overflow. */
+  const clampToPage = useCallback(
+    (left: number, top: number, box: { width: number; height: number }) => ({
+      left: Math.min(Math.max(geom.offsetX, left), geom.offsetX + geom.pageWidth - box.width),
+      top: Math.min(Math.max(0, top), Math.max(0, geom.pageHeight - box.height)),
+    }),
+    [geom],
+  );
+
+  /** Which page dot, if any, the pointer is over. */
+  function pageUnderPointer(e: PointerEvent): number | null {
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const dot = el?.closest?.("[data-deck-page]") as HTMLElement | null;
+    if (!dot) return null;
+    const value = Number(dot.dataset.deckPage);
+    return Number.isFinite(value) ? value : null;
+  }
+
   const startMove = useCallback(
     (e: PointerEvent, id: string) => {
       if (!editing) return;
       const placement = placements.get(id);
       if (!placement) return;
 
-      const target = e.currentTarget as HTMLElement;
-      target.setPointerCapture(e.pointerId);
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
       e.preventDefault();
 
       const box = rectToPixels(placement, geom);
-      const local = localPoint(e, containerRef.current);
+      const local = localPoint(e, pageRef.current);
       setGesture({
         kind: "move",
         id,
@@ -177,6 +193,7 @@ export function DeckGrid(props: DeckGridProps) {
         grabY: local.y - box.top,
         left: box.left,
         top: box.top,
+        dropPage: null,
       });
     },
     [editing, placements, geom],
@@ -207,10 +224,14 @@ export function DeckGrid(props: DeckGridProps) {
   const onPointerMove = useCallback(
     (e: PointerEvent) => {
       if (gesture.kind === "none" || e.pointerId !== gesture.pointerId) return;
-      const local = localPoint(e, containerRef.current);
+      const local = localPoint(e, pageRef.current);
 
       if (gesture.kind === "move") {
-        setGesture({ ...gesture, left: local.x - gesture.grabX, top: local.y - gesture.grabY });
+        const placement = placements.get(gesture.id);
+        if (!placement) return;
+        const box = rectToPixels(placement, geom);
+        const clamped = clampToPage(local.x - gesture.grabX, local.y - gesture.grabY, box);
+        setGesture({ ...gesture, ...clamped, dropPage: pageUnderPointer(e) });
         return;
       }
 
@@ -219,11 +240,18 @@ export function DeckGrid(props: DeckGridProps) {
       const origin = rectToPixels(placement, geom);
       setGesture({
         ...gesture,
-        width: Math.max(geom.cellWidth * 0.5, local.x - origin.left),
-        height: Math.max(geom.cellHeight * 0.5, local.y - origin.top),
+        // Bounded by the page edge so a resize cannot overflow either.
+        width: Math.min(
+          Math.max(geom.cellWidth * 0.5, local.x - origin.left),
+          geom.offsetX + geom.pageWidth - origin.left - geom.padding,
+        ),
+        height: Math.min(
+          Math.max(geom.cellHeight * 0.5, local.y - origin.top),
+          Math.max(geom.cellHeight, geom.pageHeight - origin.top - geom.padding),
+        ),
       });
     },
-    [gesture, geom, placements],
+    [gesture, geom, placements, clampToPage],
   );
 
   const onPointerUp = useCallback(
@@ -231,17 +259,32 @@ export function DeckGrid(props: DeckGridProps) {
       if (gesture.kind === "none" || e.pointerId !== gesture.pointerId) return;
 
       if (gesture.kind === "move") {
-        const cell = pixelsToCell(gesture.left, gesture.top, geom);
         const current = placements.get(gesture.id);
         if (current) {
-          commit(
-            moveWidget(
-              placements,
-              gesture.id,
-              { ...cell, w: current.w, h: current.h, page },
-              spec,
-            ),
-          );
+          // Released over a page dot: move to that page, keeping the cell
+          // position where it will fit. Otherwise place within this page.
+          const target = gesture.dropPage;
+          if (target !== null && target !== current.page) {
+            commit(
+              moveWidget(
+                placements,
+                gesture.id,
+                { x: current.x, y: current.y, w: current.w, h: current.h, page: target },
+                spec,
+              ),
+            );
+            onPageChange(target);
+          } else {
+            const cell = pixelsToCell(gesture.left, gesture.top, geom);
+            commit(
+              moveWidget(
+                placements,
+                gesture.id,
+                { ...cell, w: current.w, h: current.h, page },
+                spec,
+              ),
+            );
+          }
         }
       } else {
         const w = pixelsToSpan(gesture.width, geom.cellWidth, geom.gap);
@@ -251,44 +294,44 @@ export function DeckGrid(props: DeckGridProps) {
 
       setGesture({ kind: "none" });
     },
-    [gesture, geom, placements, page, spec, commit],
+    [gesture, geom, placements, page, spec, commit, onPageChange],
   );
 
   // ---- Render ------------------------------------------------------------
 
   const visible = widgets.filter((w) => placements.get(w.id)?.page === page);
-  const dragging = gesture.kind !== "none" ? gesture.id : null;
+  const draggingId = gesture.kind !== "none" ? gesture.id : null;
 
   /** Where a dragged widget would land, shown as an outline. */
   const dropHint = useMemo(() => {
-    if (gesture.kind !== "move") return null;
+    if (gesture.kind !== "move" || gesture.dropPage !== null) return null;
     const current = placements.get(gesture.id);
     if (!current) return null;
     const cell = pixelsToCell(gesture.left, gesture.top, geom);
-    const clamped = {
-      x: Math.min(Math.max(0, cell.x), spec.columns - current.w),
-      y: Math.min(Math.max(0, cell.y), spec.rows - current.h),
-      w: current.w,
-      h: current.h,
-    };
-    return rectToPixels(clamped, geom);
+    return rectToPixels(
+      {
+        x: Math.min(Math.max(0, cell.x), spec.columns - current.w),
+        y: Math.min(Math.max(0, cell.y), spec.rows - current.h),
+        w: current.w,
+        h: current.h,
+      },
+      geom,
+    );
   }, [gesture, placements, geom, spec]);
 
   return h(
     "div",
-    { class: "deck-root" },
+    { class: "deck-root", ref: rootRef },
     h(
       "div",
       {
-        ref: containerRef,
+        ref: pageRef,
         class: `deck-page${editing ? " is-editing" : ""}`,
-        style: { height: `${geom.pageHeight}px` },
         onPointerMove,
         onPointerUp,
         onPointerCancel: onPointerUp,
       },
 
-      // Cell guides, so the grid is legible while arranging.
       editing &&
         h(
           "div",
@@ -298,11 +341,7 @@ export function DeckGrid(props: DeckGridProps) {
               { x: i % spec.columns, y: Math.floor(i / spec.columns), w: 1, h: 1 },
               geom,
             );
-            return h("div", {
-              key: `guide-${i}`,
-              class: "deck-guide",
-              style: pxStyle(box),
-            });
+            return h("div", { key: `guide-${i}`, class: "deck-guide", style: pxStyle(box) });
           }),
         ),
 
@@ -311,7 +350,7 @@ export function DeckGrid(props: DeckGridProps) {
       visible.map((widget) => {
         const placement = placements.get(widget.id)!;
         const box = rectToPixels(placement, geom);
-        const isDragging = dragging === widget.id;
+        const isDragging = draggingId === widget.id;
 
         const style =
           isDragging && gesture.kind === "move"
@@ -328,6 +367,10 @@ export function DeckGrid(props: DeckGridProps) {
               "deck-widget",
               `variant-${widget.settings.variant || "compact"}`,
               isDragging ? "is-dragging" : "",
+              // Faded while heading to another page, so it reads as leaving.
+              isDragging && gesture.kind === "move" && gesture.dropPage !== null
+                ? "is-leaving"
+                : "",
             ]
               .filter(Boolean)
               .join(" "),
@@ -348,44 +391,15 @@ export function DeckGrid(props: DeckGridProps) {
       }),
     ),
 
-    pages > 1 &&
-      h(
-        "div",
-        { class: "deck-pager" },
-        h(
-          "button",
-          {
-            class: "deck-pager-arrow",
-            disabled: page === 0,
-            onClick: () => onPageChange(Math.max(0, page - 1)),
-            "aria-label": "Previous page",
-          },
-          "‹",
-        ),
-        h(
-          "div",
-          { class: "deck-dots" },
-          Array.from({ length: pages }, (_, i) =>
-            h("button", {
-              key: `dot-${i}`,
-              class: `deck-dot${i === page ? " is-active" : ""}`,
-              onClick: () => onPageChange(i),
-              "aria-label": `Page ${i + 1}`,
-              "aria-current": i === page ? "true" : undefined,
-            }),
-          ),
-        ),
-        h(
-          "button",
-          {
-            class: "deck-pager-arrow",
-            disabled: page >= pages - 1,
-            onClick: () => onPageChange(Math.min(pages - 1, page + 1)),
-            "aria-label": "Next page",
-          },
-          "›",
-        ),
-      ),
+    h(DeckPager, {
+      pages,
+      page,
+      onPageChange,
+      dragging: gesture.kind === "move",
+      dropPage: gesture.kind === "move" ? gesture.dropPage : null,
+      // Only offered while arranging: a spare empty page is clutter otherwise.
+      onAddPage: editing ? () => onPageChange(pages) : undefined,
+    }),
   );
 }
 
