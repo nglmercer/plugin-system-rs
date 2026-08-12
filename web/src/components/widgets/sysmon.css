@@ -1,0 +1,71 @@
+/* System monitor widget — bars and readouts. Loading state, stat grid and
+   variants' outer layout come from widget-common.css. */
+
+.sysmon-cpu-model {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sd-text-muted);
+  font-size: 0.7rem;
+}
+
+.sysmon-bar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.sysmon-bar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sysmon-bar-label {
+  color: var(--sd-text-secondary);
+  font-size: 0.75rem;
+}
+.sysmon-bar-value {
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.sysmon-bar-track {
+  height: 6px;
+  border-radius: var(--sd-radius-pill);
+  background: var(--sd-slider-track);
+  overflow: hidden;
+}
+.sysmon-bar-fill {
+  height: 100%;
+  border-radius: var(--sd-radius-pill);
+  transition: width var(--sd-duration-slow) var(--sd-ease);
+}
+.sysmon-bar-detail {
+  color: var(--sd-text-dim);
+  font-size: 0.65rem;
+}
+
+.sysmon-load-row {
+  display: flex;
+  justify-content: space-between;
+  color: var(--sd-text-muted);
+  font-size: 0.65rem;
+}
+
+/* Variants */
+
+.sysmon-variant {
+  gap: 0.4rem;
+}
+.sysmon-variant.minimal {
+  flex-direction: row;
+  justify-content: space-around;
+  align-items: center;
+}
+.sysmon-big {
+  font-size: 1.8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.sysmon-variant.detailed {
+  gap: 0.5rem;
+}

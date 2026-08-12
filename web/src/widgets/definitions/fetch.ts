@@ -1,4 +1,4 @@
-import { FetchWidget } from "../../components/FetchWidget";
+import { FetchWidget } from "../../components/widgets/FetchWidget";
 import { Icons } from "../../ui/icons/Icons";
 import { box, text } from "../preview";
 import { WidgetDefinition } from "../types";

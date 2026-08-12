@@ -7,7 +7,7 @@ import {
   FormToggle,
   KeyValueEditor,
 } from "../components/FormComponents";
-import { HotkeyRecorder } from "../components/WidgetWizard/HotkeyRecorder";
+import { HotkeyRecorder } from "../components/wizard/HotkeyRecorder";
 import { SettingsField, WidgetDefinition, visibleFields } from "./types";
 
 /**

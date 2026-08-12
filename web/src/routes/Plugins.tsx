@@ -11,6 +11,8 @@ import {
 } from '../lib/api';
 import type { PluginManifestUpload } from '../lib/api';
 import type { PluginStatus } from '../lib/types';
+import { FormTabs, FormToggle } from '../components/FormComponents';
+import './plugins.css';
 
 /**
  * Ask before handing a plugin any host capability.
@@ -277,7 +279,7 @@ export function Plugins() {
         h('p', { class: 'page-help' }, 'Install, update, enable, or disable WebAssembly plugins.')
       ),
       h('button', {
-        class: 'reload-btn',
+        class: 'btn btn-primary',
         onClick: handleRefresh,
         disabled: loading || installing || updating !== null || toggling !== null,
       }, loading ? 'Loading...' : 'Refresh')
@@ -301,16 +303,14 @@ export function Plugins() {
     message ? h('div', { class: 'plugin-message' }, message) : null,
     error ? h('div', { class: 'plugin-error' }, error) : null,
 
-    h('div', { class: 'plugin-tabs' },
-      h('button', {
-        class: `plugin-tab ${activeTab === 'installed' ? 'active' : ''}`,
-        onClick: () => handleTabChange('installed'),
-      }, 'Installed'),
-      h('button', {
-        class: `plugin-tab ${activeTab === 'install' ? 'active' : ''}`,
-        onClick: () => handleTabChange('install'),
-      }, 'Install')
-    ),
+    h(FormTabs, {
+      tabs: [
+        { value: 'installed', label: 'Installed' },
+        { value: 'install', label: 'Install' },
+      ],
+      active: activeTab,
+      onChange: (tab) => handleTabChange(tab as PluginsTab),
+    }),
 
     activeTab === 'install' && h('section', { class: 'plugin-upload-card' },
       h('h3', null, 'Install plugin'),
@@ -329,7 +329,7 @@ export function Plugins() {
           'Enable after install'
         ),
         h('button', {
-          class: 'primary-btn',
+          class: 'btn btn-primary',
           onClick: handleInstall,
           disabled: installing || !installFile,
         }, installing ? 'Installing...' : 'Install')
@@ -369,15 +369,11 @@ export function Plugins() {
                     : null
                 ),
                 h('div', { class: 'plugin-controls' },
-                  h('label', { class: 'switch' },
-                    h('input', {
-                      type: 'checkbox',
-                      checked: plugin.enabled,
-                      disabled: toggling !== null || installing || updating !== null,
-                      onChange: () => handleToggle(plugin),
-                    }),
-                    h('span', { class: 'slider' })
-                  ),
+                  h(FormToggle, {
+                    checked: plugin.enabled,
+                    disabled: toggling !== null || installing || updating !== null,
+                    onChange: () => handleToggle(plugin),
+                  }),
                   h('input', {
                     id: `plugin-update-${plugin.name}`,
                     type: 'file',
@@ -393,7 +389,7 @@ export function Plugins() {
                     onChange: event => handleUpdateManifest(plugin.name, event),
                   }),
                   h('button', {
-                    class: 'secondary-btn',
+                    class: 'btn btn-ghost btn-sm',
                     onClick: () => {
                       const input = document.getElementById(
                         `plugin-update-manifest-${plugin.name}`,
@@ -403,7 +399,7 @@ export function Plugins() {
                     disabled: installing || updating !== null || toggling !== null || uninstalling !== null,
                   }, updateManifests[plugin.name] ? 'Manifest ✓' : 'Manifest'),
                   h('button', {
-                    class: 'secondary-btn',
+                    class: 'btn btn-ghost btn-sm',
                     onClick: () => {
                       const input = document.getElementById(`plugin-update-${plugin.name}`);
                       input?.click();
@@ -411,7 +407,7 @@ export function Plugins() {
                     disabled: installing || updating !== null || toggling !== null || uninstalling !== null,
                   }, updating === plugin.name ? 'Updating...' : 'Update'),
                   h('button', {
-                    class: 'danger-btn',
+                    class: 'btn btn-danger btn-sm',
                     onClick: () => handleUninstall(plugin),
                     disabled: installing || updating !== null || toggling !== null || uninstalling !== null,
                   }, uninstalling === plugin.name ? 'Removing...' : 'Remove')

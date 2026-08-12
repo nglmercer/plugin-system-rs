@@ -1,4 +1,4 @@
-import { OpenUrlWidget } from "../../components/OpenUrlWidget";
+import { OpenUrlWidget } from "../../components/widgets/OpenUrlWidget";
 import { Icons } from "../../ui/icons/Icons";
 import { box, chip } from "../preview";
 import { WidgetDefinition } from "../types";

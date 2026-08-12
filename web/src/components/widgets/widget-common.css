@@ -1,0 +1,382 @@
+/*
+ * Shared widget primitives — the pieces widgetParts.tsx renders plus the
+ * placeholder AppIcon styles. Per-widget stylesheets only carry what is
+ * genuinely unique to that widget.
+ */
+
+/* ── States ─────────────────────────────────────────────── */
+
+.widget-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 1rem;
+  color: var(--sd-text-muted);
+  font-size: 0.8rem;
+  text-align: center;
+}
+.widget-state.error {
+  color: var(--sd-error);
+  word-break: break-word;
+}
+
+.widget-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 100%;
+  color: var(--sd-text-dim);
+  text-align: center;
+}
+.widget-empty-icon {
+  font-size: 1.75rem;
+  font-weight: 700;
+  opacity: 0.5;
+}
+.widget-empty-text {
+  font-size: 0.8rem;
+}
+
+/* ── Section head ───────────────────────────────────────── */
+
+.widget-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  min-width: 0;
+}
+.widget-head-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sd-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.widget-head-value {
+  flex-shrink: 0;
+  color: var(--sd-accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* ── Lists and items ────────────────────────────────────── */
+
+/* Fills the deck cell instead of a fixed height: the grid decides how tall
+   the widget is, and a hard cap here produced a second scrollbar inside an
+   already-scrolling cell. */
+.widget-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.widget-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.35rem;
+  background: var(--sd-bg-inset);
+  border-radius: var(--sd-radius-sm);
+}
+
+.widget-item-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.widget-item-labels {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+.widget-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sd-text-secondary);
+  font-size: 0.75rem;
+}
+
+.widget-item-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sd-text-dim);
+  font-size: 0.68rem;
+}
+.widget-item-sub.mono {
+  font-family: monospace;
+  font-size: 0.62rem;
+}
+
+/* Minimal-variant rows: name plus a small control. */
+.widget-mini-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+.widget-mini-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sd-text-secondary);
+  font-size: 0.7rem;
+}
+.widget-mini-value {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--sd-success);
+}
+.widget-mini-value.muted {
+  color: var(--sd-text-dim);
+}
+.widget-mini-more {
+  color: var(--sd-text-dim);
+  font-size: 0.65rem;
+}
+
+/* ── Slider ─────────────────────────────────────────────── */
+
+.widget-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.widget-slider {
+  flex: 1;
+  min-width: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  height: 5px;
+  border-radius: var(--sd-radius-pill);
+  outline: none;
+  cursor: pointer;
+  /* The fill is painted up to `--sd-slider-pct` in `--sd-slider-fill`; both
+     are set inline by SliderRow. One definition serves every widget. */
+  background: linear-gradient(
+    to right,
+    var(--sd-slider-fill, var(--sd-accent)) 0%,
+    var(--sd-slider-fill, var(--sd-accent)) var(--sd-slider-pct, 50%),
+    var(--sd-slider-track) var(--sd-slider-pct, 50%),
+    var(--sd-slider-track) 100%
+  );
+}
+.widget-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--sd-neutral-0);
+  box-shadow: var(--sd-shadow-sm);
+  cursor: pointer;
+}
+.widget-slider::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border: none;
+  border-radius: 50%;
+  background: var(--sd-neutral-0);
+  box-shadow: var(--sd-shadow-sm);
+  cursor: pointer;
+}
+
+.widget-slider-value {
+  flex-shrink: 0;
+  min-width: 3em;
+  text-align: right;
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Mute buttons ───────────────────────────────────────── */
+
+.widget-mute {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-sm);
+  background: var(--sd-slider-track);
+  color: var(--sd-text);
+  font-size: 0.65rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background var(--sd-duration-fast) var(--sd-ease),
+    border-color var(--sd-duration-fast) var(--sd-ease);
+}
+.widget-mute:hover {
+  background: var(--sd-border-hover);
+}
+.widget-mute.muted {
+  background: var(--sd-error);
+  border-color: var(--sd-error);
+}
+
+.widget-mute-pill {
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--sd-radius-sm);
+  padding: 0.25rem 0.6rem;
+  background: var(--sd-success);
+  color: var(--sd-bg-page);
+  font-size: 0.65rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity var(--sd-duration-fast) var(--sd-ease);
+}
+.widget-mute-pill:hover {
+  opacity: 0.85;
+}
+.widget-mute-pill.muted {
+  background: var(--sd-error);
+}
+
+/* ── Stat grid ──────────────────────────────────────────── */
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
+}
+.stat-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.stat-label {
+  color: var(--sd-text-dim);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.stat-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sd-text-secondary);
+  font-size: 0.75rem;
+  font-family: monospace;
+}
+
+/* ── Placeholders ─────────────────────────────────────────
+ * Shown instead of a widget that cannot work, in place of the cryptic errors
+ * the widgets themselves used to render. */
+
+.widget-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  height: 100%;
+  padding: 0.75rem;
+  text-align: center;
+}
+.widget-placeholder-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--sd-text);
+}
+.widget-placeholder-detail {
+  font-size: 0.75rem;
+  color: var(--sd-warning);
+}
+.widget-placeholder.unknown .widget-placeholder-detail {
+  font-family: monospace;
+  color: var(--sd-text-secondary);
+}
+.widget-placeholder-hint {
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  color: var(--sd-text-muted);
+}
+
+/* ── Application icons ──────────────────────────────────── */
+
+.app-icon {
+  flex-shrink: 0;
+  border-radius: var(--sd-radius-sm);
+  object-fit: contain;
+  /* Icons vary wildly in padding; a subtle backdrop keeps a row of mixed
+     sources looking deliberate rather than ragged. */
+  background: color-mix(in srgb, var(--sd-text) 5%, transparent);
+}
+
+.app-icon-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  line-height: 1;
+  user-select: none;
+}
+
+/* ── Widget roots fill their deck cell ────────────────────
+ * Each widget's outermost element is a flex column that fills the cell, so
+ * its scrolling region (if any) has a bounded height to flex into. */
+
+.vol-variant,
+.volapps-variant,
+.obsscene-variant,
+.obsinput-variant,
+.obs-variant,
+.sysmon-variant,
+.fetch-variant,
+.clock-variant,
+.action-single {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+/* ── Mobile ─────────────────────────────────────────────── */
+
+@media (max-width: 480px) {
+  /* A finger needs a bigger target than 5px of track. */
+  .widget-slider {
+    height: 8px;
+  }
+  .widget-slider::-webkit-slider-thumb {
+    width: 16px;
+    height: 16px;
+  }
+  .widget-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+  }
+  .widget-mute {
+    width: 26px;
+    height: 26px;
+  }
+}

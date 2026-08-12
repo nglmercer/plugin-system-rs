@@ -7,6 +7,7 @@ import {
   summarizeUnmet,
   useHostStatus,
 } from "../widgets";
+import "./widgets/widget-common.css";
 
 /**
  * Renders a widget's body.

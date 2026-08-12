@@ -1,0 +1,60 @@
+/* One-button action widgets (Type Text, Open URL) — see SingleAction.tsx. */
+
+.action-single {
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  text-align: center;
+}
+.action-single.detailed {
+  gap: 0.3rem;
+}
+
+.action-single-value {
+  max-height: 3em;
+  overflow: hidden;
+  word-break: break-all;
+  color: var(--sd-accent);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.action-single-desc {
+  color: var(--sd-text-muted);
+  font-size: 0.65rem;
+}
+
+.action-result {
+  background: color-mix(in srgb, var(--sd-success) 14%, transparent);
+  border: 1px solid var(--sd-success);
+  color: var(--sd-success);
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--sd-radius-sm);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.action-single-btn {
+  border: none;
+  border-radius: var(--sd-radius-sm);
+  background: var(--sd-accent);
+  color: var(--sd-on-accent);
+  padding: 0.4rem 1.2rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background var(--sd-duration-base) var(--sd-ease),
+    opacity var(--sd-duration-base) var(--sd-ease);
+}
+.action-single-btn:hover:not(:disabled) {
+  opacity: 0.85;
+}
+.action-single-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.action-single-btn.executing {
+  background: var(--sd-warning);
+  color: var(--sd-bg-page);
+}

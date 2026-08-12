@@ -42,6 +42,10 @@
   --sd-red-500: #f44336;
   --sd-red-700: #c62828;
   --sd-red-800: #8e1c1c;
+  --sd-blue-400: #42a5f5;
+  --sd-blue-500: #2196f3;
+  --sd-blue-700: #1e88e5;
+  --sd-blue-800: #1565c0;
 
   /* Status hues */
   --sd-status-green-400: #4caf50;
@@ -65,6 +69,7 @@
   --sd-radius-sm: 4px;
   --sd-radius-md: 6px;
   --sd-radius-lg: 10px;
+  --sd-radius-xl: 14px;
   --sd-radius-pill: 999px;
 
   /* Font sizes */
@@ -79,4 +84,18 @@
   --sd-duration-base: 0.2s;
   --sd-duration-slow: 0.3s;
   --sd-ease: ease;
+
+  /* Z-index scale — every layer that stacks above the page picks from here
+     so two features can never fight over the same layer. */
+  --sd-z-fab-overlay: 150;
+  --sd-z-fab-menu: 180;
+  --sd-z-fab: 200;
+  --sd-z-ctx: 500;
+  --sd-z-modal: 1000;
+
+  /* Shadows. Built from the theme's shadow colour, so elevation reads the
+     same in dark and light without restating either. */
+  --sd-shadow-sm: 0 1px 3px var(--sd-shadow-color);
+  --sd-shadow-md: 0 4px 16px var(--sd-shadow-color);
+  --sd-shadow-lg: 0 12px 32px var(--sd-shadow-color);
 }

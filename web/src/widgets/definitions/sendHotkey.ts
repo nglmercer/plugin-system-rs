@@ -1,4 +1,4 @@
-import { SendHotkeyWidget } from "../../components/SendHotkeyWidget";
+import { SendHotkeyWidget } from "../../components/widgets/SendHotkeyWidget";
 import { Icons } from "../../ui/icons/Icons";
 import { box, chip } from "../preview";
 import { WidgetDefinition, requiresPlugin } from "../types";

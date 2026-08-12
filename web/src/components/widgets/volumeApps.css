@@ -1,0 +1,10 @@
+/* Per-app volume streams — rows, sliders and mute buttons are shared
+   primitives from widget-common.css; this file only lays out the variants. */
+
+.volapps-variant {
+  gap: 0.4rem;
+}
+
+.volapps-variant.minimal {
+  gap: 0.3rem;
+}

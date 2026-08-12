@@ -1,0 +1,172 @@
+/* OBS scenes widget — scene switching, transitions and source visibility. */
+
+.obsscene-variant {
+  gap: 0.4rem;
+}
+
+/* Minimal */
+.obsscene-current {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sd-accent);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+.obsscene-grid-mini {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+  gap: 0.2rem;
+}
+.obsscene-mini-btn {
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-sm);
+  background: var(--sd-slider-track);
+  color: var(--sd-text-secondary);
+  padding: 0.2rem;
+  font-size: 0.6rem;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    background var(--sd-duration-fast) var(--sd-ease),
+    border-color var(--sd-duration-fast) var(--sd-ease);
+}
+.obsscene-mini-btn:hover {
+  background: var(--sd-border-hover);
+}
+.obsscene-mini-btn.active {
+  background: var(--sd-accent);
+  border-color: var(--sd-accent);
+  color: var(--sd-on-accent);
+}
+
+/* Scene list (compact + detailed) */
+.obsscene-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  /* Fills the deck cell instead of a fixed height: the grid decides how tall
+     this widget is, and a hard cap here produced a second scrollbar. */
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.obsscene-item-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-sm);
+  background: var(--sd-bg-inset);
+  color: var(--sd-text-secondary);
+  padding: 0.3rem 0.5rem;
+  font-size: 0.75rem;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--sd-duration-fast) var(--sd-ease),
+    border-color var(--sd-duration-fast) var(--sd-ease);
+}
+.obsscene-item-btn:hover {
+  background: var(--sd-bg-card-hover);
+  border-color: var(--sd-border-hover);
+}
+.obsscene-item-btn.active {
+  background: var(--sd-accent);
+  border-color: var(--sd-accent);
+  color: var(--sd-on-accent);
+  font-weight: 700;
+}
+
+.obsscene-item-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.obsscene-item-index {
+  color: var(--sd-text-dim);
+  font-size: 0.6rem;
+}
+.obsscene-item-btn.active .obsscene-item-index {
+  color: var(--sd-on-accent);
+  opacity: 0.8;
+}
+
+/* Sections: transitions, sources */
+.obsscene-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: 0.3rem;
+  padding-top: 0.3rem;
+  border-top: 1px solid var(--sd-border);
+}
+.obsscene-section-title {
+  color: var(--sd-text-dim);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.obsscene-transition-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+}
+.obsscene-transition-btn {
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-sm);
+  background: var(--sd-slider-track);
+  color: var(--sd-text-secondary);
+  padding: 0.2rem 0.5rem;
+  font-size: 0.65rem;
+  cursor: pointer;
+  transition: background var(--sd-duration-fast) var(--sd-ease);
+}
+.obsscene-transition-btn:hover {
+  background: var(--sd-border-hover);
+}
+
+.obsscene-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.obsscene-source-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.obsscene-eye-btn {
+  flex-shrink: 0;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-sm);
+  background: var(--sd-slider-track);
+  color: var(--sd-text-muted);
+  padding: 0.15rem 0.4rem;
+  font-size: 0.6rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background var(--sd-duration-fast) var(--sd-ease),
+    border-color var(--sd-duration-fast) var(--sd-ease);
+}
+.obsscene-eye-btn.active {
+  background: var(--sd-success);
+  border-color: var(--sd-success);
+  color: var(--sd-bg-page);
+}
+.obsscene-source-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sd-text-secondary);
+  font-size: 0.7rem;
+}

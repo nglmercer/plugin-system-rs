@@ -2,12 +2,6 @@ import { DashboardLayout, PluginStatus } from "./types";
 
 const API_BASE = "/api";
 
-export async function fetchDevices() {
-  const res = await fetch(`${API_BASE}/devices`);
-  const data = await res.json();
-  return data.data || [];
-}
-
 export async function fetchProfiles() {
   const res = await fetch(`${API_BASE}/profiles`);
   const data = await res.json();
@@ -30,12 +24,6 @@ export async function deleteProfile(id: string) {
   });
   const data = await res.json();
   return data.data;
-}
-
-export async function fetchActions() {
-  const res = await fetch(`${API_BASE}/actions`);
-  const data = await res.json();
-  return data.data || [];
 }
 
 export async function fetchPlugins(): Promise<PluginStatus[]> {
@@ -143,14 +131,6 @@ export async function uninstallPlugin(pluginName: string): Promise<void> {
   await readPluginResponse<string>(res);
 }
 
-export async function reloadPlugins() {
-  const res = await fetch(`${API_BASE}/plugins/reload`, {
-    method: "POST",
-  });
-  const data = await res.json();
-  return data;
-}
-
 export async function setPluginEnabled(pluginName: string, enabled: boolean): Promise<PluginStatus> {
   const res = await fetch(`${API_BASE}/plugins/${encodeURIComponent(pluginName)}/enabled`, {
     method: "PUT",
@@ -162,20 +142,6 @@ export async function setPluginEnabled(pluginName: string, enabled: boolean): Pr
     throw new Error(data.error || "Failed to update plugin");
   }
   return data.data as PluginStatus;
-}
-
-export async function simulateButtonPress(
-  deviceId: string,
-  buttonIndex: number,
-) {
-  const res = await fetch(
-    `${API_BASE}/devices/${deviceId}/press/${buttonIndex}`,
-    {
-      method: "POST",
-    },
-  );
-  const data = await res.json();
-  return data;
 }
 
 export async function fetchSystemStats() {
@@ -334,21 +300,31 @@ export async function fetchAppVolumes() {
   return data.data || [];
 }
 
-export async function setAppVolume(appName: string, volume: number) {
+/**
+ * Address one audio stream. The id targets a single stream where the backend
+ * knows them (a browser plays one per tab); the name is the fallback for
+ * backends that cannot identify streams individually.
+ */
+export interface AppAddress {
+  id?: string;
+  name: string;
+}
+
+export async function setAppVolume(app: AppAddress, volume: number) {
   const res = await fetch(`${API_BASE}/volume/app/volume`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ app_name: appName, volume }),
+    body: JSON.stringify({ app_id: app.id, app_name: app.name, volume }),
   });
   const data = await res.json();
   return data.success;
 }
 
-export async function setAppMute(appName: string, muted: boolean) {
+export async function setAppMute(app: AppAddress, muted: boolean) {
   const res = await fetch(`${API_BASE}/volume/app/mute`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ app_name: appName, muted }),
+    body: JSON.stringify({ app_id: app.id, app_name: app.name, muted }),
   });
   const data = await res.json();
   return data.success;

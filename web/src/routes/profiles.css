@@ -1,0 +1,133 @@
+/* Profiles page. Buttons come from the shared `.btn` system in base.css. */
+
+.profiles-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.profiles-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.profiles-header h2 {
+  font-size: 1.5rem;
+}
+
+.create-profile {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  background: var(--sd-bg-card);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-lg);
+}
+.create-profile input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-md);
+  background: var(--sd-bg-input);
+  color: var(--sd-text);
+  font-family: inherit;
+  font-size: 0.9rem;
+  transition: border-color var(--sd-duration-base) var(--sd-ease);
+}
+.create-profile input:focus {
+  outline: none;
+  border-color: var(--sd-accent);
+}
+
+.profiles-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--sd-text-muted);
+}
+.profiles-empty-title {
+  margin-bottom: 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--sd-text-secondary);
+}
+.profiles-empty-hint {
+  font-size: 0.9rem;
+}
+
+.profile-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.profile-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  background: var(--sd-bg-card);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-lg);
+  transition:
+    border-color var(--sd-duration-base) var(--sd-ease),
+    box-shadow var(--sd-duration-base) var(--sd-ease);
+}
+.profile-item:hover {
+  border-color: var(--sd-border-hover);
+  box-shadow: var(--sd-shadow-sm);
+}
+
+.profile-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.profile-name {
+  color: var(--sd-text);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.profile-stats {
+  display: flex;
+  gap: 1rem;
+}
+.profile-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
+}
+.profile-stat-value {
+  color: var(--sd-accent);
+  font-weight: 700;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+.profile-stat-label {
+  color: var(--sd-text-muted);
+  font-size: 0.8rem;
+}
+
+@media (max-width: 480px) {
+  .profiles-page {
+    gap: 1rem;
+  }
+  .create-profile {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .profile-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem;
+  }
+  .profile-stats {
+    gap: 0.75rem;
+  }
+}

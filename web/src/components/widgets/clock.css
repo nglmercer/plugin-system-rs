@@ -1,0 +1,44 @@
+/* Clock widget */
+
+.clock-variant {
+  gap: 0.25rem;
+}
+
+.clock-time {
+  color: var(--sd-text);
+  font-size: 2rem;
+  font-weight: 700;
+  font-family: monospace;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.clock-seconds {
+  color: var(--sd-text-muted);
+  font-size: 1rem;
+  font-family: monospace;
+}
+.clock-date {
+  color: var(--sd-text-muted);
+  font-size: 0.8rem;
+}
+
+.clock-variant.simple {
+  align-items: center;
+  justify-content: center;
+}
+.clock-variant.simple .clock-time {
+  font-size: 2.5rem;
+}
+
+.clock-variant.digital {
+  align-items: center;
+  justify-content: center;
+}
+
+.clock-variant.detailed {
+  align-items: center;
+  justify-content: center;
+}
+.clock-variant.detailed .clock-time {
+  font-size: 1.8rem;
+}

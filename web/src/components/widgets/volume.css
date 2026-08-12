@@ -1,0 +1,27 @@
+/* Master volume widget — the slider, mute buttons and heads are shared
+   primitives from widget-common.css; only the big readout is unique. */
+
+.vol-variant {
+  gap: 0.5rem;
+}
+
+.vol-variant.minimal {
+  align-items: center;
+  justify-content: center;
+}
+
+.vol-big {
+  font-size: 2rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.vol-big-row {
+  display: flex;
+  justify-content: center;
+}
+
+.vol-variant.detailed .vol-big {
+  font-size: 1.75rem;
+}

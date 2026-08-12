@@ -119,24 +119,9 @@ export const Icons = {
     h("rect", { x: "9", y: "9", width: "13", height: "13", rx: "2" }),
     h("path", { d: "M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" }),
   ),
+  check: () => h("svg", { ...s, "stroke-width": "2.5" },
+    h("polyline", { points: "20 6 9 17 4 12" }),
+  ),
 } as const;
 
 export type IconName = keyof typeof Icons;
-
-export function WidgetIcon({ type, size }: { type: string; size?: string }) {
-  const iconMap: Record<string, () => h.JSX.Element> = {
-    "system-monitor": Icons.systemMonitor,
-    "clock": Icons.clock,
-    "send-hotkey": Icons.hotkey,
-    "open-url": Icons.url,
-    "type-text": Icons.typeText,
-    "volume-master": Icons.volume,
-    "volume-apps": Icons.volumeApps,
-    "obs-control": Icons.obs,
-    "obs-scenes": Icons.obsScenes,
-    "obs-inputs": Icons.obsInputs,
-    "timer": Icons.timer,
-  };
-  const Icon = iconMap[type] || Icons.systemMonitor;
-  return h("span", { class: "widget-icon", style: size ? { fontSize: size } : {} }, h(Icon, null));
-}

@@ -1,13 +1,10 @@
-/*
- * Semantic tokens for the dark theme (the default), plus aliases that map
- * the legacy variable names onto the new ones so unmigrated CSS keeps
- * working during the refactor. The alias block is removed once every
- * stylesheet uses --sd-* tokens.
- */
+/* Semantic tokens for the dark theme (the default). Every stylesheet reads
+ * these --sd-* names directly; there are no legacy aliases. */
 :root {
   --sd-bg-page: var(--sd-neutral-950);
   --sd-bg-card: var(--sd-neutral-800);
   --sd-bg-card-hover: var(--sd-neutral-750);
+  --sd-bg-inset: var(--sd-neutral-950);
   --sd-bg-input: var(--sd-neutral-950);
   --sd-bg-nav: var(--sd-neutral-800);
   --sd-border: var(--sd-neutral-700);
@@ -19,30 +16,12 @@
   --sd-accent: var(--sd-cyan-400);
   --sd-accent-hover: var(--sd-cyan-500);
   --sd-on-accent: var(--sd-neutral-950);
+  --sd-accent-alt: var(--sd-purple-400);
   --sd-success: var(--sd-status-green-400);
   --sd-warning: var(--sd-status-amber-400);
   --sd-error: var(--sd-status-red-400);
+  --sd-info: var(--sd-blue-400);
   --sd-slider-track: var(--sd-neutral-700);
   --sd-shadow-color: rgba(0, 0, 0, 0.3);
   --sd-overlay: rgba(0, 0, 0, 0.6);
-
-  /* Legacy aliases (temporary) */
-  --bg-page: var(--sd-bg-page);
-  --bg-card: var(--sd-bg-card);
-  --bg-card-hover: var(--sd-bg-card-hover);
-  --bg-input: var(--sd-bg-input);
-  --bg-nav: var(--sd-bg-nav);
-  --border: var(--sd-border);
-  --border-hover: var(--sd-border-hover);
-  --text: var(--sd-text);
-  --text-secondary: var(--sd-text-secondary);
-  --text-muted: var(--sd-text-muted);
-  --text-dim: var(--sd-text-dim);
-  --accent: var(--sd-accent);
-  --accent-hover: var(--sd-accent-hover);
-  --success: var(--sd-success);
-  --warning: var(--sd-warning);
-  --error: var(--sd-error);
-  --slider-track: var(--sd-slider-track);
-  --shadow: var(--sd-shadow-color);
 }

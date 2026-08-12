@@ -9,7 +9,6 @@
     "plugins": "Plugins"
   },
   "dashboard": {
-    "title": "Panel",
     "addWidget": "Agregar Widget",
     "empty": "No hay widgets agregados",
     "emptyHint": "Haz clic en \"Agregar Widget\" para comenzar",

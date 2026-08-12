@@ -1,0 +1,44 @@
+/* Dashboard page shell — the deck root and its loading/empty states. */
+
+.dashboard-root {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  /* Claim the remaining height so the deck can fill it. */
+  flex: 1;
+  min-height: 0;
+}
+
+.dashboard-loading {
+  color: var(--sd-text-muted);
+  text-align: center;
+  padding: 4rem;
+}
+
+.dashboard-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 5rem 2rem;
+  border: 2px dashed var(--sd-border);
+  border-radius: var(--sd-radius-xl);
+}
+.empty-icon {
+  display: flex;
+  color: var(--sd-text-dim);
+}
+.empty-icon svg {
+  width: 32px;
+  height: 32px;
+}
+.empty-text {
+  color: var(--sd-text-secondary);
+  font-size: 1rem;
+}
+.empty-sub {
+  color: var(--sd-text-dim);
+  font-size: 0.8rem;
+}

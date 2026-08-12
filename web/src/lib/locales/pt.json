@@ -9,7 +9,6 @@
     "plugins": "Plugins"
   },
   "dashboard": {
-    "title": "Painel",
     "addWidget": "Adicionar Widget",
     "empty": "Nenhum widget adicionado",
     "emptyHint": "Clique em \"Adicionar Widget\" para começar",

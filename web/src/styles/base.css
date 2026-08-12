@@ -1,440 +1,178 @@
+/*
+ * Global foundation: reset, shell, and the few primitives every page leans
+ * on (buttons, focus rings, scrollbars). Anything a single feature owns lives
+ * next to that feature instead of here.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  height: 100%;
+}
+
+body {
+  min-height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
+  background: var(--sd-bg-page);
+  color: var(--sd-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  min-height: 100vh;
+}
+
 /* Buttons inherit the page's typography by default.
  *
  * Several controls are <button> purely so they are focusable and keyboard
- * operable — the wizard's step rail, modal close buttons, library tiles. Those
- * arrived with the user-agent's serif-ish font and default metrics, which is
- * why they rendered as grey boxes among styled UI. Components still set their
- * own colours and borders; this only fixes what they should never have had to
- * think about.
+ * operable — the wizard's step rail, modal close buttons, library tiles. Left
+ * alone they arrive with the user-agent's font and default metrics and render
+ * as grey boxes among styled UI. Components still set their own colours and
+ * borders; this only fixes what they should never have had to think about.
  */
 button {
-    font: inherit;
-    color: inherit;
+  font: inherit;
+  color: inherit;
 }
 
-/* Layout */
+/* Keyboard focus is visible everywhere. Individual controls may add a border
+   colour change on top, but none of them is allowed to remove the ring. */
+:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--sd-accent) 75%, transparent);
+  outline-offset: 2px;
+}
+
+/* App shell — a flex column so a page that wants the remaining height (the
+   dashboard deck) can claim it with `flex: 1`. */
 .app {
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
-    background: var(--bg-page);
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--sd-bg-page);
 }
-/* A flex column so a page that wants the remaining height (the dashboard
-   deck) can claim it with `flex: 1`. Other pages are single flex children and
-   stretch exactly as they did under block layout. */
+
 .main {
-    flex: 1;
-    padding: 1.5rem 2rem;
-    width: 100%;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: 1.5rem 2rem;
 }
 
-/* Floating Action Button — Burger */
-.fab-burger {
-    position: fixed;
-    bottom: 1.5rem;
-    right: 1.5rem;
-    width: 52px;
-    height: 52px;
-    border-radius: 50%;
-    background: var(--accent);
-    border: none;
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    gap: 5px;
-    z-index: 200;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
-    transition: transform 0.3s, box-shadow 0.3s;
-}
-.fab-burger:hover {
-    transform: scale(1.08);
-    box-shadow: 0 6px 24px rgba(0,0,0,0.5);
-}
-.fab-burger span {
-    display: block;
-    width: 20px;
-    height: 2px;
-    background: var(--bg-page);
-    border-radius: 1px;
-    transition: transform 0.3s, opacity 0.3s;
-}
-.fab-burger.open span:nth-child(1) {
-    transform: translateY(7px) rotate(45deg);
-}
-.fab-burger.open span:nth-child(2) {
-    opacity: 0;
-}
-.fab-burger.open span:nth-child(3) {
-    transform: translateY(-7px) rotate(-45deg);
-}
-
-/* Overlay backdrop */
-.fab-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.6);
-    z-index: 150;
-    animation: fadeIn 0.2s ease;
-}
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-/* Slide-in menu */
-.fab-menu {
-    position: fixed;
-    top: 0;
-    right: -280px;
-    width: 260px;
-    height: 100vh;
-    background: var(--bg-nav);
-    border-left: 1px solid var(--border);
-    z-index: 180;
-    display: flex;
-    flex-direction: column;
-    padding: 1.5rem 1rem;
-    gap: 0.4rem;
-    transition: right 0.3s ease;
-    overflow-y: auto;
-}
-.fab-menu.open {
-    right: 0;
-}
-.fab-menu button {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 0.65rem 0.8rem;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    font-size: 0.9rem;
-    text-align: left;
-    width: 100%;
-}
-.fab-menu button:hover {
-    background: var(--border);
-}
-.fab-menu button.active {
-    background: var(--accent);
-    color: var(--bg-page);
-    border-color: var(--accent);
-}
-.fab-menu button svg {
-    width: 18px;
-    height: 18px;
-    flex-shrink: 0;
-}
-.fab-divider {
-    height: 1px;
-    background: var(--border);
-    margin: 0.4rem 0;
-}
-.fab-add-btn {
-    background: var(--accent) !important;
-    color: var(--bg-page) !important;
-    border-color: var(--accent) !important;
-    font-weight: bold;
-}
-.fab-add-btn:hover {
-    opacity: 0.85 !important;
-}
-.fab-bottom-row {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    margin-top: auto;
-    padding-top: 0.5rem;
-}
-.fab-theme-btn {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--text-secondary);
-    padding: 0.5rem !important;
-    border-radius: 6px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s;
-    font-size: 1rem;
-    width: auto !important;
-}
-.fab-theme-btn:hover {
-    color: var(--accent);
-    border-color: var(--accent);
-}
-.fab-lang-selector {
-    flex: 1;
-}
-.lang-select {
-    width: 100%;
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--text-secondary);
-    padding: 0.5rem;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.8rem;
-    font-weight: bold;
-    appearance: none;
-    -webkit-appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 0.5rem center;
-    padding-right: 1.5rem;
-}
-.lang-select:hover {
-    color: var(--accent);
-    border-color: var(--accent);
-}
-.lang-select:focus {
-    outline: none;
-    border-color: var(--accent);
-}
-.lang-select option {
-    background: var(--bg-nav);
-    color: var(--text);
-}
-.nav-qr-btn {
-    background: var(--accent) !important;
-    color: var(--bg-page) !important;
-    font-weight: bold;
-    font-size: 0.8rem;
-    padding: 0.5rem 0.7rem !important;
-    border-radius: 6px !important;
-    flex: 1;
-    justify-content: center;
-}
-.nav-qr-btn:hover {
-    background: var(--accent-hover) !important;
-}
-
-/* ── QR Modal ─────────────────────────────────────────────
- * The URL now carries the API token, so this dialog hands out a credential.
- * It is laid out as a block — label, masked URL that wraps, copy button,
- * warning — rather than the single ellipsised row that used to collapse to
- * "ht" beside an oversized Copy button.
+/* ── Buttons ──────────────────────────────────────────────
+ * One small system instead of a bespoke button per feature. Variants carry
+ * the colour decision; the base carries everything else.
  */
-.qr-overlay {
-    position: fixed;
-    inset: 0;
-    background: var(--sd-overlay);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1rem;
-    z-index: 1000;
+.btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: 1px solid transparent;
+  border-radius: var(--sd-radius-md);
+  padding: 0.5rem 1rem;
+  font-family: inherit;
+  font-size: var(--sd-font-sm);
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    background var(--sd-duration-base) var(--sd-ease),
+    border-color var(--sd-duration-base) var(--sd-ease),
+    color var(--sd-duration-base) var(--sd-ease),
+    opacity var(--sd-duration-base) var(--sd-ease);
 }
-.qr-modal {
-    width: 100%;
-    max-width: 24rem;
-    max-height: 90vh;
-    overflow-y: auto;
-    /* Nothing in here may push the dialog sideways. The URL is long and
-       unbreakable, and without this the modal grew a horizontal scrollbar and
-       shoved its own buttons off the right edge. */
-    overflow-x: hidden;
-    background: var(--sd-bg-card);
-    border: 1px solid var(--sd-border);
-    border-radius: 0.75rem;
-    padding: 1.25rem;
+.btn svg {
+  width: 1em;
+  height: 1em;
+  flex-shrink: 0;
 }
-.qr-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
-}
-.qr-header h2 {
-    margin: 0;
-    min-width: 0;
-    font-size: 1.05rem;
-    color: var(--sd-text);
-    /* Without this the heading wrapped to two lines and shoved the close
-       button into the space it left. */
-    white-space: nowrap;
-}
-.qr-close {
-    flex: 0 0 auto;
-    appearance: none;
-    -webkit-appearance: none;
-    background: transparent;
-    border: none;
-    color: var(--sd-text-muted);
-    font-size: 1.1rem;
-    line-height: 1;
-    padding: 0.25rem 0.4rem;
-    border-radius: 0.25rem;
-    cursor: pointer;
-}
-.qr-close:hover {
-    color: var(--sd-text);
-    background: var(--sd-bg-card-hover);
-}
-.qr-body {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.75rem;
-    min-width: 0;
-}
-.qr-image {
-    width: 100%;
-    max-width: 15rem;
-    height: auto;
-    border-radius: 0.5rem;
-    /* A white quiet zone regardless of theme: a dark-on-dark code does not
-       scan. */
-    background: #fff;
-    padding: 0.5rem;
-}
-.qr-loading {
-    width: 100%;
-    max-width: 15rem;
-    aspect-ratio: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--sd-text-muted);
-    background: var(--sd-bg-input);
-    border-radius: 0.5rem;
-}
-.qr-hint {
-    margin: 0;
-    font-size: 0.8125rem;
-    color: var(--sd-text-secondary);
-    text-align: center;
-}
-.qr-url-block {
-    width: 100%;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-    padding: 0.625rem;
-    border: 1px solid var(--sd-border);
-    border-radius: 0.5rem;
-    background: var(--sd-bg-input);
-}
-.qr-url-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 0.5rem;
-}
-.qr-url-label {
-    font-size: 0.6875rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--sd-text-muted);
-}
-.qr-reveal-btn {
-    flex: 0 0 auto;
-    appearance: none;
-    -webkit-appearance: none;
-    background: transparent;
-    border: none;
-    color: var(--sd-accent);
-    font-family: inherit;
-    font-size: 0.75rem;
-    cursor: pointer;
-    padding: 0;
-}
-.qr-url {
-    display: block;
-    font-family: monospace;
-    font-size: 0.75rem;
-    line-height: 1.5;
-    color: var(--sd-text);
-    /* Wrap it. A long token in a nowrap box is a box showing two characters. */
-    word-break: break-all;
-    white-space: normal;
-}
-.qr-copy-btn {
-    align-self: stretch;
-    appearance: none;
-    -webkit-appearance: none;
-    background: var(--sd-accent);
-    color: var(--sd-on-accent);
-    border: none;
-    padding: 0.4rem 0.8rem;
-    border-radius: 0.25rem;
-    cursor: pointer;
-    font-family: inherit;
-    font-weight: 600;
-    font-size: 0.8125rem;
-}
-.qr-copy-btn:hover {
-    background: var(--sd-accent-hover);
-}
-.qr-warning {
-    margin: 0;
-    font-size: 0.75rem;
-    line-height: 1.5;
-    color: var(--sd-warning);
-    text-align: center;
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-/* Scrollbar */
+.btn-primary {
+  background: var(--sd-accent);
+  color: var(--sd-on-accent);
+}
+.btn-primary:not(:disabled):hover {
+  background: var(--sd-accent-hover);
+}
+
+.btn-success {
+  background: var(--sd-success);
+  color: var(--sd-bg-page);
+}
+.btn-success:not(:disabled):hover {
+  opacity: 0.85;
+}
+
+.btn-danger {
+  background: color-mix(in srgb, var(--sd-error) 14%, transparent);
+  border-color: color-mix(in srgb, var(--sd-error) 35%, transparent);
+  color: var(--sd-error);
+}
+.btn-danger:not(:disabled):hover {
+  background: color-mix(in srgb, var(--sd-error) 24%, transparent);
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: var(--sd-border);
+  color: var(--sd-text-secondary);
+}
+.btn-ghost:not(:disabled):hover {
+  border-color: var(--sd-accent);
+  color: var(--sd-accent);
+}
+
+.btn-sm {
+  padding: 0.3rem 0.65rem;
+  font-size: var(--sd-font-xs);
+  border-radius: var(--sd-radius-sm);
+}
+
+/* ── Scrollbars ─────────────────────────────────────────── */
 ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-    background: var(--bg-page);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-    background: var(--border);
-    border-radius: 3px;
+  background: var(--sd-border);
+  border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--border-hover);
+  background: var(--sd-border-hover);
 }
 
-/* Mobile: Tablet (768px) */
+/* ── Mobile shell ───────────────────────────────────────── */
 @media (max-width: 768px) {
-    .main {
-        padding: 1rem;
-        width: 100%;
-    }
-    .fab-burger {
-        bottom: 1rem;
-        right: 1rem;
-        width: 48px;
-        height: 48px;
-    }
-    .fab-menu {
-        width: 240px;
-    }
+  .main {
+    padding: 1rem;
+  }
 }
 
-/* Mobile: Phone (480px) */
 @media (max-width: 480px) {
-    .main {
-        padding: 0.5rem;
-        width: 100%;
-    }
-    .fab-burger {
-        bottom: 0.75rem;
-        right: 0.75rem;
-        width: 46px;
-        height: 46px;
-    }
-    .fab-menu {
-        width: 100%;
-        right: -100%;
-    }
+  .main {
+    padding: 0.5rem;
+  }
 }

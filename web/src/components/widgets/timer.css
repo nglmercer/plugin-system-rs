@@ -1,0 +1,121 @@
+/* Timer widget — the remaining time is the point, so it is the only element
+   that gets to be large. `tabular-nums` stops the digits jittering as the
+   countdown advances. */
+
+.timer-widget {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.timer-widget.error {
+  color: var(--sd-error);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.timer-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  color: var(--sd-text-secondary);
+}
+
+.timer-time {
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--sd-text);
+}
+.timer-widget.minimal .timer-time {
+  font-size: 2.25rem;
+}
+.timer-time.expired {
+  color: var(--sd-warning);
+}
+
+.timer-controls {
+  display: flex;
+  gap: 0.375rem;
+}
+
+.timer-btn {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-sm);
+  background: var(--sd-bg-card-hover);
+  color: var(--sd-text);
+  font-family: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: border-color var(--sd-duration-fast) var(--sd-ease);
+}
+.timer-btn:hover:not(:disabled) {
+  border-color: var(--sd-accent);
+}
+.timer-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Detailed: one row per running timer */
+.timer-widget.detailed {
+  align-items: stretch;
+  justify-content: flex-start;
+  overflow-y: auto;
+}
+
+.timer-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+}
+.timer-row-name {
+  flex: 0 0 5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sd-text-secondary);
+}
+.timer-row-time {
+  font-variant-numeric: tabular-nums;
+  color: var(--sd-text);
+}
+.timer-row-time.expired {
+  color: var(--sd-warning);
+}
+
+.timer-bar {
+  flex: 1;
+  height: 0.25rem;
+  border-radius: 0.125rem;
+  background: var(--sd-slider-track);
+  overflow: hidden;
+}
+.timer-bar-fill {
+  height: 100%;
+  background: var(--sd-accent);
+}
+.timer-bar-fill.expired {
+  background: var(--sd-warning);
+}
+
+.timer-empty {
+  font-size: 0.75rem;
+  color: var(--sd-text-muted);
+  text-align: center;
+}
+.timer-error {
+  font-size: 0.6875rem;
+  color: var(--sd-error);
+  text-align: center;
+}

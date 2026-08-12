@@ -1,4 +1,4 @@
-import { TypeTextWidget } from "../../components/TypeTextWidget";
+import { TypeTextWidget } from "../../components/widgets/TypeTextWidget";
 import { Icons } from "../../ui/icons/Icons";
 import { box, chip } from "../preview";
 import { WidgetDefinition, requiresPlugin } from "../types";

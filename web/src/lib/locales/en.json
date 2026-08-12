@@ -9,7 +9,6 @@
     "plugins": "Plugins"
   },
   "dashboard": {
-    "title": "Dashboard",
     "addWidget": "Add Widget",
     "empty": "No widgets added yet",
     "emptyHint": "Click \"Add Widget\" to get started",

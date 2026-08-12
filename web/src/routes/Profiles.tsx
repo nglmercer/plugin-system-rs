@@ -2,6 +2,7 @@ import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import { fetchProfiles, createProfile, deleteProfile } from '../lib/api';
 import { Profile } from '../lib/types';
+import './profiles.css';
 
 export function Profiles() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -51,7 +52,7 @@ export function Profiles() {
         onKeyDown: handleKeyDown,
       }),
       h('button', {
-        class: 'primary-btn',
+        class: 'btn btn-primary',
         onClick: handleCreate,
         disabled: !newProfileName.trim(),
       }, 'Create Profile')
@@ -79,7 +80,7 @@ export function Profiles() {
                 )
               ),
               h('button', {
-                class: 'danger-btn',
+                class: 'btn btn-danger btn-sm',
                 onClick: () => handleDelete(profile.id, profile.name),
               }, 'Delete')
             )

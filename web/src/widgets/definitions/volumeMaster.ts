@@ -1,4 +1,4 @@
-import { VolumeWidget } from "../../components/VolumeWidget";
+import { VolumeWidget } from "../../components/widgets/VolumeWidget";
 import { Icons } from "../../ui/icons/Icons";
 import { bar, box, chip, text } from "../preview";
 import { WidgetDefinition, requiresPlugin } from "../types";

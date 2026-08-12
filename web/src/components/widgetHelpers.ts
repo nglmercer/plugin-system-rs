@@ -15,11 +15,6 @@ export function generateId(): string {
   return Math.random().toString(36).substring(2, 10);
 }
 
-/** Whether the wizard has a config step for this type. */
-export function widgetHasConfig(type: string): boolean {
-  return (getWidget(type)?.settings?.length ?? 0) > 0;
-}
-
 /**
  * A new widget of the given type, at its declared default size.
  *

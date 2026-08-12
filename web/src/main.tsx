@@ -5,17 +5,15 @@ import { initI18n } from './lib/i18n';
 import { initAuth } from './lib/auth';
 import { initTheme } from './ui';
 import { installExternalWidgetApi, registerBuiltinWidgets } from './widgets';
+
+/* Only the global foundation is imported here: design tokens, themes, and the
+ * app shell. Every feature's styles live next to its component and are
+ * imported there. */
 import './ui/tokens.css';
 import './ui/themes/dark.css';
 import './ui/themes/light.css';
 import './ui/themes/accents.css';
 import './styles/base.css';
-import './styles/dashboard.css';
-import './styles/deck.css';
-import './styles/library.css';
-import './styles/widgets.css';
-import './styles/wizard.css';
-import './styles/pages.css';
 
 initTheme();
 

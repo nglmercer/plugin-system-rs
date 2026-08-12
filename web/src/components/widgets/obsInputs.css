@@ -1,0 +1,10 @@
+/* OBS inputs widget — almost entirely shared primitives; this file only
+   spaces the minimal variant. */
+
+.obsinput-variant {
+  gap: 0.4rem;
+}
+
+.obsinput-variant.minimal {
+  gap: 0.3rem;
+}

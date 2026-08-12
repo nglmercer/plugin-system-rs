@@ -1,0 +1,141 @@
+/* QR modal internals — the shell itself comes from Modal.css.
+ * The URL carries the API token, so this dialog hands out a credential: the
+ * layout is label, masked URL that wraps, copy button, warning. */
+
+.qr-modal {
+  max-width: 24rem;
+  /* Nothing in here may push the dialog sideways. The URL is long and
+     unbreakable, and without this the modal grew a horizontal scrollbar and
+     shoved its own buttons off the right edge. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 1.25rem;
+}
+
+.qr-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.qr-header h2 {
+  min-width: 0;
+  font-size: 1.05rem;
+  color: var(--sd-text);
+  /* Without this the heading wrapped to two lines and shoved the close
+     button into the space it left. */
+  white-space: nowrap;
+}
+
+.qr-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.qr-image {
+  width: 100%;
+  max-width: 15rem;
+  height: auto;
+  border-radius: var(--sd-radius-md);
+  /* A white quiet zone regardless of theme: a dark-on-dark code does not
+     scan. */
+  background: #fff;
+  padding: 0.5rem;
+}
+
+.qr-loading {
+  width: 100%;
+  max-width: 15rem;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sd-text-muted);
+  background: var(--sd-bg-input);
+  border-radius: var(--sd-radius-md);
+}
+
+.qr-hint {
+  font-size: 0.8125rem;
+  color: var(--sd-text-secondary);
+  text-align: center;
+}
+
+.qr-url-block {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.625rem;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-md);
+  background: var(--sd-bg-input);
+}
+
+.qr-url-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.qr-url-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sd-text-muted);
+}
+
+.qr-reveal-btn {
+  flex: 0 0 auto;
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: var(--sd-accent);
+  font-family: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 0;
+}
+
+.qr-url {
+  display: block;
+  font-family: monospace;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--sd-text);
+  /* Wrap it. A long token in a nowrap box is a box showing two characters. */
+  word-break: break-all;
+  white-space: normal;
+}
+
+.qr-copy-btn {
+  align-self: stretch;
+  appearance: none;
+  background: var(--sd-accent);
+  color: var(--sd-on-accent);
+  border: none;
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--sd-radius-sm);
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  transition: background var(--sd-duration-fast) var(--sd-ease);
+}
+.qr-copy-btn:hover {
+  background: var(--sd-accent-hover);
+}
+
+.qr-warning {
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--sd-warning);
+  text-align: center;
+}

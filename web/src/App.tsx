@@ -3,12 +3,16 @@ import { useState, useEffect } from 'preact/hooks';
 import { Dashboard } from './routes/Dashboard';
 import { Profiles } from './routes/Profiles';
 import { Plugins } from './routes/Plugins';
-import { QrButton } from './components/QrModal';
-import { Icons } from './ui/icons/Icons';
-import { useTheme } from './ui';
-import { t, getLocale, setLocale, getAvailableLocales } from './lib/i18n';
+import { FabMenu } from './components/FabMenu';
+import type { Page } from './components/FabMenu';
 
-type Page = 'dashboard' | 'profiles' | 'plugins';
+/**
+ * App shell: the page under test and the floating menu above it.
+ *
+ * Navigation state lives here because the URL and the FAB menu both touch it;
+ * arrange state lives here for the same reason — the FAB menu toggles it and
+ * the dashboard consumes it, and neither should know about the other.
+ */
 
 function getPageFromURL(): Page {
   const params = new URLSearchParams(window.location.search);
@@ -27,10 +31,7 @@ function setPageToURL(page: Page) {
 
 export function App() {
   const [currentPage, setCurrentPage] = useState<Page>(getPageFromURL);
-  const themeApi = useTheme();
-  const theme = themeApi.resolved;
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [locale, setLocaleState] = useState(getLocale());
+  const [arranging, setArranging] = useState(false);
 
   useEffect(() => {
     function handlePopState() {
@@ -40,88 +41,32 @@ export function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  useEffect(() => {
-    if (menuOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => { document.body.style.overflow = ''; };
-  }, [menuOpen]);
-
-  function toggleTheme() {
-    themeApi.toggle();
-  }
-
   function navigateTo(page: Page) {
     setCurrentPage(page);
     setPageToURL(page);
-    setMenuOpen(false);
+    // Arrangement belongs to the dashboard; leaving cancels it.
+    if (page !== 'dashboard') setArranging(false);
   }
 
   function handleAddWidget() {
-    setMenuOpen(false);
     window.dispatchEvent(new CustomEvent('sd:add-widget'));
-  }
-
-  async function handleLocaleChange(newLocale: string) {
-    await setLocale(newLocale);
-    setLocaleState(newLocale);
   }
 
   return h('div', { class: 'app' },
     h('main', { class: 'main' },
-      currentPage === 'dashboard' && h(Dashboard, null),
+      currentPage === 'dashboard' && h(Dashboard, {
+        arranging,
+        onToggleArrange: () => setArranging((v) => !v),
+      }),
       currentPage === 'profiles' && h(Profiles, null),
       currentPage === 'plugins' && h(Plugins, null),
     ),
-    menuOpen && h('div', { class: 'fab-overlay', onClick: () => setMenuOpen(false) }),
-    h('div', { class: `fab-menu ${menuOpen ? 'open' : ''}` },
-      h('button', {
-        class: currentPage === 'dashboard' ? 'active' : '',
-        onClick: () => navigateTo('dashboard')
-      }, h(Icons.dashboard, null), t('nav.dashboard')),
-      h('button', {
-        class: currentPage === 'profiles' ? 'active' : '',
-        onClick: () => navigateTo('profiles')
-      }, h(Icons.profiles, null), t('nav.profiles')),
-      h('button', {
-        class: currentPage === 'plugins' ? 'active' : '',
-        onClick: () => navigateTo('plugins')
-      }, h(Icons.plugins, null), t('nav.plugins')),
-      h('div', { class: 'fab-divider' }),
-      h('button', { class: 'fab-add-btn', onClick: handleAddWidget },
-        h(Icons.plus, null), t('dashboard.addWidget')
-      ),
-      h('div', { class: 'fab-divider' }),
-      h('div', { class: 'fab-bottom-row' },
-        h('button', {
-          class: 'fab-theme-btn',
-          onClick: toggleTheme,
-          title: t('theme.switchTo', { theme: theme === 'dark' ? t('theme.light') : t('theme.dark') }),
-        }, theme === 'dark' ? h(Icons.sun, null) : h(Icons.moon, null)),
-        h('div', { class: 'fab-lang-selector' },
-          h('select', {
-            class: 'lang-select',
-            value: locale,
-            onChange: (e: Event) => handleLocaleChange((e.target as HTMLSelectElement).value),
-          },
-            getAvailableLocales().map((loc) =>
-              h('option', { key: loc, value: loc }, loc.toUpperCase())
-            )
-          )
-        ),
-        h(QrButton, null)
-      )
-    ),
-    h('button', {
-      class: `fab-burger ${menuOpen ? 'open' : ''}`,
-      onClick: () => setMenuOpen(!menuOpen),
-      'aria-label': 'Menu',
-    },
-      h('span', null),
-      h('span', null),
-      h('span', null),
-    )
+    h(FabMenu, {
+      page: currentPage,
+      onNavigate: navigateTo,
+      onAddWidget: handleAddWidget,
+      arranging,
+      onToggleArrange: () => setArranging((v) => !v),
+    }),
   );
 }

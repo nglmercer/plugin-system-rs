@@ -1,0 +1,119 @@
+/* Generic plugin panel — renders any plugin's interface-data, so a backend
+   plugin is usable on the dashboard without shipping a matching frontend. */
+
+.plugin-widget {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  height: 100%;
+  overflow: auto;
+  font-size: 0.75rem;
+}
+
+.plugin-widget.empty,
+.plugin-widget-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--sd-text-muted);
+  text-align: center;
+}
+
+.plugin-widget-error {
+  color: var(--sd-error);
+  word-break: break-word;
+}
+
+.plugin-widget-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.plugin-widget-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.2rem 0;
+  border-bottom: 1px solid var(--sd-border);
+}
+.plugin-widget-row:last-child {
+  border-bottom: none;
+}
+
+.plugin-widget-key {
+  color: var(--sd-text-secondary);
+}
+
+.plugin-widget-value {
+  color: var(--sd-text);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  word-break: break-word;
+}
+
+.plugin-widget-scalar {
+  font-size: 1.5rem;
+  font-weight: 600;
+  text-align: center;
+  color: var(--sd-text);
+}
+
+/* Wide plugin tables scroll inside the tile rather than stretching it. */
+.plugin-widget-table-wrap {
+  overflow-x: auto;
+}
+
+.plugin-widget-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.plugin-widget-table th {
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--sd-text-muted);
+  padding: 0.2rem 0.4rem 0.2rem 0;
+}
+.plugin-widget-table td {
+  padding: 0.2rem 0.4rem 0.2rem 0;
+  border-top: 1px solid var(--sd-border);
+  color: var(--sd-text);
+  white-space: nowrap;
+}
+
+.plugin-widget-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: auto;
+  padding-top: 0.35rem;
+}
+
+.plugin-widget-btn {
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-sm);
+  background: var(--sd-bg-card-hover);
+  color: var(--sd-text);
+  font-family: inherit;
+  font-size: 0.6875rem;
+  cursor: pointer;
+  transition: border-color var(--sd-duration-fast) var(--sd-ease);
+}
+.plugin-widget-btn:hover:not(:disabled) {
+  border-color: var(--sd-accent);
+}
+.plugin-widget-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.plugin-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}

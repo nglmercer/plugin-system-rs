@@ -20,5 +20,5 @@ export {
 export type { ThemeMode, ResolvedTheme, AccentId, ThemeState } from "./theme/themeStore";
 export { useTheme } from "./theme/useTheme";
 export type { ThemeApi } from "./theme/useTheme";
-export { Icons, WidgetIcon } from "./icons/Icons";
+export { Icons } from "./icons/Icons";
 export type { IconName } from "./icons/Icons";

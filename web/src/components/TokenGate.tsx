@@ -1,6 +1,7 @@
 import { h } from "preact";
 import { useState } from "preact/hooks";
 import { setToken } from "../lib/auth";
+import "./TokenGate.css";
 
 /**
  * Shown when the dashboard could not obtain an API token on its own.

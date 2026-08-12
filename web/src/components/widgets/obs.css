@@ -1,0 +1,165 @@
+/* OBS control widget — connection status and the stream/record controls. */
+
+.obs-variant {
+  gap: 0.4rem;
+}
+
+/* Status dot + label */
+.obs-status-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+.obs-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sd-text-dim);
+}
+.obs-dot.green { background: var(--sd-success); }
+.obs-dot.red { background: var(--sd-error); }
+
+.obs-conn-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sd-text-muted);
+  font-size: 0.75rem;
+}
+
+/* Connect buttons */
+.obs-btn {
+  margin-top: 0.3rem;
+  border: none;
+  border-radius: var(--sd-radius-sm);
+  background: var(--sd-accent);
+  color: var(--sd-on-accent);
+  padding: 0.3rem 0.8rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity var(--sd-duration-fast) var(--sd-ease);
+}
+.obs-btn:hover { opacity: 0.85; }
+
+.obs-btn-sm {
+  border: none;
+  border-radius: var(--sd-radius-sm);
+  background: var(--sd-accent);
+  color: var(--sd-on-accent);
+  padding: 0.15rem 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity var(--sd-duration-fast) var(--sd-ease);
+}
+.obs-btn-sm:hover { opacity: 0.85; }
+
+/* Minimal */
+.obs-variant.minimal {
+  justify-content: center;
+}
+
+/* Compact */
+.obs-compact-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.obs-scene-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sd-text-secondary);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.obs-compact-controls {
+  display: flex;
+  gap: 0.3rem;
+}
+.obs-toggle-btn {
+  flex: 1;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-sm);
+  background: var(--sd-slider-track);
+  color: var(--sd-text-muted);
+  padding: 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background var(--sd-duration-fast) var(--sd-ease),
+    border-color var(--sd-duration-fast) var(--sd-ease);
+}
+.obs-toggle-btn:hover:not(:disabled) {
+  background: var(--sd-border-hover);
+}
+.obs-toggle-btn.active {
+  background: var(--sd-error);
+  border-color: var(--sd-error);
+  color: var(--sd-bg-page);
+}
+.obs-toggle-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Detailed */
+.obs-variant.detailed {
+  gap: 0.5rem;
+}
+.obs-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.obs-controls-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.3rem;
+}
+.obs-ctrl-btn {
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-sm);
+  background: var(--sd-slider-track);
+  color: var(--sd-text-secondary);
+  padding: 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background var(--sd-duration-fast) var(--sd-ease),
+    border-color var(--sd-duration-fast) var(--sd-ease);
+}
+.obs-ctrl-btn:hover:not(:disabled) {
+  background: var(--sd-border-hover);
+}
+.obs-ctrl-btn.active {
+  background: var(--sd-error);
+  border-color: var(--sd-error);
+  color: var(--sd-bg-page);
+}
+.obs-ctrl-btn.small {
+  padding: 0.2rem;
+  font-size: 0.6rem;
+}
+.obs-ctrl-btn.paused {
+  background: var(--sd-warning);
+  border-color: var(--sd-warning);
+  color: var(--sd-bg-page);
+}
+.obs-ctrl-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.obs-pause-row {
+  display: flex;
+  justify-content: center;
+}

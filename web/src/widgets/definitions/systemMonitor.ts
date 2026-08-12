@@ -1,5 +1,5 @@
 import { h } from "preact";
-import { SystemMonitorWidget } from "../../components/SystemMonitorWidget";
+import { SystemMonitorWidget } from "../../components/widgets/SystemMonitorWidget";
 import { Icons } from "../../ui/icons/Icons";
 import { bar, box, text } from "../preview";
 import { WidgetDefinition, requiresPlugin } from "../types";

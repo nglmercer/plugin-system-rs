@@ -3,6 +3,9 @@ import { useState, useEffect } from 'preact/hooks';
 import QRCode from 'qrcode';
 import { fetchLocalIp } from '../lib/api';
 import { t } from '../lib/i18n';
+import { Modal, ModalClose } from './Modal';
+import './Modal.css';
+import './QrModal.css';
 
 /**
  * QR code for opening the dashboard on a phone.
@@ -37,8 +40,7 @@ export function QrModal({ onClose }: { onClose: () => void }) {
         const dataUrl = await QRCode.toDataURL(target, {
           width: 280,
           margin: 2,
-          // Read from the theme so the code stays scannable in both, instead
-          // of the hardcoded cyan-on-charcoal that vanished in light mode.
+          // A scannable code needs contrast regardless of theme.
           color: { dark: '#000000', light: '#ffffff' },
         });
         if (!cancelled) setQrDataUrl(dataUrl);
@@ -61,53 +63,45 @@ export function QrModal({ onClose }: { onClose: () => void }) {
   }
 
   return h(
-    'div',
-    { class: 'qr-overlay', onClick: onClose },
+    Modal,
+    { onClose, class: 'qr-modal' },
     h(
       'div',
-      { class: 'qr-modal', onClick: (e: Event) => e.stopPropagation() },
+      { class: 'qr-header' },
+      h('h2', null, t('qr.title')),
+      h(ModalClose, { onClose, label: t('common.close') }),
+    ),
+    h(
+      'div',
+      { class: 'qr-body' },
+      qrDataUrl
+        ? h('img', { src: qrDataUrl, alt: t('qr.title'), class: 'qr-image' })
+        : h('div', { class: 'qr-loading' }, t('app.loading')),
+
+      h('p', { class: 'qr-hint' }, t('qr.hint')),
+
       h(
         'div',
-        { class: 'qr-header' },
-        h('h2', null, t('qr.title')),
-        h(
-          'button',
-          { class: 'qr-close', type: 'button', onClick: onClose, 'aria-label': t('common.close') },
-          '✕',
-        ),
-      ),
-      h(
-        'div',
-        { class: 'qr-body' },
-        qrDataUrl
-          ? h('img', { src: qrDataUrl, alt: t('qr.title'), class: 'qr-image' })
-          : h('div', { class: 'qr-loading' }, t('app.loading')),
-
-        h('p', { class: 'qr-hint' }, t('qr.hint')),
-
+        { class: 'qr-url-block' },
         h(
           'div',
-          { class: 'qr-url-block' },
-          h(
-            'div',
-            { class: 'qr-url-head' },
-            h('span', { class: 'qr-url-label' }, t('qr.url')),
-            h(
-              'button',
-              { class: 'qr-reveal-btn', type: 'button', onClick: () => setRevealed(!revealed) },
-              revealed ? t('qr.hide') : t('qr.reveal'),
-            ),
-          ),
-          h('code', { class: 'qr-url' }, revealed ? url : maskToken(url)),
+          { class: 'qr-url-head' },
+          h('span', { class: 'qr-url-label' }, t('qr.url')),
           h(
             'button',
-            { class: 'qr-copy-btn', type: 'button', onClick: handleCopy },
-            copied ? t('qr.copied') : t('qr.copy'),
+            { class: 'qr-reveal-btn', type: 'button', onClick: () => setRevealed(!revealed) },
+            revealed ? t('qr.hide') : t('qr.reveal'),
           ),
         ),
-
-        h('p', { class: 'qr-warning' }, t('qr.tokenWarning')),
+        h('code', { class: 'qr-url' }, revealed ? url : maskToken(url)),
+        h(
+          'button',
+          { class: 'qr-copy-btn', type: 'button', onClick: handleCopy },
+          copied ? t('qr.copied') : t('qr.copy'),
+        ),
       ),
+
+      h('p', { class: 'qr-warning' }, t('qr.tokenWarning')),
     ),
   );
 }
@@ -122,11 +116,11 @@ export function QrButton() {
 
   return h(
     'div',
-    { class: 'qr-btn-wrap' },
+    null,
     h(
       'button',
       {
-        class: 'nav-qr-btn',
+        class: 'fab-util',
         type: 'button',
         onClick: () => setShow(true),
         title: t('qr.title'),

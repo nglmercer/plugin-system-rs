@@ -1,0 +1,75 @@
+/* Shared modal shell — see Modal.tsx. */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--sd-z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: var(--sd-overlay);
+  animation: modal-fade var(--sd-duration-base) var(--sd-ease);
+}
+
+@keyframes modal-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-card {
+  width: 100%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--sd-bg-card);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-xl);
+  box-shadow: var(--sd-shadow-lg);
+  animation: modal-rise var(--sd-duration-base) var(--sd-ease);
+}
+
+@keyframes modal-rise {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+
+.modal-close {
+  flex: 0 0 auto;
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: var(--sd-text-muted);
+  font-size: 1.05rem;
+  line-height: 1;
+  padding: 0.3rem 0.45rem;
+  border-radius: var(--sd-radius-sm);
+  cursor: pointer;
+  transition:
+    color var(--sd-duration-fast) var(--sd-ease),
+    background var(--sd-duration-fast) var(--sd-ease);
+}
+.modal-close:hover {
+  color: var(--sd-text);
+  background: var(--sd-bg-card-hover);
+}
+
+/* Phones get a bottom sheet: a centered card is unreachable one-handed. */
+@media (max-width: 480px) {
+  .modal-overlay:has(.modal-card.sheet) {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .modal-card.sheet {
+    max-width: 100%;
+    max-height: 92vh;
+    border-radius: var(--sd-radius-xl) var(--sd-radius-xl) 0 0;
+    border-bottom: none;
+    animation: modal-sheet var(--sd-duration-slow) var(--sd-ease);
+  }
+}
+
+@keyframes modal-sheet {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}

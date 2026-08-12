@@ -1,0 +1,75 @@
+/* Token entry — shown instead of the dashboard when the browser could not
+   obtain an API token, i.e. the page is open on a device other than the one
+   running sd-core. */
+
+.token-gate {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: var(--sd-bg-page);
+}
+
+.token-gate-card {
+  width: 100%;
+  max-width: 30rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 2rem;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-xl);
+  background: var(--sd-bg-card);
+  box-shadow: var(--sd-shadow-lg);
+}
+
+.token-gate-card h1 {
+  font-size: 1.25rem;
+  color: var(--sd-text);
+}
+
+.token-gate-card p {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--sd-text-secondary);
+}
+
+.token-gate-input {
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-md);
+  background: var(--sd-bg-input);
+  color: var(--sd-text);
+  font-family: inherit;
+  font-size: 0.875rem;
+  transition: border-color var(--sd-duration-base) var(--sd-ease);
+}
+.token-gate-input:focus {
+  outline: none;
+  border-color: var(--sd-accent);
+}
+
+.token-gate-error {
+  color: var(--sd-error);
+}
+
+.token-gate-submit {
+  padding: 0.625rem 1rem;
+  border: none;
+  border-radius: var(--sd-radius-md);
+  background: var(--sd-accent);
+  color: var(--sd-on-accent);
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--sd-duration-base) var(--sd-ease);
+}
+.token-gate-submit:hover:not(:disabled) {
+  background: var(--sd-accent-hover);
+}
+.token-gate-submit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

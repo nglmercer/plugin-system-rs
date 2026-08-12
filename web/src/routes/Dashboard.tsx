@@ -1,6 +1,12 @@
 import { h } from 'preact';
-import { WidgetGrid } from '../components/WidgetGrid';
+import { WidgetGrid } from '../components/deck/WidgetGrid';
 
-export function Dashboard() {
-  return h(WidgetGrid, null);
+export function Dashboard({
+  arranging,
+  onToggleArrange,
+}: {
+  arranging: boolean;
+  onToggleArrange: () => void;
+}) {
+  return h(WidgetGrid, { arranging, onToggleArrange });
 }

@@ -1,0 +1,282 @@
+/*
+ * The floating action button and its drawer — see FabMenu.tsx.
+ * Navigation, the dashboard actions, and the utility row all live here.
+ */
+
+/* ── Burger ─────────────────────────────────────────────── */
+
+.fab-burger {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: var(--sd-z-fab);
+  width: 52px;
+  height: 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: none;
+  border-radius: 50%;
+  background: var(--sd-accent);
+  cursor: pointer;
+  box-shadow: var(--sd-shadow-md);
+  transition:
+    transform var(--sd-duration-slow) var(--sd-ease),
+    box-shadow var(--sd-duration-slow) var(--sd-ease),
+    background var(--sd-duration-base) var(--sd-ease);
+}
+.fab-burger:hover {
+  transform: scale(1.07);
+  box-shadow: var(--sd-shadow-lg);
+}
+.fab-burger span {
+  display: block;
+  width: 20px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--sd-on-accent);
+  transition:
+    transform var(--sd-duration-slow) var(--sd-ease),
+    opacity var(--sd-duration-slow) var(--sd-ease);
+}
+.fab-burger.open span:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+.fab-burger.open span:nth-child(2) {
+  opacity: 0;
+}
+.fab-burger.open span:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+/* ── Drawer ─────────────────────────────────────────────── */
+
+.fab-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--sd-z-fab-overlay);
+  background: var(--sd-overlay);
+  animation: fab-fade var(--sd-duration-base) var(--sd-ease);
+}
+
+@keyframes fab-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.fab-menu {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: var(--sd-z-fab-menu);
+  width: 264px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1.25rem 0.9rem;
+  overflow-y: auto;
+  background: var(--sd-bg-nav);
+  border-left: 1px solid var(--sd-border);
+  box-shadow: var(--sd-shadow-lg);
+  transform: translateX(100%);
+  visibility: hidden;
+  transition:
+    transform var(--sd-duration-slow) var(--sd-ease),
+    visibility 0s linear var(--sd-duration-slow);
+}
+.fab-menu.open {
+  transform: none;
+  visibility: visible;
+  transition: transform var(--sd-duration-slow) var(--sd-ease);
+}
+
+/* Nav entries */
+.fab-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.6rem 0.8rem;
+  border: none;
+  border-radius: var(--sd-radius-md);
+  background: transparent;
+  color: var(--sd-text-secondary);
+  font-size: var(--sd-font-md);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--sd-duration-base) var(--sd-ease),
+    color var(--sd-duration-base) var(--sd-ease);
+}
+.fab-nav svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.fab-nav:hover {
+  background: var(--sd-bg-card-hover);
+  color: var(--sd-text);
+}
+.fab-nav.active {
+  background: color-mix(in srgb, var(--sd-accent) 14%, transparent);
+  color: var(--sd-accent);
+  font-weight: 600;
+}
+
+/* Dashboard actions */
+.fab-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--sd-border);
+}
+
+.fab-action {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-md);
+  background: transparent;
+  color: var(--sd-text);
+  font-size: var(--sd-font-sm);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--sd-duration-base) var(--sd-ease),
+    border-color var(--sd-duration-base) var(--sd-ease),
+    color var(--sd-duration-base) var(--sd-ease);
+}
+.fab-action svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.fab-action:hover {
+  border-color: var(--sd-accent);
+  color: var(--sd-accent);
+}
+.fab-action.is-active {
+  background: color-mix(in srgb, var(--sd-accent) 14%, transparent);
+  border-color: var(--sd-accent);
+  color: var(--sd-accent);
+}
+
+.fab-add {
+  background: var(--sd-accent);
+  border-color: var(--sd-accent);
+  color: var(--sd-on-accent);
+}
+.fab-add:hover {
+  background: var(--sd-accent-hover);
+  border-color: var(--sd-accent-hover);
+  color: var(--sd-on-accent);
+}
+
+/* Utility row pinned to the bottom */
+.fab-footer {
+  margin-top: auto;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--sd-border);
+}
+.fab-footer-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.fab-util {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 0.5rem;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-md);
+  background: transparent;
+  color: var(--sd-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    color var(--sd-duration-base) var(--sd-ease),
+    border-color var(--sd-duration-base) var(--sd-ease);
+}
+.fab-util svg {
+  width: 17px;
+  height: 17px;
+}
+.fab-util:hover {
+  color: var(--sd-accent);
+  border-color: var(--sd-accent);
+}
+
+.fab-lang {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  padding: 0 1.6rem 0 0.6rem;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-md);
+  background: transparent;
+  color: var(--sd-text-secondary);
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.55rem center;
+  transition:
+    color var(--sd-duration-base) var(--sd-ease),
+    border-color var(--sd-duration-base) var(--sd-ease);
+}
+.fab-lang:hover,
+.fab-lang:focus {
+  outline: none;
+  color: var(--sd-accent);
+  border-color: var(--sd-accent);
+}
+.fab-lang option {
+  background: var(--sd-bg-nav);
+  color: var(--sd-text);
+}
+
+/* ── Mobile ─────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .fab-burger {
+    bottom: 1rem;
+    right: 1rem;
+    width: 48px;
+    height: 48px;
+  }
+  .fab-menu {
+    width: 248px;
+  }
+}
+
+@media (max-width: 480px) {
+  .fab-burger {
+    bottom: 0.75rem;
+    right: 0.75rem;
+    width: 46px;
+    height: 46px;
+  }
+  .fab-menu {
+    width: 100%;
+  }
+}

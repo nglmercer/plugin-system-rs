@@ -1,5 +1,5 @@
 import { h } from "preact";
-import { ObsScenesWidget } from "../../components/ObsScenesWidget";
+import { ObsScenesWidget } from "../../components/widgets/ObsScenesWidget";
 import { Icons } from "../../ui/icons/Icons";
 import { box, chip, chips, text } from "../preview";
 import { WidgetDefinition, requiresPlugin } from "../types";

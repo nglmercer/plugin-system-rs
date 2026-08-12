@@ -1,4 +1,4 @@
-import { TimerWidget } from "../../components/TimerWidget";
+import { TimerWidget } from "../../components/widgets/TimerWidget";
 import { Icons } from "../../ui/icons/Icons";
 import { bar, box, chips, line, text } from "../preview";
 import { WidgetDefinition, requiresPlugin } from "../types";

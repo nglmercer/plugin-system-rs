@@ -1,4 +1,4 @@
-import { VolumeAppsWidget } from "../../components/VolumeAppsWidget";
+import { VolumeAppsWidget } from "../../components/widgets/VolumeAppsWidget";
 import { Icons } from "../../ui/icons/Icons";
 import { bar, box, text } from "../preview";
 import { WidgetDefinition, requiresPlugin } from "../types";

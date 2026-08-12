@@ -1,0 +1,296 @@
+/*
+ * The reusable form kit — see FormComponents.tsx. Fields, inputs, toggle,
+ * key-value editor, collapsible section and tabs. The wizard and the settings
+ * schema both render through these.
+ */
+
+/* ── Field ──────────────────────────────────────────────── */
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.form-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--sd-text-secondary);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.form-hint {
+  color: var(--sd-text-dim);
+  font-size: 0.7rem;
+  font-weight: 400;
+}
+
+.form-input,
+.form-textarea,
+.form-select {
+  background: var(--sd-bg-input);
+  border: 1px solid var(--sd-border);
+  color: var(--sd-text);
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--sd-radius-md);
+  font-family: inherit;
+  font-size: 0.85rem;
+  transition: border-color var(--sd-duration-base) var(--sd-ease);
+}
+.form-input:focus,
+.form-textarea:focus,
+.form-select:focus {
+  outline: none;
+  border-color: var(--sd-accent);
+}
+.form-textarea {
+  resize: vertical;
+  min-height: 60px;
+  font-family: monospace;
+  line-height: 1.5;
+}
+.form-select {
+  cursor: pointer;
+}
+
+/* Validation — a blocked Next must be distinguishable from a dead one. */
+.form-field-invalid .form-input,
+.form-field-invalid .form-textarea,
+.form-field-invalid .form-select {
+  border-color: var(--sd-error);
+}
+.form-error {
+  margin: 0.3rem 0 0;
+  font-size: 0.75rem;
+  color: var(--sd-error);
+}
+
+/* ── Toggle ─────────────────────────────────────────────── */
+
+.form-toggle {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.form-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+.form-toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--sd-slider-track);
+  border-radius: var(--sd-radius-pill);
+  transition: background var(--sd-duration-base) var(--sd-ease);
+}
+.form-toggle-slider::before {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  left: 3px;
+  bottom: 3px;
+  background: var(--sd-neutral-0);
+  border-radius: 50%;
+  transition: transform var(--sd-duration-base) var(--sd-ease);
+}
+.form-toggle input:checked + .form-toggle-slider {
+  background: var(--sd-accent);
+}
+.form-toggle input:checked + .form-toggle-slider::before {
+  transform: translateX(16px);
+}
+.form-toggle input:disabled + .form-toggle-slider {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Key-value editor ───────────────────────────────────── */
+
+.kv-editor {
+  background: var(--sd-bg-input);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-lg);
+  overflow: hidden;
+}
+.kv-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+}
+.kv-expand-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: none;
+  border: none;
+  color: var(--sd-text-secondary);
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 0;
+}
+.kv-chevron {
+  display: inline-block;
+  font-size: 0.6rem;
+  color: var(--sd-text-muted);
+  transition: transform var(--sd-duration-base) var(--sd-ease);
+}
+.kv-chevron.open {
+  transform: rotate(90deg);
+}
+.kv-summary {
+  color: var(--sd-text-muted);
+  font-size: 0.8rem;
+}
+.kv-add-btn {
+  background: transparent;
+  border: 1px solid var(--sd-border);
+  color: var(--sd-accent);
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--sd-radius-sm);
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: all var(--sd-duration-fast) var(--sd-ease);
+}
+.kv-add-btn:hover {
+  background: var(--sd-accent);
+  color: var(--sd-on-accent);
+  border-color: var(--sd-accent);
+}
+.kv-list {
+  padding: 0.5rem 0.75rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.kv-empty {
+  color: var(--sd-text-dim);
+  font-size: 0.75rem;
+  text-align: center;
+  padding: 1rem;
+  font-style: italic;
+}
+.kv-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.kv-row.disabled {
+  opacity: 0.4;
+}
+.kv-key,
+.kv-value {
+  flex: 1;
+  min-width: 0;
+  background: var(--sd-bg-card);
+  border: 1px solid var(--sd-border);
+  color: var(--sd-text);
+  padding: 0.4rem 0.5rem;
+  border-radius: var(--sd-radius-sm);
+  font-size: 0.8rem;
+  font-family: monospace;
+}
+.kv-key:focus,
+.kv-value:focus {
+  outline: none;
+  border-color: var(--sd-accent);
+}
+.kv-key {
+  max-width: 140px;
+}
+.kv-remove-btn {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: var(--sd-text-dim);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0.2rem;
+  line-height: 1;
+  border-radius: var(--sd-radius-sm);
+  transition: all var(--sd-duration-fast) var(--sd-ease);
+}
+.kv-remove-btn:hover {
+  color: var(--sd-error);
+  background: color-mix(in srgb, var(--sd-error) 12%, transparent);
+}
+
+/* ── Collapsible section ────────────────────────────────── */
+
+.collapsible {
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-lg);
+  overflow: hidden;
+}
+.collapsible-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  background: var(--sd-bg-input);
+  border: none;
+  color: var(--sd-text-secondary);
+  padding: 0.6rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: left;
+  transition: background var(--sd-duration-fast) var(--sd-ease);
+}
+.collapsible-trigger:hover {
+  background: var(--sd-bg-card);
+}
+.collapsible-content {
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* ── Tabs ───────────────────────────────────────────────── */
+
+.form-tabs {
+  display: flex;
+  border-bottom: 2px solid var(--sd-border);
+}
+.form-tab {
+  position: relative;
+  background: transparent;
+  border: none;
+  color: var(--sd-text-muted);
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--sd-duration-base) var(--sd-ease);
+}
+.form-tab:hover {
+  color: var(--sd-text);
+}
+.form-tab.active {
+  color: var(--sd-accent);
+}
+.form-tab.active::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--sd-accent);
+}
+
+@media (max-width: 480px) {
+  .kv-key {
+    max-width: none;
+  }
+}

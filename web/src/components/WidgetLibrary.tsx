@@ -8,6 +8,9 @@ import {
   widgetsByCategory,
   WidgetDefinition,
 } from "../widgets";
+import { Modal, ModalClose } from "./Modal";
+import "./Modal.css";
+import "./WidgetLibrary.css";
 
 /**
  * The widget picker.
@@ -43,21 +46,14 @@ export function WidgetLibrary({
   }, [query, host]);
 
   return h(
-    "div",
-    { class: "widget-library-overlay", onClick: onClose },
+    Modal,
+    { onClose, sheet: true, class: "widget-library-modal" },
     h(
       "div",
-      { class: "widget-library-modal", onClick: (e: Event) => e.stopPropagation() },
-      h(
-        "div",
-        { class: "library-header" },
-        h("span", { class: "library-title" }, t("widget.library")),
-        h(
-          "button",
-          { class: "library-close", type: "button", onClick: onClose, "aria-label": t("common.close") },
-          "✕",
-        ),
-      ),
+      { class: "library-header" },
+      h("span", { class: "library-title" }, t("widget.library")),
+      h(ModalClose, { onClose, label: t("common.close") }),
+    ),
       h("input", {
         class: "library-search",
         type: "search",
@@ -88,7 +84,6 @@ export function WidgetLibrary({
                 ),
               ),
             ),
-      ),
     ),
   );
 }

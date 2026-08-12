@@ -1,0 +1,796 @@
+/*
+ * The widget wizard — modal shell shared from Modal.css, everything inside it
+ * lives here: step rail, body, footer, variant picker, hotkey recorder,
+ * key picker, confirm summary and the miniature previews.
+ */
+
+/* ── Chrome ─────────────────────────────────────────────── */
+
+.wizard-modal {
+  max-width: 34rem;
+  overflow: hidden;
+}
+
+.wizard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--sd-border);
+}
+
+.wizard-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--sd-accent);
+}
+.wizard-title-icon {
+  display: flex;
+  color: var(--sd-accent);
+}
+.wizard-title-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ── Step rail ──────────────────────────────────────────── */
+
+.wizard-steps {
+  display: flex;
+  padding: 1rem 1.5rem;
+  background: var(--sd-bg-input);
+  border-bottom: 1px solid var(--sd-border);
+}
+
+/* These are <button>s so they are keyboard-reachable, which means the
+   user-agent border, background and padding have to be turned off explicitly —
+   left on, they render as grey stretched boxes. */
+.wizard-step-indicator {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  position: relative;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  min-width: 0;
+}
+.wizard-step-indicator::after {
+  content: "";
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  width: 100%;
+  height: 2px;
+  background: var(--sd-slider-track);
+  z-index: 0;
+}
+.wizard-step-indicator:last-child::after {
+  display: none;
+}
+.wizard-step-indicator.active::after,
+.wizard-step-indicator.done::after {
+  background: var(--sd-accent);
+}
+
+.wizard-step-circle {
+  /* Fixed, and not allowed to be squashed by the flex parent: a "circle"
+     that stretches to fill its column is the stretched-pill look. */
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  z-index: 1;
+  background: var(--sd-slider-track);
+  color: var(--sd-text-muted);
+  border: 2px solid var(--sd-border-hover);
+  transition: all var(--sd-duration-slow) var(--sd-ease);
+}
+.wizard-step-indicator:hover .wizard-step-circle {
+  border-color: var(--sd-accent);
+  color: var(--sd-accent);
+}
+.wizard-step-indicator.active .wizard-step-circle,
+.wizard-step-indicator.done .wizard-step-circle {
+  background: var(--sd-accent);
+  border-color: var(--sd-accent);
+  color: var(--sd-on-accent);
+}
+
+.wizard-step-label {
+  font-size: 0.65rem;
+  color: var(--sd-text-dim);
+  text-transform: uppercase;
+}
+.wizard-step-indicator:hover .wizard-step-label {
+  color: var(--sd-text-muted);
+}
+.wizard-step-indicator.active .wizard-step-label {
+  color: var(--sd-accent);
+}
+.wizard-step-indicator.done .wizard-step-label {
+  color: var(--sd-text-muted);
+}
+
+/* ── Body ───────────────────────────────────────────────── */
+
+.wizard-body {
+  flex: 1;
+  padding: 1.5rem;
+  overflow-y: auto;
+  min-height: 200px;
+}
+
+.wizard-step-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.wizard-step-heading {
+  color: var(--sd-text);
+  font-size: 1rem;
+}
+.wizard-step-desc {
+  color: var(--sd-text-muted);
+  font-size: 0.8rem;
+}
+
+.wizard-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+/* ── Footer ─────────────────────────────────────────────── */
+
+.wizard-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--sd-border);
+}
+.wizard-footer-spacer {
+  flex: 1;
+}
+.wizard-btn {
+  padding: 0.5rem 1.2rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.wizard-btn.blocked {
+  opacity: 0.6;
+}
+.wizard-blocker {
+  font-size: 0.75rem;
+  color: var(--sd-warning);
+}
+
+.wizard-warning {
+  margin-bottom: 0.875rem;
+  padding: 0.625rem 0.75rem;
+  border-left: 3px solid var(--sd-warning);
+  border-radius: var(--sd-radius-sm);
+  background: var(--sd-bg-input);
+  font-size: 0.8125rem;
+  color: var(--sd-text-secondary);
+}
+
+/* ── Variant picker ─────────────────────────────────────── */
+
+.variant-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+.variant-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 2px solid var(--sd-border);
+  border-radius: var(--sd-radius-lg);
+  background: var(--sd-bg-input);
+  color: var(--sd-text);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color var(--sd-duration-base) var(--sd-ease),
+    background var(--sd-duration-base) var(--sd-ease);
+}
+.variant-card:hover {
+  border-color: var(--sd-accent);
+  background: var(--sd-bg-card-hover);
+}
+.variant-card.selected {
+  border-color: var(--sd-success);
+  background: color-mix(in srgb, var(--sd-success) 10%, transparent);
+}
+
+.variant-card-preview {
+  width: 80px;
+  height: 50px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--sd-bg-card);
+  border-radius: var(--sd-radius-sm);
+}
+
+.variant-card-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.variant-card-label {
+  color: var(--sd-text);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.variant-card-desc {
+  color: var(--sd-text-muted);
+  font-size: 0.7rem;
+}
+
+/* ── Miniature previews ─────────────────────────────────
+ * Tiny renderings of each variant in the style step. The shared pieces are
+ * the only styling most of them need; a few kinds fine-tune below. */
+
+.variant-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 4px;
+  font-size: 0.55rem;
+  line-height: 1.4;
+  color: var(--sd-text-muted);
+  text-align: center;
+}
+
+.simple-preview {
+  align-items: center;
+  justify-content: center;
+}
+
+.mini-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+.mini-btns {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px;
+}
+.mini-btn {
+  padding: 1px 4px;
+  border-radius: 2px;
+  background: var(--sd-slider-track);
+  color: var(--sd-text-secondary);
+  font-size: 0.45rem;
+  line-height: 1.4;
+}
+.mini-btn.active {
+  background: var(--sd-accent);
+  color: var(--sd-on-accent);
+}
+.mini-dot {
+  flex-shrink: 0;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--sd-text-dim);
+}
+.mini-dot.green { background: var(--sd-success); }
+.mini-dot.red { background: var(--sd-error); }
+.mini-bar {
+  height: 5px;
+  border-radius: 2px;
+  background: var(--sd-slider-track);
+  overflow: hidden;
+}
+.mini-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+}
+.mini-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16px, 1fr));
+  gap: 2px;
+  width: 100%;
+}
+.mini-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  font-size: 0.5rem;
+}
+.mini-apps,
+.mini-url {
+  font-size: 0.5rem;
+  color: var(--sd-text-muted);
+}
+.mini-status {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--sd-success);
+}
+.mini-time {
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--sd-text);
+}
+.mini-sec { font-size: 0.5rem; color: var(--sd-text-muted); }
+.mini-date { font-size: 0.45rem; color: var(--sd-text-muted); }
+
+/* Kind fine-tuning */
+.variant-preview.clock-simple {
+  font-size: 0.8rem;
+  color: var(--sd-text);
+  font-family: monospace;
+}
+.variant-preview.clock-digital {
+  align-items: center;
+  font-size: 0.7rem;
+  color: var(--sd-text);
+  font-family: monospace;
+}
+.variant-preview.clock-detailed {
+  align-items: center;
+  font-size: 0.6rem;
+  color: var(--sd-text);
+  font-family: monospace;
+}
+.variant-preview.sysmon-minimal {
+  flex-direction: row;
+  justify-content: space-around;
+  color: var(--sd-success);
+}
+
+/* ── Confirm step ───────────────────────────────────────── */
+
+.confirm-details {
+  background: var(--sd-bg-input);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-md);
+  overflow: hidden;
+}
+.confirm-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--sd-border);
+  font-size: 0.8rem;
+}
+.confirm-row:last-child {
+  border-bottom: none;
+}
+.confirm-row span:first-child {
+  color: var(--sd-text-muted);
+  text-transform: capitalize;
+}
+.confirm-row span:last-child {
+  color: var(--sd-text);
+  font-family: monospace;
+  word-break: break-word;
+}
+
+.confirm-preview {
+  margin-top: 0.5rem;
+}
+.confirm-preview-label {
+  margin-bottom: 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sd-text-muted);
+}
+.preview-frame {
+  background: var(--sd-bg-input);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-md);
+  padding: 0.75rem;
+  min-height: 60px;
+}
+
+.wizard-remove {
+  align-self: stretch;
+  margin-top: 0.5rem;
+}
+
+/* ── Hotkey recorder ────────────────────────────────────── */
+
+.hotkey-display {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+/* Scoped to the recorder: the hotkey widget uses the same class name for its
+   row of key chips. */
+.hotkey-display .hotkey-keys {
+  flex: 1;
+  background: var(--sd-bg-input);
+  border: 1px solid var(--sd-border);
+  padding: 0.6rem;
+  border-radius: var(--sd-radius-md);
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--sd-accent);
+  font-family: monospace;
+  text-align: center;
+}
+.hotkey-record-btn {
+  background: var(--sd-warning);
+  color: var(--sd-bg-page);
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: var(--sd-radius-md);
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.8rem;
+  transition: opacity var(--sd-duration-base) var(--sd-ease);
+}
+.hotkey-record-btn:hover:not(:disabled) {
+  opacity: 0.85;
+}
+.hotkey-record-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.hotkey-record-btn.recording {
+  background: var(--sd-error);
+  animation: wizard-pulse 1s infinite;
+}
+@keyframes wizard-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ── Key picker ─────────────────────────────────────────── */
+
+.key-picker {
+  background: var(--sd-bg-input);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-md);
+  padding: 0.75rem;
+  margin-top: 0.5rem;
+  max-height: 400px;
+  overflow-y: auto;
+}
+.key-picker-section {
+  margin-bottom: 0.75rem;
+}
+.key-picker-section:last-child {
+  margin-bottom: 0;
+}
+.key-picker-label {
+  color: var(--sd-text-muted);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  margin-bottom: 0.4rem;
+}
+.key-picker-selected {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  min-height: 28px;
+  align-items: center;
+}
+.key-picker-empty {
+  color: var(--sd-text-dim);
+  font-size: 0.75rem;
+  font-style: italic;
+}
+.key-picker-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: var(--sd-accent);
+  color: var(--sd-on-accent);
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--sd-radius-sm);
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--sd-duration-fast) var(--sd-ease);
+}
+.key-picker-chip:hover {
+  background: var(--sd-error);
+  color: var(--sd-bg-page);
+}
+.key-picker-chip-x {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+.key-picker-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.key-picker-clear {
+  background: transparent;
+  border: 1px solid var(--sd-border);
+  color: var(--sd-text-secondary);
+  padding: 0.35rem 0.7rem;
+  border-radius: var(--sd-radius-sm);
+  cursor: pointer;
+  font-size: 0.7rem;
+}
+.key-picker-clear:hover {
+  border-color: var(--sd-error);
+  color: var(--sd-error);
+}
+.key-picker-apply {
+  background: var(--sd-success);
+  border: none;
+  color: var(--sd-bg-page);
+  padding: 0.35rem 0.9rem;
+  border-radius: var(--sd-radius-sm);
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+.key-picker-apply:hover {
+  opacity: 0.85;
+}
+.key-picker-modifiers {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.key-picker-mod {
+  background: var(--sd-bg-card);
+  border: 1px solid var(--sd-border);
+  color: var(--sd-text-secondary);
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--sd-radius-sm);
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 700;
+  transition: all var(--sd-duration-fast) var(--sd-ease);
+}
+.key-picker-mod:hover {
+  border-color: var(--sd-accent);
+  color: var(--sd-accent);
+}
+.key-picker-mod.active {
+  background: var(--sd-accent);
+  border-color: var(--sd-accent);
+  color: var(--sd-on-accent);
+}
+.key-picker-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.key-picker-key {
+  background: var(--sd-bg-card);
+  border: 1px solid var(--sd-border);
+  color: var(--sd-text-secondary);
+  padding: 0.35rem 0.55rem;
+  border-radius: var(--sd-radius-sm);
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 500;
+  min-width: 28px;
+  text-align: center;
+  transition: all var(--sd-duration-fast) var(--sd-ease);
+}
+.key-picker-key:hover {
+  border-color: var(--sd-accent);
+  color: var(--sd-accent);
+}
+.key-picker-key.active {
+  background: var(--sd-accent);
+  border-color: var(--sd-accent);
+  color: var(--sd-on-accent);
+}
+.key-picker-letters .key-picker-key {
+  min-width: 26px;
+}
+.key-picker-functions .key-picker-key {
+  min-width: 32px;
+  font-size: 0.65rem;
+}
+.key-picker-special .key-picker-key {
+  min-width: 40px;
+  font-size: 0.65rem;
+}
+
+/* ── Requirements step ──────────────────────────────────
+ * Says what a widget needs before the user configures it, so "not connected
+ * to OBS" on a finished tile is not the first time they hear about it. */
+
+.requirement-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.requirement-row {
+  display: flex;
+  gap: 0.625rem;
+  padding: 0.75rem;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-md);
+  background: var(--sd-bg-input);
+}
+.requirement-row.unmet {
+  border-color: var(--sd-warning);
+}
+
+.requirement-mark {
+  flex: 0 0 1.25rem;
+  height: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.requirement-row.met .requirement-mark {
+  background: var(--sd-success);
+  color: var(--sd-bg-page);
+}
+.requirement-row.unmet .requirement-mark {
+  background: var(--sd-warning);
+  color: var(--sd-bg-page);
+}
+
+.requirement-body {
+  min-width: 0;
+  flex: 1;
+}
+.requirement-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+.requirement-name {
+  font-family: monospace;
+  font-size: 0.875rem;
+  color: var(--sd-text);
+}
+.requirement-status {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--sd-text-muted);
+}
+.requirement-row.unmet .requirement-status {
+  color: var(--sd-warning);
+}
+.requirement-reason {
+  margin-top: 0.2rem;
+  font-size: 0.8125rem;
+  color: var(--sd-text-secondary);
+}
+.requirement-remedy {
+  margin-top: 0.35rem;
+  font-size: 0.8125rem;
+  color: var(--sd-accent);
+}
+
+/* ── Mobile ─────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .wizard-header {
+    padding: 0.75rem 1rem;
+  }
+  .wizard-body {
+    padding: 1rem;
+  }
+  .wizard-footer {
+    padding: 0.75rem 1rem;
+  }
+  .wizard-btn {
+    min-height: 40px;
+  }
+  .variant-card {
+    padding: 0.6rem;
+  }
+  .variant-card-preview {
+    width: 60px;
+    height: 40px;
+  }
+  .key-picker-key {
+    min-width: 32px;
+    min-height: 36px;
+    padding: 0.4rem 0.6rem;
+  }
+  .wizard-field-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .wizard-modal {
+    max-width: 100%;
+  }
+  .wizard-steps {
+    padding: 0.75rem 1rem;
+    overflow-x: auto;
+  }
+  .wizard-step-label {
+    font-size: 0.55rem;
+  }
+  .wizard-body {
+    padding: 0.75rem;
+    min-height: 150px;
+  }
+  .wizard-footer {
+    padding: 0.75rem;
+    flex-wrap: wrap;
+  }
+  .wizard-footer .btn {
+    flex: 1;
+    min-width: 100px;
+    min-height: 48px;
+    font-size: 0.9rem;
+  }
+  .variant-card {
+    padding: 0.5rem;
+    gap: 0.5rem;
+  }
+  .variant-card-preview {
+    width: 50px;
+    height: 35px;
+  }
+  .variant-card-label {
+    font-size: 0.8rem;
+  }
+  .variant-card-desc {
+    font-size: 0.65rem;
+  }
+  .hotkey-record-btn {
+    min-height: 44px;
+    padding: 0.6rem 1rem;
+    font-size: 0.85rem;
+  }
+  .key-picker {
+    padding: 0.5rem;
+    max-height: 300px;
+  }
+  .key-picker-key {
+    min-width: 36px;
+    min-height: 40px;
+    font-size: 0.8rem;
+  }
+  .key-picker-mod {
+    min-height: 40px;
+    padding: 0.5rem 0.8rem;
+    font-size: 0.85rem;
+  }
+}

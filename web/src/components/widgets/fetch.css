@@ -1,0 +1,92 @@
+/* Fetch widget — request status and response preview. */
+
+.fetch-widget {
+  overflow: hidden;
+  font-size: 0.8rem;
+}
+
+.fetch-variant {
+  gap: 4px;
+  padding: 0.25rem;
+}
+.fetch-variant.minimal {
+  align-items: center;
+  justify-content: center;
+}
+
+.fetch-status {
+  font-size: 2rem;
+  font-weight: 700;
+}
+.fetch-status.ok { color: var(--sd-success); }
+.fetch-status.err { color: var(--sd-error); }
+
+.fetch-url-mini,
+.fetch-url-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sd-text-muted);
+  font-size: 0.7rem;
+}
+
+.fetch-preview {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  word-break: break-all;
+  color: var(--sd-text-secondary);
+}
+
+.fetch-status-line {
+  font-size: 0.7rem;
+  color: var(--sd-text-dim);
+}
+
+.fetch-full-preview {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0.35rem;
+  border-radius: var(--sd-radius-sm);
+  background: color-mix(in srgb, var(--sd-text) 6%, transparent);
+  font-family: monospace;
+  font-size: 0.7rem;
+  overflow: auto;
+}
+
+.fetch-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: auto;
+}
+
+.fetch-status-badge {
+  background: color-mix(in srgb, var(--sd-accent) 12%, transparent);
+  color: var(--sd-accent);
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--sd-radius-sm);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.fetch-refresh-btn {
+  border: none;
+  border-radius: var(--sd-radius-sm);
+  background: var(--sd-accent);
+  color: var(--sd-on-accent);
+  padding: 0.3rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity var(--sd-duration-fast) var(--sd-ease);
+}
+.fetch-refresh-btn:hover:not(:disabled) {
+  opacity: 0.85;
+}
+.fetch-refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

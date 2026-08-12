@@ -1,4 +1,4 @@
-import { ClockWidget } from "../../components/ClockWidget";
+import { ClockWidget } from "../../components/widgets/ClockWidget";
 import { Icons } from "../../ui/icons/Icons";
 import { box, text } from "../preview";
 import { WidgetDefinition } from "../types";

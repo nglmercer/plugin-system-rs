@@ -1,5 +1,5 @@
 import { h } from "preact";
-import { PluginDataWidget } from "../../components/PluginDataWidget";
+import { PluginDataWidget } from "../../components/widgets/PluginDataWidget";
 import { FormSelect } from "../../components/FormComponents";
 import { Icons } from "../../ui/icons/Icons";
 import { box, chips, line, text } from "../preview";
