@@ -9,7 +9,7 @@ url-loader = ["ureq", "ureq/_tls", "dirs"]
 file-loader = []
 # WebAssembly component plugins (WASI Preview 2). Off by default so hosts that
 # only load native plugins do not pull in the wasmtime runtime.
-wasm = []
+wasm = ["wasmtime", "wasmtime-wasi"]
 
 [dependencies]
 libloading = "0.8"
@@ -22,6 +22,13 @@ ureq = { version = "3", optional = true, default-features = false }
 dirs = { version = "6", optional = true }
 plugin-macros = { path = "../plugin-macros" }
 semver = "1"
+wasmtime = { version = "47", optional = true, default-features = false, features = [
+    "component-model",
+    "cranelift",
+    "runtime",
+    "std",
+] }
+wasmtime-wasi = { version = "47", optional = true }
 
 [dev-dependencies]
 tempfile = "3"

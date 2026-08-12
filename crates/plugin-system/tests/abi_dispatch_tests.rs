@@ -18,8 +18,9 @@ fn fake_plugin(dir: &Path, stem: &str, manifest: &str) -> PathBuf {
     lib
 }
 
-#[test]
-fn wasm_manifest_reports_unsupported_abi_when_runtime_is_absent() {
+/// Load a manifest that declares the wasm ABI over bytes that are not a
+/// component, and return the resulting error message.
+fn wasm_manifest_load_error() -> String {
     let temp = TempDir::new().unwrap();
     let lib = fake_plugin(
         temp.path(),
@@ -31,15 +32,38 @@ fn wasm_manifest_reports_unsupported_abi_when_runtime_is_absent() {
     let err = manager.load_plugin(&lib).unwrap_err();
     let msg = err.to_string();
 
-    // The failure must name the ABI and the plugin, not surface as a generic
-    // "missing symbol" error from the native path.
+    // Whatever the outcome, it must never be a native symbol-resolution
+    // failure: that would mean a wasm plugin reached `dlopen`.
+    assert!(
+        !msg.contains("Symbol"),
+        "wasm plugin must not fall through to native symbol resolution: {msg}"
+    );
+    msg
+}
+
+#[cfg(not(feature = "wasm"))]
+#[test]
+fn wasm_manifest_reports_unsupported_abi_when_runtime_is_absent() {
+    let msg = wasm_manifest_load_error();
+
+    // Built without the runtime, the host must say so plainly rather than
+    // failing with something that looks like a corrupt plugin.
     assert!(
         msg.contains("wasm-component") && msg.contains("wasmy"),
         "expected an unsupported-ABI error naming the plugin, got: {msg}"
     );
+}
+
+#[cfg(feature = "wasm")]
+#[test]
+fn wasm_manifest_rejects_bytes_that_are_not_a_component() {
+    let msg = wasm_manifest_load_error();
+
+    // With the runtime present, the same manifest reaches wasmtime, which
+    // rejects the junk bytes. The error must still name the plugin.
     assert!(
-        !msg.contains("Symbol"),
-        "wasm plugin must not fall through to native symbol resolution: {msg}"
+        msg.contains("wasmy") && msg.contains("WebAssembly"),
+        "expected a component-validation error naming the plugin, got: {msg}"
     );
 }
 

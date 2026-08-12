@@ -20,6 +20,11 @@ members = [
     "plugins/plugin-obs",
 ]
 exclude = [
+    # Built for wasm32-wasip2, never for the host: its wit-bindgen glue emits
+    # wasm-only imports that cannot link into a native cdylib. Build it with
+    # `sd-plugins build --wasm`, or `cargo build` from inside its directory.
+    "plugins/plugin-timer-wasm",
+    "plugins/plugin-misbehaving-wasm",
     "target",
     "data",
     "web",

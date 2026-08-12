@@ -38,3 +38,6 @@ macos-sdk/
 *.so
 *.dylib
 data/plugin-state.json
+
+# wasm plugin crates are outside the workspace and build into their own target/
+plugins/*-wasm/target/

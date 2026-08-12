@@ -10,6 +10,8 @@ pub mod platform;
 pub mod plugin_info;
 pub mod registry;
 pub mod traits;
+#[cfg(feature = "wasm")]
+pub mod wasm;
 
 pub use context::PluginContext;
 pub use error::{PluginError, Result};

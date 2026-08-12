@@ -1,0 +1,12 @@
+[package]
+name = "plugin-misbehaving-wasm"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Test fixture: a component that hangs, panics, and allocates on demand"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wit-bindgen = "0.46"

@@ -109,7 +109,6 @@ impl SdPluginManager {
         if !dir.exists() {
             return Ok(Vec::new());
         }
-        let expected_ext = plugin_extension();
         let mut loaded = Vec::new();
         for entry in fs::read_dir(dir)? {
             let path = entry?.path();
@@ -125,10 +124,8 @@ impl SdPluginManager {
                 continue;
             }
 
-            if let Some(ext) = path.extension() {
-                if ext != expected_ext {
-                    continue;
-                }
+            if !is_plugin_file(&path) {
+                continue;
             }
             let file_stem = path
                 .file_stem()
@@ -174,7 +171,6 @@ impl SdPluginManager {
         let dir = Path::new(&self.plugin_dir);
         let mut statuses = Vec::new();
         if dir.exists() {
-            let expected_ext = plugin_extension();
             for entry in fs::read_dir(dir)? {
                 let path = entry?.path();
                 if !path.is_file() {
@@ -189,10 +185,8 @@ impl SdPluginManager {
                     continue;
                 }
 
-                if let Some(ext) = path.extension() {
-                    if ext != expected_ext {
-                        continue;
-                    }
+                if !is_plugin_file(&path) {
+                    continue;
                 }
                 let file_stem = path
                     .file_stem()
@@ -537,17 +531,14 @@ impl SdPluginManager {
 
     fn find_plugin_path(&self, name: &str) -> PathBuf {
         let dir = Path::new(&self.plugin_dir);
-        let expected_ext = plugin_extension();
         if let Ok(entries) = fs::read_dir(dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
                 if !path.is_file() {
                     continue;
                 }
-                if let Some(ext) = path.extension() {
-                    if ext != expected_ext {
-                        continue;
-                    }
+                if !is_plugin_file(&path) {
+                    continue;
                 }
                 if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                     let derived = derive_plugin_name(stem);
@@ -590,6 +581,22 @@ impl SdPluginManager {
                 .map(|metadata| metadata.version)
                 .unwrap_or_default(),
         })
+    }
+}
+
+/// Extension for WebAssembly component plugins. Unlike the native extensions
+/// this is the same everywhere, which is the point: one artifact per plugin
+/// instead of one per platform.
+const WASM_EXTENSION: &str = "wasm";
+
+/// Whether a directory entry looks like a loadable plugin.
+///
+/// Accepts the platform's native library extension and `.wasm`. Files with no
+/// extension are accepted too, preserving the previous behaviour.
+fn is_plugin_file(path: &Path) -> bool {
+    match path.extension().and_then(|ext| ext.to_str()) {
+        Some(ext) => ext == plugin_extension() || ext == WASM_EXTENSION,
+        None => true,
     }
 }
 
@@ -658,10 +665,11 @@ fn validate_uploaded_filename(filename: &str) -> PluginResult<()> {
         .extension()
         .and_then(|ext| ext.to_str())
         .unwrap_or_default();
-    if extension != plugin_extension() {
+    if extension != plugin_extension() && extension != WASM_EXTENSION {
         return Err(PluginResultError::InvalidInput(format!(
-            "Plugin file must use .{} on this platform",
-            plugin_extension()
+            "Plugin file must use .{} or .{} on this platform",
+            plugin_extension(),
+            WASM_EXTENSION
         )));
     }
 

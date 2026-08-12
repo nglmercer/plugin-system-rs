@@ -1,0 +1,16 @@
+[package]
+name = "plugin-timer-wasm"
+version = "0.1.0"
+edition = "2021"
+description = "Timer plugin compiled as a WASI Preview 2 component"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# The guest deliberately does not depend on `plugin-system`: that crate pulls
+# in libloading and the native host machinery, none of which exists inside a
+# component. The WIT contract is the only thing shared with the host.
+wit-bindgen = "0.46"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

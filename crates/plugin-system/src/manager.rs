@@ -66,6 +66,9 @@ pub struct PluginManager {
     registry: SharedRegistry,
     command_registry: SharedCommandRegistry,
     loaded: HashMap<String, LoadedPlugin>,
+    /// Created lazily on the first wasm plugin, and shared by all of them.
+    #[cfg(feature = "wasm")]
+    wasm_runtime: Option<std::sync::Arc<crate::wasm::WasmRuntime>>,
 }
 
 impl PluginManager {
@@ -74,6 +77,8 @@ impl PluginManager {
             registry: new_shared_registry(),
             command_registry: new_shared_command_registry(),
             loaded: HashMap::new(),
+            #[cfg(feature = "wasm")]
+            wasm_runtime: None,
         }
     }
 
@@ -661,6 +666,14 @@ impl PluginManager {
 
     pub fn metadata_from_path(path: impl AsRef<Path>) -> Result<PluginMetadata> {
         let path = path.as_ref();
+
+        // Prefer the sidecar manifest. It is the only source available for a
+        // component — `dlopen` cannot open a `.wasm` — and for native plugins
+        // the loader already trusts it over the exported symbols.
+        if let Some(manifest) = detect_manifest(path)? {
+            return Ok(manifest.into());
+        }
+
         let lib = unsafe {
             libloading::Library::new(path).map_err(|e| PluginError::LibraryLoad {
                 path: path.to_path_buf(),
@@ -782,6 +795,48 @@ impl PluginManager {
     /// The runtime lives behind the `wasm` feature so hosts that only load
     /// native plugins do not pay for wasmtime. Without it, a `.wasm` plugin
     /// is reported as unsupported rather than silently skipped.
+    #[cfg(feature = "wasm")]
+    fn load_wasm_plugin(&mut self, path: &Path, manifest: &PluginManifest) -> Result<String> {
+        use crate::wasm::{WasmPlugin, WasmRuntime};
+
+        // The engine is shared across plugins and created on first use, since
+        // most hosts load at least one wasm plugin or none at all.
+        let runtime = match &self.wasm_runtime {
+            Some(rt) => rt.clone(),
+            None => {
+                let rt = WasmRuntime::new()?;
+                self.wasm_runtime = Some(rt.clone());
+                rt
+            }
+        };
+
+        let bytes = std::fs::read(path).map_err(PluginError::Io)?;
+        let plugin = WasmPlugin::load(&runtime, &bytes, manifest)?;
+
+        let metadata = plugin.metadata_ref().clone();
+        let name = metadata.name.clone();
+
+        {
+            let registry = self.read_registry(self.registry.read(), "PluginRegistry")?;
+            for dep in &metadata.dependencies {
+                if !registry.contains(dep.name.as_str()) {
+                    return Err(PluginError::MissingDependency {
+                        plugin: name.clone(),
+                        dependency: dep.name.clone(),
+                    });
+                }
+            }
+        }
+
+        // Let the plugin reach its peers now that it is about to be live.
+        plugin.set_peers(self.command_registry.clone());
+
+        let boxed: Box<dyn Plugin> = Box::new(plugin);
+        self.register_and_load(boxed, metadata, path.to_path_buf(), None)?;
+
+        Ok(name)
+    }
+
     #[cfg(not(feature = "wasm"))]
     fn load_wasm_plugin(&mut self, path: &Path, manifest: &PluginManifest) -> Result<String> {
         Err(PluginError::UnsupportedAbi {
@@ -834,42 +889,60 @@ impl PluginManager {
         }
 
         let boxed: Box<dyn Plugin> = Box::new(cabi);
+        // CAbiPlugin owns its own library, so no handle is retained here.
+        self.register_and_load(boxed, metadata, path.to_path_buf(), None)?;
+
+        log::info!("C-ABI plugin '{}' loaded successfully", name);
+        Ok(name)
+    }
+
+    /// Register an already-constructed plugin, record it as loaded, and run
+    /// its `on_load`.
+    ///
+    /// Shared by every non-native backend: whatever produced the
+    /// `Box<dyn Plugin>`, the bookkeeping from here on is identical.
+    fn register_and_load(
+        &mut self,
+        plugin: Box<dyn Plugin>,
+        metadata: PluginMetadata,
+        path: PathBuf,
+        lib: Option<libloading::Library>,
+    ) -> Result<()> {
+        let name = metadata.name.clone();
 
         if self.loaded.contains_key(&name) {
             self.unload_plugin(&name)?;
         }
         {
             let mut registry = self.write_registry(self.registry.write(), "PluginRegistry")?;
-            registry.register(boxed);
+            registry.register(plugin);
         }
 
-        let loaded_plugin = LoadedPlugin {
-            _lib: None, // CAbiPlugin owns its own library
-            path: path.to_path_buf(),
-            metadata,
-            temp_path: None,
-        };
-        self.loaded.insert(name.clone(), loaded_plugin);
+        self.loaded.insert(
+            name.clone(),
+            LoadedPlugin {
+                _lib: lib,
+                path,
+                metadata,
+                temp_path: None,
+            },
+        );
 
-        // Invoke on_load
-        {
-            let ctx = PluginContext::new(self.registry.clone(), self.command_registry.clone());
-            let registry = self.read_registry(self.registry.read(), "PluginRegistry")?;
-            if let Some(plugin_arc) = registry.get_by_name(&name) {
-                let mut plugin = self.write_plugin(plugin_arc.write(), &name)?;
-                plugin.on_load(&ctx);
-            }
+        let ctx = PluginContext::new(self.registry.clone(), self.command_registry.clone());
+        let registry = self.read_registry(self.registry.read(), "PluginRegistry")?;
+        if let Some(plugin_arc) = registry.get_by_name(&name) {
+            let mut plugin = self.write_plugin(plugin_arc.write(), &name)?;
+            plugin.on_load(&ctx);
         }
 
-        log::info!("C-ABI plugin '{}' loaded successfully", name);
-        Ok(name)
+        Ok(())
     }
 }
 
-/// Inspect the sidecar `<lib>.manifest.json` and return the parsed
-/// [`crate::cabi::CAbiManifest`] if it declares `"abi": "c-flat"` (or
-/// `"c_abi"`). Returns `Ok(None)` when no manifest is present or when the
-/// manifest doesn't enable the C-ABI path.
+/// Read the sidecar `<lib>.manifest.json`, if any.
+///
+/// Returns `Ok(None)` when no manifest is present — the normal case for a
+/// native Rust plugin, which reports its metadata through exported symbols.
 fn detect_manifest(lib_path: &Path) -> Result<Option<PluginManifest>> {
     let stem = match lib_path.file_stem().and_then(|s| s.to_str()) {
         Some(s) => s,

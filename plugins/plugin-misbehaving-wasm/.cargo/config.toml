@@ -1,0 +1,4 @@
+# This crate only makes sense as a WebAssembly component, so a bare
+# `cargo build` in this directory produces one.
+[build]
+target = "wasm32-wasip2"

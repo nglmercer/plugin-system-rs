@@ -1,0 +1,80 @@
+package streamdeck:plugin@0.1.0;
+
+interface types {
+  /// A dependency on another plugin, with a semver requirement.
+  record dependency {
+    name: string,
+    version-req: string,
+  }
+
+  record metadata {
+    name: string,
+    version: string,
+    authors: list<string>,
+    dependencies: list<dependency>,
+  }
+
+  /// Why a command failed. Distinguishing these lets the host answer an HTTP
+  /// request with the right status instead of a blanket 500.
+  variant command-error {
+    /// The plugin does not implement this method.
+    not-found(string),
+    /// The method exists but the arguments were unusable.
+    invalid-args(string),
+    /// The method ran and failed.
+    failed(string),
+  }
+
+  enum log-level {
+    trace,
+    debug,
+    info,
+    warn,
+    error,
+  }
+}
+
+/// Implemented by the host, called by the guest. Everything a plugin is
+/// allowed to reach outside its sandbox arrives through here.
+interface host {
+  use types.{log-level};
+
+  /// Write to the host log. Guests have no stdout worth reading.
+  log: func(level: log-level, message: string);
+
+  /// Invoke a command on another loaded plugin.
+  call-plugin: func(plugin: string, method: string, args-json: string)
+    -> result<string, string>;
+}
+
+/// Implemented by the guest. Mirrors the host-side `Plugin` trait so a
+/// component and a native plugin are interchangeable above the loader.
+interface guest {
+  use types.{metadata, command-error};
+
+  /// Report identity. Called before `on-load`, and must not depend on any
+  /// host capability.
+  get-metadata: func() -> metadata;
+
+  /// The plugin has been registered and may start work.
+  on-load: func();
+
+  /// The plugin is being dropped.
+  on-unload: func();
+
+  /// Handle a JSON command. The payload stays JSON because both ends of this
+  /// boundary are already JSON: an HTTP request in, a `serde_json::Value` out.
+  handle-command: func(method: string, args-json: string)
+    -> result<string, command-error>;
+
+  /// Interface ids this plugin implements.
+  interface-ids: func() -> list<string>;
+
+  /// Current interface state, as JSON, for widgets to render.
+  interface-data: func() -> option<string>;
+}
+
+world streamdeck-plugin {
+  import host;
+  export guest;
+}
