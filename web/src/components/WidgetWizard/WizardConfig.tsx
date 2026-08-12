@@ -1,166 +1,32 @@
 import { h } from "preact";
-import { WidgetConfig } from "../../lib/types";
-import { FormField, FormInput, FormTextarea } from "../FormComponents";
-import { HotkeyRecorder } from "./HotkeyRecorder";
-import { IntervalField } from "./IntervalField";
-import { FetchConfig } from "./FetchConfig";
+import { t } from "../../lib/i18n";
+import { SettingsForm, WidgetDefinition } from "../../widgets";
 
-interface WizardConfigProps {
-  widget: WidgetConfig;
-  settings: Record<string, any>;
-  onChange: (s: Record<string, any>) => void;
-  updateSetting: (key: string, value: any) => void;
-}
-
+/**
+ * The config step is now just the widget's schema, rendered.
+ *
+ * It used to be a chain of `widget.type === "..."` branches, which is where new
+ * widgets were forgotten: a type with no branch got an empty panel and a Next
+ * button. A widget with no settings no longer reaches this step at all — the
+ * wizard drops it — so an empty config step is impossible rather than merely
+ * unlikely.
+ */
 export function WizardConfig({
-  widget,
+  definition,
   settings,
+  errors,
   onChange,
-  updateSetting,
-}: WizardConfigProps) {
-  const set = (key: string, value: any) => updateSetting(key, value);
-
+}: {
+  definition: WidgetDefinition;
+  settings: Record<string, any>;
+  errors: Record<string, string>;
+  onChange: (key: string, value: any) => void;
+}) {
   return h(
     "div",
     { class: "wizard-step-content" },
-    h("h3", { class: "wizard-step-heading" }, "Widget Configuration"),
-
-    widget.type === "send-hotkey" &&
-      h(HotkeyRecorder, {
-        currentKeys: settings.keys || "",
-        onChange: (keys) => set("keys", keys),
-      }),
-
-    widget.type === "open-url" &&
-      h(
-        FormField,
-        { label: "URL" },
-        h(FormInput, {
-          value: settings.url || "",
-          placeholder: "https://example.com",
-          onInput: (v) => set("url", v),
-        }),
-      ),
-
-    widget.type === "type-text" &&
-      h(
-        FormField,
-        { label: "Text" },
-        h(FormTextarea, {
-          value: settings.text || "",
-          placeholder: "Text to type...",
-          onInput: (v) => set("text", v),
-        }),
-      ),
-
-    widget.type === "system-monitor" &&
-      h(IntervalField, {
-        value: settings.refreshInterval || 2000,
-        min: 500,
-        onChange: (v) => set("refreshInterval", v),
-      }),
-
-    widget.type === "volume-master" &&
-      h(IntervalField, {
-        value: settings.refreshInterval || 2000,
-        min: 500,
-        onChange: (v) => set("refreshInterval", v),
-      }),
-
-    widget.type === "volume-apps" &&
-      h(IntervalField, {
-        value: settings.refreshInterval || 2000,
-        min: 500,
-        onChange: (v) => set("refreshInterval", v),
-      }),
-
-    widget.type === "obs-control" &&
-      h(
-        "div",
-        { class: "wizard-step-content" },
-        h(
-          FormField,
-          { label: "OBS Host" },
-          h(FormInput, {
-            value: settings.host || "127.0.0.1",
-            placeholder: "127.0.0.1",
-            onInput: (v) => set("host", v),
-          }),
-        ),
-        h(
-          "div",
-          { class: "wizard-field-row" },
-          h(
-            FormField,
-            { label: "Port" },
-            h(FormInput, {
-              type: "number",
-              value: String(settings.port || 4455),
-              onInput: (v) => set("port", parseInt(v) || 4455),
-            }),
-          ),
-          h(
-            FormField,
-            { label: "Password" },
-            h(FormInput, {
-              type: "password",
-              value: settings.password || "",
-              placeholder: "OBS WebSocket password",
-              onInput: (v) => set("password", v),
-            }),
-          ),
-        ),
-        h(IntervalField, {
-          value: settings.refreshInterval || 2000,
-          min: 500,
-          onChange: (v) => set("refreshInterval", v),
-        }),
-      ),
-
-    widget.type === "obs-scenes" &&
-      h(IntervalField, {
-        value: settings.refreshInterval || 2000,
-        min: 500,
-        onChange: (v) => set("refreshInterval", v),
-      }),
-
-    widget.type === "obs-inputs" &&
-      h(IntervalField, {
-        value: settings.refreshInterval || 2000,
-        min: 500,
-        onChange: (v) => set("refreshInterval", v),
-      }),
-
-    widget.type === "timer" &&
-      h(
-        "div",
-        null,
-        h(
-          FormField,
-          { label: "Timer name" },
-          h(FormInput, {
-            value: settings.timerName || "",
-            placeholder: "timer",
-            onInput: (v) => set("timerName", v),
-          }),
-        ),
-        h(
-          FormField,
-          { label: "Duration (seconds)" },
-          h(FormInput, {
-            value: String(settings.seconds ?? 300),
-            type: "number",
-            onInput: (v) => set("seconds", Math.max(1, Number(v) || 1)),
-          }),
-        ),
-        h(IntervalField, {
-          value: settings.refreshInterval || 1000,
-          min: 250,
-          onChange: (v) => set("refreshInterval", v),
-        }),
-      ),
-
-    widget.type === "fetch" &&
-      h(FetchConfig, { settings, updateSetting }),
+    h("h3", { class: "wizard-step-heading" }, t("widget.wizard.config")),
+    h("p", { class: "wizard-step-desc" }, t("widget.wizard.configDesc")),
+    h(SettingsForm, { definition, settings, errors, onChange }),
   );
 }

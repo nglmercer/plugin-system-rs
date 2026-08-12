@@ -60,6 +60,15 @@ export const Icons = {
     h("line", { x1: "12", y1: "19", x2: "12", y2: "23" }),
     h("line", { x1: "8", y1: "23", x2: "16", y2: "23" }),
   ),
+  // A cloud with a downward arrow: data arriving from somewhere else.
+  fetch: () => h("svg", { ...s },
+    h("path", { d: "M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" }),
+    h("polyline", { points: "9 13 12 16 15 13" }),
+  ),
+  // Stacked layers with a gear notch: a widget contributed by a plugin.
+  puzzle: () => h("svg", { ...s },
+    h("path", { d: "M4 5a2 2 0 0 1 2-2h4v2a2 2 0 1 0 4 0V3h4a2 2 0 0 1 2 2v4h-2a2 2 0 1 0 0 4h2v4a2 2 0 0 1-2 2h-4v-2a2 2 0 1 0-4 0v2H6a2 2 0 0 1-2-2v-4h2a2 2 0 1 0 0-4H4V5z" }),
+  ),
   edit: () => h("svg", { ...s, "stroke-width": "1.5" },
     h("path", { d: "M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" }),
   ),

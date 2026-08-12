@@ -43,6 +43,7 @@ for **Open in Browser** / **Exit**.
 | Feature overview | [`docs/features.md`](docs/features.md) |
 | Architecture, plugin ABI, capabilities | [`docs/architecture.md`](docs/architecture.md) |
 | Creating a plugin | [`docs/plugin-development.md`](docs/plugin-development.md) |
+| Adding a dashboard widget | [`docs/widgets.md`](docs/widgets.md) |
 | Built-in plugins & widgets catalog | [`docs/system-plugins.md`](docs/system-plugins.md) |
 | HTTP + WebSocket API reference | [`docs/api-reference.md`](docs/api-reference.md) |
 | Packaging, releases, CI | [`docs/packaging.md`](docs/packaging.md) |

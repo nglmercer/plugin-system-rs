@@ -35,7 +35,23 @@
       "variant": "Variante",
       "save": "Salvar e Fechar",
       "cancel": "Cancelar",
-      "delete": "Excluir"
+      "delete": "Excluir",
+      "requirements": "Requisitos",
+      "requirementsOk": "Tudo o que este widget precisa está disponível.",
+      "requirementsMissing": "Este widget precisa de algo que ainda não está disponível. Podes adicioná-lo à mesma: começará a funcionar assim que isto for resolvido.",
+      "requirementsMissingShort": "Não está pronto:",
+      "configDesc": "Definições deste widget",
+      "styleDesc": "Escolhe como este widget é mostrado",
+      "applyDesc": "Revê a configuração antes de guardar",
+      "preview": "Pré-visualização",
+      "size": "Tamanho",
+      "titlePlaceholder": "Escreve um título...",
+      "titleRequired": "Dá um título ao widget",
+      "fixFields": "Corrige {count} campo(s) primeiro",
+      "gridHint": "de {count}",
+      "gridHintRows": "de {count}",
+      "back": "Voltar",
+      "next": "Seguinte"
     },
     "context": {
       "edit": "Editar",
@@ -54,7 +70,8 @@
       "obs-scenes": "Cenas OBS",
       "obs-inputs": "Entradas OBS",
       "timer": "Temporizador",
-      "fetch": "Buscar Dados"
+      "fetch": "Buscar Dados",
+      "plugin-data": "Painel de plugin"
     },
     "config": {
       "refreshInterval": "Intervalo de Atualização (ms)",
@@ -65,6 +82,21 @@
       "host": "Host",
       "port": "Porta",
       "password": "Senha"
+    },
+    "searchPlaceholder": "Procurar widgets...",
+    "noMatches": "Nenhum widget corresponde à procura",
+    "fromPlugin": "De um plugin",
+    "unknownTitle": "Widget desconhecido",
+    "unknownHint": "O plugin que o fornece pode ter sido removido.",
+    "unknownType": "Não há nenhum widget registado para o tipo \"{type}\".",
+    "categories": {
+      "system": "Sistema",
+      "time": "Tempo",
+      "input": "Entrada",
+      "audio": "Áudio",
+      "obs": "OBS",
+      "web": "Web",
+      "plugin": "Plugins"
     }
   },
   "profiles": {
@@ -90,5 +122,20 @@
     "dark": "Escuro",
     "light": "Claro",
     "switchTo": "Mudar para tema {theme}"
+  },
+  "common": {
+    "close": "Fechar",
+    "yes": "Sim",
+    "no": "Não"
+  },
+  "qr": {
+    "title": "Digitalizar para ligar",
+    "hint": "Abre isto no teu telemóvel para chegar ao painel.",
+    "url": "URL",
+    "copy": "Copiar",
+    "copied": "Copiado!",
+    "reveal": "Mostrar",
+    "hide": "Ocultar",
+    "tokenWarning": "Esta ligação contém o teu token de API. Quem o tiver pode controlar esta máquina — partilha-o apenas com os teus dispositivos."
   }
 }

@@ -1039,3 +1039,167 @@
 .css-editor-textarea::placeholder {
   color: var(--text-dim);
 }
+
+/* ── Requirements step ────────────────────────────────────
+ * Says what a widget needs before the user configures it, so "not connected to
+ * OBS" on a finished tile is no longer the first time they hear about it.
+ */
+.requirement-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+}
+
+.requirement-row {
+    display: flex;
+    gap: 0.625rem;
+    padding: 0.75rem;
+    border: 1px solid var(--sd-border);
+    border-radius: 0.5rem;
+    background: var(--sd-bg-input);
+}
+.requirement-row.unmet {
+    border-color: var(--sd-warning);
+}
+
+.requirement-mark {
+    flex: 0 0 1.25rem;
+    height: 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+.requirement-row.met .requirement-mark {
+    background: var(--sd-success);
+    color: var(--sd-bg-page);
+}
+.requirement-row.unmet .requirement-mark {
+    background: var(--sd-warning);
+    color: var(--sd-bg-page);
+}
+
+.requirement-body {
+    min-width: 0;
+    flex: 1;
+}
+
+.requirement-title {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    align-items: baseline;
+}
+
+.requirement-name {
+    font-family: monospace;
+    font-size: 0.875rem;
+    color: var(--sd-text);
+}
+
+.requirement-status {
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--sd-text-muted);
+}
+.requirement-row.unmet .requirement-status {
+    color: var(--sd-warning);
+}
+
+.requirement-reason {
+    margin-top: 0.2rem;
+    font-size: 0.8125rem;
+    color: var(--sd-text-secondary);
+}
+
+.requirement-remedy {
+    margin-top: 0.35rem;
+    font-size: 0.8125rem;
+    color: var(--sd-accent);
+}
+
+/* ── Validation ───────────────────────────────────────────
+ * A blocked Next used to be indistinguishable from a dead one, so the reason
+ * is shown next to the button and the offending field is marked.
+ */
+.form-field-invalid .form-input,
+.form-field-invalid .form-textarea,
+.form-field-invalid .form-select {
+    border-color: var(--sd-error);
+}
+
+.form-error {
+    margin: 0.3rem 0 0;
+    font-size: 0.75rem;
+    color: var(--sd-error);
+}
+
+.wizard-blocker {
+    font-size: 0.75rem;
+    color: var(--sd-warning);
+}
+
+.wizard-btn.next.blocked {
+    opacity: 0.6;
+}
+
+.wizard-warning {
+    margin-bottom: 0.875rem;
+    padding: 0.625rem 0.75rem;
+    border-left: 3px solid var(--sd-warning);
+    border-radius: 0.25rem;
+    background: var(--sd-bg-input);
+    font-size: 0.8125rem;
+    color: var(--sd-text-secondary);
+}
+
+/* ── Header / chrome ──────────────────────────────────── */
+.wizard-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.wizard-title-icon {
+    display: flex;
+    color: var(--sd-accent);
+}
+.wizard-title-icon svg {
+    width: 18px;
+    height: 18px;
+}
+
+.wizard-close {
+    background: transparent;
+    border: none;
+    color: var(--sd-text-muted);
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 0.25rem 0.4rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    flex: 0 0 auto;
+}
+.wizard-close:hover {
+    color: var(--sd-text);
+    background: var(--sd-bg-card-hover);
+}
+
+.wizard-field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.confirm-preview-label {
+    margin-bottom: 0.5rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--sd-text-muted);
+}

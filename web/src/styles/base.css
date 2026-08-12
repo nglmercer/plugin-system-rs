@@ -206,45 +206,61 @@
     background: var(--accent-hover) !important;
 }
 
-/* QR Modal */
+/* ── QR Modal ─────────────────────────────────────────────
+ * The URL now carries the API token, so this dialog hands out a credential.
+ * It is laid out as a block — label, masked URL that wraps, copy button,
+ * warning — rather than the single ellipsised row that used to collapse to
+ * "ht" beside an oversized Copy button.
+ */
 .qr-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.6);
+    background: var(--sd-overlay);
     display: flex;
     align-items: center;
     justify-content: center;
+    padding: 1rem;
     z-index: 1000;
 }
 .qr-modal {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 1.5rem;
-    min-width: 340px;
-    max-width: 400px;
+    width: 100%;
+    max-width: 24rem;
+    max-height: 90vh;
+    overflow-y: auto;
+    background: var(--sd-bg-card);
+    border: 1px solid var(--sd-border);
+    border-radius: 0.75rem;
+    padding: 1.25rem;
 }
 .qr-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1.25rem;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
 }
 .qr-header h2 {
-    color: var(--accent);
-    font-size: 1.1rem;
     margin: 0;
+    font-size: 1.05rem;
+    color: var(--sd-text);
+    /* Without this the heading wrapped to two lines and shoved the close
+       button into the space it left. */
+    white-space: nowrap;
 }
 .qr-close {
+    flex: 0 0 auto;
     background: transparent;
     border: none;
-    color: var(--text-muted);
-    font-size: 1.5rem;
+    color: var(--sd-text-muted);
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 0.25rem 0.4rem;
+    border-radius: 0.25rem;
     cursor: pointer;
-    padding: 0 0.3rem;
 }
 .qr-close:hover {
-    color: var(--text);
+    color: var(--sd-text);
+    background: var(--sd-bg-card-hover);
 }
 .qr-body {
     display: flex;
@@ -253,56 +269,94 @@
     gap: 0.75rem;
 }
 .qr-image {
-    border-radius: 8px;
-    border: 2px solid var(--border);
+    width: 100%;
+    max-width: 15rem;
+    height: auto;
+    border-radius: 0.5rem;
+    /* A white quiet zone regardless of theme: a dark-on-dark code does not
+       scan. */
+    background: #fff;
+    padding: 0.5rem;
 }
 .qr-loading {
-    width: 280px;
-    height: 280px;
+    width: 100%;
+    max-width: 15rem;
+    aspect-ratio: 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--text-muted);
-    background: var(--bg-input);
-    border-radius: 8px;
-}
-.qr-url-row {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    width: 100%;
-}
-.qr-url {
-    flex: 1;
-    background: var(--bg-input);
-    padding: 0.4rem 0.7rem;
-    border-radius: 4px;
-    font-family: monospace;
-    font-size: 0.8rem;
-    color: var(--accent);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.qr-copy-btn {
-    background: var(--accent);
-    color: var(--bg-page);
-    border: none;
-    padding: 0.4rem 0.8rem;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: bold;
-    font-size: 0.8rem;
-    white-space: nowrap;
-}
-.qr-copy-btn:hover {
-    background: var(--accent-hover);
+    color: var(--sd-text-muted);
+    background: var(--sd-bg-input);
+    border-radius: 0.5rem;
 }
 .qr-hint {
-    color: var(--text-muted);
-    font-size: 0.8rem;
-    text-align: center;
     margin: 0;
+    font-size: 0.8125rem;
+    color: var(--sd-text-secondary);
+    text-align: center;
+}
+.qr-url-block {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.625rem;
+    border: 1px solid var(--sd-border);
+    border-radius: 0.5rem;
+    background: var(--sd-bg-input);
+}
+.qr-url-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.qr-url-label {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--sd-text-muted);
+}
+.qr-reveal-btn {
+    background: transparent;
+    border: none;
+    color: var(--sd-accent);
+    font-family: inherit;
+    font-size: 0.75rem;
+    cursor: pointer;
+    padding: 0;
+}
+.qr-url {
+    display: block;
+    font-family: monospace;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    color: var(--sd-text);
+    /* Wrap it. A long token in a nowrap box is a box showing two characters. */
+    word-break: break-all;
+    white-space: normal;
+}
+.qr-copy-btn {
+    align-self: stretch;
+    background: var(--sd-accent);
+    color: var(--sd-on-accent);
+    border: none;
+    padding: 0.4rem 0.8rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 0.8125rem;
+}
+.qr-copy-btn:hover {
+    background: var(--sd-accent-hover);
+}
+.qr-warning {
+    margin: 0;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    color: var(--sd-warning);
+    text-align: center;
 }
 
 /* Scrollbar */
@@ -336,11 +390,6 @@
     .fab-menu {
         width: 240px;
     }
-    .qr-modal {
-        width: 95%;
-        min-width: unset;
-        padding: 1.25rem;
-    }
 }
 
 /* Mobile: Phone (480px) */
@@ -358,25 +407,5 @@
     .fab-menu {
         width: 100%;
         right: -100%;
-    }
-    .qr-modal {
-        width: 100%;
-        max-width: 100%;
-        border-radius: 0;
-        height: 100%;
-        max-height: 100%;
-        padding: 0.75rem;
-    }
-    .qr-image {
-        width: 200px;
-        height: 200px;
-    }
-    .qr-url {
-        font-size: 0.7rem;
-        padding: 0.35rem 0.5rem;
-    }
-    .qr-copy-btn {
-        padding: 0.4rem 0.7rem;
-        min-height: 40px;
     }
 }

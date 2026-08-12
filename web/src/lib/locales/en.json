@@ -35,7 +35,23 @@
       "variant": "Variant",
       "save": "Save & Close",
       "cancel": "Cancel",
-      "delete": "Delete"
+      "delete": "Delete",
+      "requirements": "Requires",
+      "requirementsOk": "Everything this widget needs is available.",
+      "requirementsMissing": "This widget needs something that is not available yet. You can still add it — it will start working once this is resolved.",
+      "requirementsMissingShort": "Not ready:",
+      "configDesc": "Settings for this widget",
+      "styleDesc": "Choose how this widget displays",
+      "applyDesc": "Review the configuration before saving",
+      "preview": "Preview",
+      "size": "Size",
+      "titlePlaceholder": "Enter widget title...",
+      "titleRequired": "Give the widget a title",
+      "fixFields": "Fix {count} field(s) first",
+      "gridHint": "of {count}",
+      "gridHintRows": "of {count}",
+      "back": "Back",
+      "next": "Next"
     },
     "context": {
       "edit": "Edit",
@@ -54,7 +70,8 @@
       "obs-scenes": "OBS Scenes",
       "obs-inputs": "OBS Inputs",
       "timer": "Timer",
-      "fetch": "Fetch Data"
+      "fetch": "Fetch Data",
+      "plugin-data": "Plugin Panel"
     },
     "config": {
       "refreshInterval": "Refresh Interval (ms)",
@@ -65,6 +82,21 @@
       "host": "Host",
       "port": "Port",
       "password": "Password"
+    },
+    "searchPlaceholder": "Search widgets...",
+    "noMatches": "No widgets match that search",
+    "fromPlugin": "From a plugin",
+    "unknownTitle": "Unknown widget",
+    "unknownHint": "The plugin that provides it may have been removed.",
+    "unknownType": "No widget is registered for type \"{type}\".",
+    "categories": {
+      "system": "System",
+      "time": "Time",
+      "input": "Input",
+      "audio": "Audio",
+      "obs": "OBS",
+      "web": "Web",
+      "plugin": "Plugins"
     }
   },
   "profiles": {
@@ -90,5 +122,20 @@
     "dark": "Dark",
     "light": "Light",
     "switchTo": "Switch to {theme} theme"
+  },
+  "common": {
+    "close": "Close",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "qr": {
+    "title": "Scan to Connect",
+    "hint": "Open this on your phone to reach the dashboard.",
+    "url": "URL",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "reveal": "Show",
+    "hide": "Hide",
+    "tokenWarning": "This link contains your API token. Anyone who has it can control this machine — share it only with your own devices."
   }
 }

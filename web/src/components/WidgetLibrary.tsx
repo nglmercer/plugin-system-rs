@@ -1,23 +1,139 @@
 import { h } from "preact";
-import { WidgetType } from "../lib/types";
-import { WIDGET_CATALOG } from "./widgetHelpers";
+import { useMemo, useState } from "preact/hooks";
+import { t, tOr } from "../lib/i18n";
+import {
+  checkRequirements,
+  summarizeUnmet,
+  useHostStatus,
+  widgetsByCategory,
+  WidgetDefinition,
+} from "../widgets";
 
-export function WidgetLibrary({ onAdd, onClose }: { onAdd: (t: WidgetType) => void; onClose: () => void }) {
-  return h("div", { class: "widget-library-overlay", onClick: onClose },
-    h("div", { class: "widget-library-modal", onClick: (e: Event) => e.stopPropagation() },
-      h("div", { class: "library-header" },
-        h("span", null, "Widget Library"),
-        h("button", { class: "picker-close", onClick: onClose }, "X"),
-      ),
-      h("div", { class: "library-grid" },
-        WIDGET_CATALOG.map((item) =>
-          h("button", { class: "library-item", key: item.type, onClick: () => onAdd(item.type) },
-            h("div", { class: "library-icon" }, item.icon),
-            h("div", { class: "library-label" }, item.label),
-            h("div", { class: "library-desc" }, item.description),
-          )
+/**
+ * The widget picker.
+ *
+ * Three things changed from the flat grid it replaced: widgets are grouped by
+ * category so a list that grows with every plugin stays navigable, there is a
+ * filter for when it grows anyway, and a widget whose plugin is missing is
+ * shown as unavailable with the reason rather than looking identical to one
+ * that will work.
+ *
+ * Unavailable widgets are still addable. Someone laying out a dashboard before
+ * starting OBS is doing something reasonable, and a picker that hides options
+ * based on transient state is a picker people stop trusting.
+ */
+export function WidgetLibrary({
+  onAdd,
+  onClose,
+}: {
+  onAdd: (type: string) => void;
+  onClose: () => void;
+}) {
+  const host = useHostStatus();
+  const [query, setQuery] = useState("");
+
+  const groups = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return widgetsByCategory()
+      .map((group) => ({
+        ...group,
+        widgets: group.widgets.filter((widget) => matches(widget, needle)),
+      }))
+      .filter((group) => group.widgets.length > 0);
+  }, [query, host]);
+
+  return h(
+    "div",
+    { class: "widget-library-overlay", onClick: onClose },
+    h(
+      "div",
+      { class: "widget-library-modal", onClick: (e: Event) => e.stopPropagation() },
+      h(
+        "div",
+        { class: "library-header" },
+        h("span", { class: "library-title" }, t("widget.library")),
+        h(
+          "button",
+          { class: "library-close", type: "button", onClick: onClose, "aria-label": t("common.close") },
+          "✕",
         ),
       ),
+      h("input", {
+        class: "library-search",
+        type: "search",
+        value: query,
+        placeholder: t("widget.searchPlaceholder"),
+        onInput: (e: Event) => setQuery((e.target as HTMLInputElement).value),
+      }),
+      h(
+        "div",
+        { class: "library-scroll" },
+        groups.length === 0
+          ? h("div", { class: "library-empty" }, t("widget.noMatches"))
+          : groups.map((group) =>
+              h(
+                "section",
+                { class: "library-section", key: group.category },
+                h(
+                  "h4",
+                  { class: "library-section-title" },
+                  t(`widget.categories.${group.category}`),
+                ),
+                h(
+                  "div",
+                  { class: "library-grid" },
+                  group.widgets.map((widget) =>
+                    h(LibraryTile, { key: widget.type, widget, onAdd }),
+                  ),
+                ),
+              ),
+            ),
+      ),
     ),
+  );
+}
+
+function LibraryTile({
+  widget,
+  onAdd,
+}: {
+  widget: WidgetDefinition;
+  onAdd: (type: string) => void;
+}) {
+  const host = useHostStatus();
+  const requirements = checkRequirements(widget, host);
+  const unavailable = !requirements.satisfied;
+
+  return h(
+    "button",
+    {
+      class: `library-item ${unavailable ? "unavailable" : ""}`,
+      type: "button",
+      title: unavailable ? requirements.unmet[0]?.remedy : widget.description,
+      onClick: () => onAdd(widget.type),
+    },
+    h("div", { class: "library-icon" }, h(widget.icon, null)),
+    h(
+      "div",
+      { class: "library-label" },
+      tOr(`widget.types.${widget.type}`, widget.label),
+    ),
+    h("div", { class: "library-desc" }, widget.description),
+    widget.source === "external"
+      ? h("span", { class: "library-badge external" }, t("widget.fromPlugin"))
+      : null,
+    unavailable
+      ? h("span", { class: "library-badge blocked" }, summarizeUnmet(requirements))
+      : null,
+  );
+}
+
+function matches(widget: WidgetDefinition, needle: string): boolean {
+  if (!needle) return true;
+  const label = tOr(`widget.types.${widget.type}`, widget.label);
+  return (
+    label.toLowerCase().includes(needle) ||
+    widget.type.includes(needle) ||
+    widget.description.toLowerCase().includes(needle)
   );
 }

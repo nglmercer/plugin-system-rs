@@ -1,45 +1,62 @@
 import { h } from "preact";
 import { WidgetConfig } from "../lib/types";
-import { SystemMonitorWidget } from "./SystemMonitorWidget";
-import { ClockWidget } from "./ClockWidget";
-import { SendHotkeyWidget } from "./SendHotkeyWidget";
-import { OpenUrlWidget } from "./OpenUrlWidget";
-import { TypeTextWidget } from "./TypeTextWidget";
-import { VolumeWidget } from "./VolumeWidget";
-import { VolumeAppsWidget } from "./VolumeAppsWidget";
-import { ObsWidget } from "./ObsWidget";
-import { ObsScenesWidget } from "./ObsScenesWidget";
-import { ObsInputsWidget } from "./ObsInputsWidget";
-import { TimerWidget } from "./TimerWidget";
-import { FetchWidget } from "./FetchWidget";
+import { t, tOr } from "../lib/i18n";
+import {
+  checkRequirements,
+  getWidget,
+  summarizeUnmet,
+  useHostStatus,
+} from "../widgets";
 
+/**
+ * Renders a widget's body.
+ *
+ * This was a `switch` over every widget type. Now it is a registry lookup, so a
+ * widget that exists is rendered and a widget that does not says which type is
+ * missing instead of the uniform "Unknown widget" that gave no way to tell a
+ * typo from an uninstalled plugin.
+ *
+ * It also refuses to render a widget whose requirements are unmet, showing what
+ * is missing instead. Letting it render produced the screen this refactor
+ * started from: an OBS tile whose entire content was the words "not connected
+ * to OBS" in red, which is true but tells the user nothing they can act on.
+ */
 export function WidgetContent({ widget }: { widget: WidgetConfig }) {
-  switch (widget.type) {
-    case "system-monitor":
-      return h(SystemMonitorWidget, { settings: widget.settings });
-    case "clock":
-      return h(ClockWidget, { settings: widget.settings });
-    case "send-hotkey":
-      return h(SendHotkeyWidget, { settings: widget.settings });
-    case "open-url":
-      return h(OpenUrlWidget, { settings: widget.settings });
-    case "type-text":
-      return h(TypeTextWidget, { settings: widget.settings });
-    case "volume-master":
-      return h(VolumeWidget, { settings: widget.settings });
-    case "volume-apps":
-      return h(VolumeAppsWidget, { settings: widget.settings });
-    case "obs-control":
-      return h(ObsWidget, { settings: widget.settings });
-    case "obs-scenes":
-      return h(ObsScenesWidget, { settings: widget.settings });
-    case "obs-inputs":
-      return h(ObsInputsWidget, { settings: widget.settings });
-    case "timer":
-      return h(TimerWidget, { settings: widget.settings });
-    case "fetch":
-      return h(FetchWidget, { settings: widget.settings });
-    default:
-      return h("div", { class: "widget-unknown" }, "Unknown widget");
+  const definition = getWidget(widget.type);
+  const host = useHostStatus();
+
+  if (!definition) {
+    return h(
+      "div",
+      { class: "widget-placeholder unknown" },
+      h("div", { class: "widget-placeholder-title" }, t("widget.unknownTitle")),
+      h("div", { class: "widget-placeholder-detail" }, widget.type),
+      h(
+        "div",
+        { class: "widget-placeholder-hint" },
+        t("widget.unknownHint"),
+      ),
+    );
   }
+
+  const requirements = checkRequirements(definition, host);
+  if (!requirements.satisfied) {
+    return h(
+      "div",
+      { class: "widget-placeholder blocked" },
+      h(
+        "div",
+        { class: "widget-placeholder-title" },
+        tOr(`widget.types.${definition.type}`, definition.label),
+      ),
+      h("div", { class: "widget-placeholder-detail" }, summarizeUnmet(requirements)),
+      h(
+        "div",
+        { class: "widget-placeholder-hint" },
+        requirements.unmet[0]?.remedy ?? "",
+      ),
+    );
+  }
+
+  return h(definition.component, { settings: widget.settings });
 }

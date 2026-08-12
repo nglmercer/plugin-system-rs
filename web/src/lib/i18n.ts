@@ -33,6 +33,23 @@ export function t(key: string, params?: Record<string, string | number>): string
   return value;
 }
 
+/**
+ * Translate, falling back to a supplied string rather than the key.
+ *
+ * `t` returns the key when a translation is missing, which is a useful default
+ * for app chrome but wrong for anything with a real name of its own — a widget
+ * contributed by a plugin has no entry in our locale files, and showing
+ * `widget.types.my-plugin` in the library instead of its label is worse than
+ * showing untranslated text.
+ */
+export function tOr(key: string, fallback: string, params?: Record<string, string | number>): string {
+  return hasTranslation(key) ? t(key, params) : fallback;
+}
+
+export function hasTranslation(key: string): boolean {
+  return getNestedValue(translations, key) !== undefined;
+}
+
 export async function setLocale(locale: string): Promise<void> {
   const loader = localeModules[locale];
   if (!loader) {

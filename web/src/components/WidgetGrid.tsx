@@ -159,7 +159,12 @@ export function WidgetGrid() {
 
   function handleSaveWidget(
     id: string,
-    updates: { title?: string; colSpan?: number; settings?: Record<string, any> },
+    updates: {
+      title?: string;
+      colSpan?: number;
+      rowSpan?: number;
+      settings?: Record<string, any>;
+    },
   ) {
     persist({
       ...layout,
@@ -297,6 +302,7 @@ export function WidgetGrid() {
       h(WidgetWizard, {
         widget: editing,
         columns: layout.columns,
+        rows,
         onSave: handleSaveWidget,
         onRemove: () => handleRemoveWidget(editing.id),
         onClose: () => setWizardWidget(null),

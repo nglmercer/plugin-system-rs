@@ -35,7 +35,23 @@
       "variant": "Variante",
       "save": "Guardar y Cerrar",
       "cancel": "Cancelar",
-      "delete": "Eliminar"
+      "delete": "Eliminar",
+      "requirements": "Requisitos",
+      "requirementsOk": "Todo lo que necesita este widget está disponible.",
+      "requirementsMissing": "Este widget necesita algo que aún no está disponible. Puedes añadirlo igualmente: funcionará en cuanto se resuelva.",
+      "requirementsMissingShort": "No está listo:",
+      "configDesc": "Ajustes de este widget",
+      "styleDesc": "Elige cómo se muestra este widget",
+      "applyDesc": "Revisa la configuración antes de guardar",
+      "preview": "Vista previa",
+      "size": "Tamaño",
+      "titlePlaceholder": "Escribe un título...",
+      "titleRequired": "Ponle un título al widget",
+      "fixFields": "Corrige {count} campo(s) primero",
+      "gridHint": "de {count}",
+      "gridHintRows": "de {count}",
+      "back": "Atrás",
+      "next": "Siguiente"
     },
     "context": {
       "edit": "Editar",
@@ -54,7 +70,8 @@
       "obs-scenes": "Escenas OBS",
       "obs-inputs": "Entradas OBS",
       "timer": "Temporizador",
-      "fetch": "Obtener Datos"
+      "fetch": "Obtener Datos",
+      "plugin-data": "Panel de plugin"
     },
     "config": {
       "refreshInterval": "Intervalo de Actualización (ms)",
@@ -65,6 +82,21 @@
       "host": "Host",
       "port": "Puerto",
       "password": "Contraseña"
+    },
+    "searchPlaceholder": "Buscar widgets...",
+    "noMatches": "Ningún widget coincide con la búsqueda",
+    "fromPlugin": "De un plugin",
+    "unknownTitle": "Widget desconocido",
+    "unknownHint": "Puede que se haya eliminado el plugin que lo proporciona.",
+    "unknownType": "No hay ningún widget registrado para el tipo «{type}».",
+    "categories": {
+      "system": "Sistema",
+      "time": "Tiempo",
+      "input": "Entrada",
+      "audio": "Audio",
+      "obs": "OBS",
+      "web": "Web",
+      "plugin": "Plugins"
     }
   },
   "profiles": {
@@ -90,5 +122,20 @@
     "dark": "Oscuro",
     "light": "Claro",
     "switchTo": "Cambiar a tema {theme}"
+  },
+  "common": {
+    "close": "Cerrar",
+    "yes": "Sí",
+    "no": "No"
+  },
+  "qr": {
+    "title": "Escanear para conectar",
+    "hint": "Ábrelo en tu teléfono para acceder al panel.",
+    "url": "URL",
+    "copy": "Copiar",
+    "copied": "¡Copiado!",
+    "reveal": "Mostrar",
+    "hide": "Ocultar",
+    "tokenWarning": "Este enlace contiene tu token de API. Quien lo tenga puede controlar este equipo: compártelo solo con tus propios dispositivos."
   }
 }

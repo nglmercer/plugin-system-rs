@@ -120,3 +120,109 @@
     justify-content: center;
   }
 }
+
+/* ── Widget library, grouped ──────────────────────────────
+ * The flat grid became unnavigable as soon as plugins could contribute to it,
+ * so the modal is now a scrolling list of category sections with a filter
+ * pinned above them.
+ */
+.library-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--sd-text);
+}
+
+.library-close {
+    background: transparent;
+    border: none;
+    color: var(--sd-text-muted);
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 0.25rem 0.4rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+}
+.library-close:hover {
+    color: var(--sd-text);
+    background: var(--sd-bg-card-hover);
+}
+
+.library-search {
+    width: 100%;
+    margin: 0 0 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--sd-border);
+    border-radius: 0.375rem;
+    background: var(--sd-bg-input);
+    color: var(--sd-text);
+    font-family: inherit;
+    font-size: 0.875rem;
+}
+.library-search:focus {
+    outline: none;
+    border-color: var(--sd-accent);
+}
+
+.library-scroll {
+    overflow-y: auto;
+    min-height: 0;
+    flex: 1;
+}
+
+.library-section + .library-section {
+    margin-top: 1.25rem;
+}
+
+.library-section-title {
+    margin: 0 0 0.5rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--sd-text-muted);
+}
+
+.library-empty {
+    padding: 2rem 1rem;
+    text-align: center;
+    color: var(--sd-text-muted);
+    font-size: 0.875rem;
+}
+
+/* A tile whose plugin is missing stays clickable — laying out a dashboard
+   before starting OBS is reasonable — but must not look identical to one that
+   will actually work. */
+.library-item.unavailable {
+    opacity: 0.55;
+    border-style: dashed;
+}
+.library-item.unavailable:hover {
+    opacity: 0.8;
+}
+
+.library-item .library-icon svg {
+    width: 22px;
+    height: 22px;
+}
+
+.library-badge {
+    display: inline-block;
+    margin-top: 0.35rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 0.75rem;
+    font-size: 0.625rem;
+    line-height: 1.4;
+}
+.library-badge.external {
+    background: var(--sd-bg-card-hover);
+    color: var(--sd-accent);
+}
+.library-badge.blocked {
+    background: var(--sd-bg-card-hover);
+    color: var(--sd-warning);
+}
+
+.widget-icon-letter {
+    font-weight: 700;
+    font-size: 1rem;
+}

@@ -4,6 +4,7 @@ import { TokenGate } from './components/TokenGate';
 import { initI18n } from './lib/i18n';
 import { initAuth } from './lib/auth';
 import { initTheme } from './ui';
+import { installExternalWidgetApi, registerBuiltinWidgets } from './widgets';
 import './ui/tokens.css';
 import './ui/themes/dark.css';
 import './ui/themes/light.css';
@@ -17,6 +18,12 @@ import './styles/wizard.css';
 import './styles/pages.css';
 
 initTheme();
+
+// Widgets register before anything renders, and the external door opens before
+// any plugin script could run — a script that loaded first and found no
+// `window.streamdeck` would simply give up.
+registerBuiltinWidgets();
+installExternalWidgetApi();
 
 const root = document.getElementById('app')!;
 
