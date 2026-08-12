@@ -47,8 +47,30 @@ one, and the real address is printed at startup). For a one-off override use
 `SD_CORE_BIND_ADDR`:
 
 ```bash
-SD_CORE_BIND_ADDR=0.0.0.0:3001 cargo run --bin sd-core
+SD_CORE_BIND_ADDR=127.0.0.1:3001 cargo run --bin sd-core
 ```
+
+**Q: I can't reach the dashboard from my phone.**
+
+A: sd-core binds loopback by default. Set `"host": "0.0.0.0"` in
+`data/config.json` to accept connections from your network, then scan the QR
+code from the local dashboard — the URL it encodes carries the API token that
+remote clients need. See
+[Access and the API token](getting-started.md#access-and-the-api-token).
+
+**Q: The API returns 401 Unauthorized.**
+
+A: Every `/api` and `/ws` request needs the API token, as an
+`Authorization: Bearer <token>` header (or `?token=` for the WebSocket). The
+token is printed at startup and stored in your user data directory; set
+`SD_API_TOKEN` to pin your own.
+
+**Q: The Fetch widget says the proxy refuses my URL.**
+
+A: `/api/proxy` will not fetch loopback, private or link-local addresses — that
+is what stops a page from using the daemon to reach your router or a cloud
+metadata service. Set `SD_PROXY_ALLOW_PRIVATE=1` if you genuinely need to poll a
+device on your own network.
 
 ## WebSocket not connecting?
 

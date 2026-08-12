@@ -4,7 +4,8 @@ import { Dashboard } from './routes/Dashboard';
 import { Profiles } from './routes/Profiles';
 import { Plugins } from './routes/Plugins';
 import { QrButton } from './components/QrModal';
-import { Icons } from './components/Icons';
+import { Icons } from './ui/icons/Icons';
+import { useTheme } from './ui';
 import { t, getLocale, setLocale, getAvailableLocales } from './lib/i18n';
 
 type Page = 'dashboard' | 'profiles' | 'plugins';
@@ -26,9 +27,8 @@ function setPageToURL(page: Page) {
 
 export function App() {
   const [currentPage, setCurrentPage] = useState<Page>(getPageFromURL);
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    return (localStorage.getItem('theme') as 'dark' | 'light') || 'dark';
-  });
+  const themeApi = useTheme();
+  const theme = themeApi.resolved;
   const [menuOpen, setMenuOpen] = useState(false);
   const [locale, setLocaleState] = useState(getLocale());
 
@@ -41,11 +41,6 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
-  }, [theme]);
-
-  useEffect(() => {
     if (menuOpen) {
       document.body.style.overflow = 'hidden';
     } else {
@@ -55,7 +50,7 @@ export function App() {
   }, [menuOpen]);
 
   function toggleTheme() {
-    setTheme(t => t === 'dark' ? 'light' : 'dark');
+    themeApi.toggle();
   }
 
   function navigateTo(page: Page) {

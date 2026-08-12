@@ -1,0 +1,82 @@
+/*
+ * Primitive design tokens: raw scales shared by every theme.
+ * Components should use the semantic tokens defined in ui/themes/*.css;
+ * primitives are the building blocks those semantic values reference.
+ */
+:root {
+  /* Neutral scale */
+  --sd-neutral-0: #fff;
+  --sd-neutral-50: #fafafa;
+  --sd-neutral-100: #f5f5f5;
+  --sd-neutral-200: #f0f0f0;
+  --sd-neutral-300: #e0e0e0;
+  --sd-neutral-400: #ccc;
+  --sd-neutral-500: #aaa;
+  --sd-neutral-550: #888;
+  --sd-neutral-600: #666;
+  --sd-neutral-650: #505050;
+  --sd-neutral-700: #404040;
+  --sd-neutral-750: #333;
+  --sd-neutral-800: #2d2d2d;
+  --sd-neutral-900: #222;
+  --sd-neutral-950: #1a1a1a;
+
+  /* Accent hues (reference values; themes/accents.css picks per mode) */
+  --sd-cyan-400: #00d4ff;
+  --sd-cyan-500: #00b8d9;
+  --sd-cyan-700: #0099cc;
+  --sd-cyan-800: #0077aa;
+  --sd-orange-400: #ffa726;
+  --sd-orange-500: #fb8c00;
+  --sd-orange-700: #e65100;
+  --sd-orange-800: #bf360c;
+  --sd-green-400: #66bb6a;
+  --sd-green-500: #4caf50;
+  --sd-green-700: #388e3c;
+  --sd-green-800: #1b5e20;
+  --sd-purple-400: #ab7df6;
+  --sd-purple-500: #9356e8;
+  --sd-purple-700: #6a3bbf;
+  --sd-purple-800: #4a288a;
+  --sd-red-400: #ef5350;
+  --sd-red-500: #f44336;
+  --sd-red-700: #c62828;
+  --sd-red-800: #8e1c1c;
+
+  /* Status hues */
+  --sd-status-green-400: #4caf50;
+  --sd-status-green-700: #388e3c;
+  --sd-status-amber-400: #ff9800;
+  --sd-status-amber-700: #e65100;
+  --sd-status-red-400: #f44336;
+  --sd-status-red-700: #c62828;
+
+  /* Spacing scale */
+  --sd-space-1: 0.25rem;
+  --sd-space-2: 0.5rem;
+  --sd-space-3: 0.75rem;
+  --sd-space-4: 1rem;
+  --sd-space-5: 1.5rem;
+  --sd-space-6: 2rem;
+  --sd-space-7: 3rem;
+  --sd-space-8: 4rem;
+
+  /* Radii */
+  --sd-radius-sm: 4px;
+  --sd-radius-md: 6px;
+  --sd-radius-lg: 10px;
+  --sd-radius-pill: 999px;
+
+  /* Font sizes */
+  --sd-font-xs: 0.75rem;
+  --sd-font-sm: 0.85rem;
+  --sd-font-md: 0.9rem;
+  --sd-font-lg: 1.05rem;
+  --sd-font-xl: 1.3rem;
+
+  /* Motion */
+  --sd-duration-fast: 0.15s;
+  --sd-duration-base: 0.2s;
+  --sd-duration-slow: 0.3s;
+  --sd-ease: ease;
+}

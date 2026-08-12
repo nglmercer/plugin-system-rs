@@ -559,15 +559,42 @@ fn cmd_package(
         vec![(chosen, triple, fmts)]
     };
 
-    // Optionally build first
+    // Optionally build first.
+    //
+    // Plugins are built once, not once per platform: a component is the same
+    // file everywhere, which is the whole reason the native ABIs were dropped.
+    // The host binary is the only per-target artifact, and cross-compiling it
+    // needs a toolchain for the target that this machine may simply not have —
+    // `sd-core` links wasmtime, so there is no cross build without one. Rather
+    // than failing the whole run on the first foreign target, each is attempted
+    // and a missing toolchain is reported as a skip.
     if build {
+        println!("{}", "Building plugins (wasm32-wasip2)...".yellow());
+        build_all_plugins(&workspace_root, true)?;
+        println!();
+
+        let mut built_any = false;
         for (plat, triple_opt, _) in &targets {
-            let triple = match triple_opt {
-                Some(t) => t.clone(),
-                None => host_target.clone(),
-            };
-            build_for_target(&workspace_root, &triple)?;
-            let _ = plat;
+            let triple = triple_opt.clone().unwrap_or_else(|| host_target.clone());
+            match build_host_for_target(&workspace_root, &triple, &host_target) {
+                Ok(true) => built_any = true,
+                Ok(false) => eprintln!(
+                    "  {} platform `{}`: no toolchain for {}; packaging whatever is \
+                     already in target/{}/release",
+                    "skip:".yellow(),
+                    plat,
+                    triple,
+                    triple
+                ),
+                Err(e) => return Err(e),
+            }
+        }
+
+        if !built_any {
+            eprintln!(
+                "  {} no host binary was built for any requested platform",
+                "warning:".yellow()
+            );
         }
         println!();
     }
@@ -635,25 +662,144 @@ fn default_formats_for_platform(platform: &str, explicit: &Option<Vec<String>>) 
         .collect()
 }
 
-fn build_for_target(workspace_root: &Path, triple: &str) -> Result<()> {
-    println!("  {} building for {}...", "build:".yellow(), triple.cyan());
+/// Build `sd-core` for one target triple.
+///
+/// Returns `Ok(false)` when the target's std is not installed, which is the
+/// ordinary situation for `--all-platforms` on a developer machine — there is
+/// nothing wrong with the repository, this host just cannot produce a Windows
+/// binary. Only a genuine compile failure is an error.
+///
+/// It does *not* build the plugin crates. They are outside the workspace (see
+/// `discover_plugins`) and are built once for `wasm32-wasip2` by the caller; a
+/// workspace-wide `cargo build --target <foreign triple>` would try to
+/// cross-compile wasmtime and fail on every host without a cross toolchain,
+/// which is what made `--build --all-platforms` unusable.
+fn build_host_for_target(workspace_root: &Path, triple: &str, host_target: &str) -> Result<bool> {
+    if triple != host_target && !target_is_installed(triple) {
+        return Ok(false);
+    }
+
+    println!(
+        "  {} building sd-core for {}...",
+        "build:".yellow(),
+        triple.cyan()
+    );
     let status = Command::new("cargo")
         .args(["build", "--release", "--target", triple, "-p", "sd-core"])
         .current_dir(workspace_root)
         .status()
         .with_context(|| format!("building sd-core for {triple}"))?;
     if !status.success() {
-        anyhow::bail!("cargo build for {triple} failed");
+        anyhow::bail!("cargo build of sd-core for {triple} failed");
     }
-    let status = Command::new("cargo")
-        .args(["build", "--release", "--target", triple])
-        .current_dir(workspace_root)
-        .status()
-        .with_context(|| format!("building plugins for {triple}"))?;
-    if !status.success() {
-        anyhow::bail!("cargo build (workspace) for {triple} failed");
+    Ok(true)
+}
+
+/// Whether rustup reports the target's standard library as installed.
+///
+/// A missing rustup is treated as "installed" so the build is attempted and
+/// cargo gets to produce the real error, rather than this check inventing one.
+fn target_is_installed(triple: &str) -> bool {
+    let output = Command::new("rustup")
+        .args(["target", "list", "--installed"])
+        .output();
+
+    match output {
+        Ok(output) if output.status.success() => String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .any(|line| line.trim() == triple),
+        _ => true,
     }
-    Ok(())
+}
+
+/// How the staged artifact in `plugins/` relates to the plugin's source.
+#[derive(Debug, PartialEq, Eq)]
+enum Staleness {
+    /// Built, newer than its source, and its manifest matches.
+    Fresh,
+    /// No artifact staged yet. Normal on a fresh checkout — the artifacts are
+    /// build output and are not committed.
+    NotBuilt,
+    /// A source file is newer than the staged `.wasm`.
+    SourceNewer,
+    /// The staged sidecar manifest no longer matches the plugin's own
+    /// `plugin.manifest.json`.
+    ManifestDrifted,
+}
+
+/// Compare a plugin's staged artifact against its source.
+///
+/// `check` used to validate only that a `Cargo.toml` and a `src/lib.rs` were
+/// present, which said nothing about whether the binary in `plugins/` had
+/// anything to do with them. Editing a plugin and forgetting to rebuild
+/// shipped the old binary silently — and editing `plugin.manifest.json`
+/// without rebuilding left the loader reading a staged copy with the previous
+/// capability grants, which is the worse half of the same problem.
+fn check_staged_artifact(workspace_root: &Path, plugin: &PluginInfo) -> Staleness {
+    let plugin_dir = match plugin.manifest_path.parent() {
+        Some(dir) => dir,
+        None => return Staleness::NotBuilt,
+    };
+    let plugins_dir = workspace_root.join("plugins");
+    let artifact = plugins_dir.join(plugin_artifact_filename(&plugin.lib_name));
+
+    let artifact_time = match std::fs::metadata(&artifact).and_then(|m| m.modified()) {
+        Ok(time) => time,
+        Err(_) => return Staleness::NotBuilt,
+    };
+
+    // The manifest check first: it is the one with a security consequence, and
+    // a byte comparison is exact where an mtime comparison is a heuristic.
+    let source_manifest = plugin_dir.join("plugin.manifest.json");
+    if source_manifest.exists() {
+        let staged_manifest = plugins_dir.join(format!(
+            "{}.manifest.json",
+            plugin_artifact_filename(&plugin.lib_name)
+                .trim_end_matches(".wasm")
+        ));
+        let staged = std::fs::read(&staged_manifest).ok();
+        let source = std::fs::read(&source_manifest).ok();
+        if staged.as_deref() != source.as_deref() {
+            return Staleness::ManifestDrifted;
+        }
+    }
+
+    if newest_source_time(&plugin_dir.join("src"))
+        .into_iter()
+        .chain(std::fs::metadata(&plugin.manifest_path).and_then(|m| m.modified()))
+        .any(|source_time| source_time > artifact_time)
+    {
+        return Staleness::SourceNewer;
+    }
+
+    Staleness::Fresh
+}
+
+/// The most recent modification time anywhere under `dir`.
+fn newest_source_time(dir: &Path) -> Option<std::time::SystemTime> {
+    let mut newest: Option<std::time::SystemTime> = None;
+    let mut stack = vec![dir.to_path_buf()];
+
+    while let Some(current) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(&current) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+                continue;
+            }
+            if let Ok(modified) = entry.metadata().and_then(|m| m.modified()) {
+                newest = Some(match newest {
+                    Some(current) if current >= modified => current,
+                    _ => modified,
+                });
+            }
+        }
+    }
+
+    newest
 }
 
 fn cmd_check() -> Result<()> {
@@ -691,7 +837,30 @@ fn cmd_check() -> Result<()> {
             continue;
         }
 
-        println!("{}", "OK".green());
+        match check_staged_artifact(&workspace_root, plugin) {
+            Staleness::Fresh => println!("{}", "OK".green()),
+            Staleness::NotBuilt => println!(
+                "{} not built; run `sd-plugins build --release`",
+                "STALE".yellow()
+            ),
+            Staleness::SourceNewer => {
+                println!(
+                    "{} plugins/{} is older than its source; rebuild before shipping it",
+                    "STALE".yellow(),
+                    plugin_artifact_filename(&plugin.lib_name)
+                );
+                errors += 1;
+            }
+            Staleness::ManifestDrifted => {
+                println!(
+                    "{} the staged manifest differs from {}/plugin.manifest.json; \
+                     the loader is granting the old capabilities",
+                    "STALE".red(),
+                    plugin.name
+                );
+                errors += 1;
+            }
+        }
     }
 
     println!();

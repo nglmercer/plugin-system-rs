@@ -1,8 +1,59 @@
+//! Calling into plugins from async request handlers.
+//!
+//! # Why everything here goes through `spawn_blocking`
+//!
+//! A plugin call is synchronous all the way down: `handle_command` enters
+//! wasmtime, and any host capability it uses — a WebSocket handshake, an audio
+//! query — blocks the calling thread until it returns. The OBS plugin's
+//! `connect` performs a full handshake plus several request/response
+//! round-trips with a 15 second timeout.
+//!
+//! Running that directly inside an `async fn` parks a tokio worker for the
+//! duration. Worse, the handler holds the `PluginManager` read guard and the
+//! plugin's own write guard the whole time, so one slow OBS connect serialised
+//! every other request touching that plugin — including the ones that would
+//! have told the user what was happening.
+//!
+//! So the helpers take the *shared* manager rather than a guard, and acquire
+//! both locks inside a blocking thread. The async caller holds nothing while
+//! it waits, and the runtime keeps serving.
+
+use std::sync::Arc;
+
 use plugin_system::PluginManager;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
+use tokio::sync::RwLock;
 
 use crate::response::ApiResponse;
+
+/// The manager as handlers see it: shared, and locked only inside a blocking
+/// thread.
+pub type SharedPluginManager = Arc<RwLock<PluginManager>>;
+
+/// Run `f` on the blocking pool with a read guard on the manager.
+async fn with_manager<R, F>(pm: &SharedPluginManager, f: F) -> Option<R>
+where
+    F: FnOnce(&PluginManager) -> R + Send + 'static,
+    R: Send + 'static,
+{
+    let pm = pm.clone();
+    match tokio::task::spawn_blocking(move || {
+        let manager = pm.blocking_read();
+        f(&manager)
+    })
+    .await
+    {
+        Ok(value) => Some(value),
+        Err(e) => {
+            // A join error means the blocking task panicked. That is a bug in
+            // the plugin boundary, not an expected "plugin unavailable", so it
+            // is logged rather than folded silently into a None.
+            log::error!("plugin call panicked on the blocking pool: {e}");
+            None
+        }
+    }
+}
 
 /// Call a plugin command synchronously (for use in spawn_blocking).
 pub fn call_plugin_raw_sync(
@@ -43,17 +94,42 @@ pub fn call_plugin_ok_sync(
 
 /// Call a plugin command and return the raw JSON result.
 ///
-/// This is the low-level helper that handles the plugin manager locking pattern.
+/// This is the low-level helper: it takes both locks and enters the plugin on
+/// a blocking thread, so the caller's tokio worker stays free.
 pub async fn call_plugin_raw(
-    plugin_manager: &PluginManager,
+    plugin_manager: &SharedPluginManager,
     plugin_name: &str,
     method: &str,
     args: Value,
 ) -> Option<Value> {
-    plugin_manager
-        .with_plugin_mut(plugin_name, |plugin| plugin.handle_command(method, args))
-        .ok()
-        .flatten()
+    let plugin_name = plugin_name.to_string();
+    let method = method.to_string();
+    with_manager(plugin_manager, move |manager| {
+        call_plugin_raw_sync(manager, &plugin_name, &method, args)
+    })
+    .await
+    .flatten()
+}
+
+/// Refresh a plugin, then read its interface data — in one blocking hop.
+///
+/// Both halves enter the plugin, so doing them as two separate awaits would
+/// take and release the locks twice and let another caller interleave between
+/// the refresh and the read, which is precisely the pair that must not be
+/// split.
+pub async fn refresh_and_read(
+    plugin_manager: &SharedPluginManager,
+    plugin_name: &str,
+) -> Option<Value> {
+    let plugin_name = plugin_name.to_string();
+    with_manager(plugin_manager, move |manager| {
+        let _ = call_plugin_ok_sync(manager, &plugin_name, "refresh", serde_json::json!({}));
+        let plugin_arc = manager.get_plugin_arc(&plugin_name).ok()?;
+        let plugin = plugin_arc.read().ok()?;
+        plugin.interface_data()
+    })
+    .await
+    .flatten()
 }
 
 /// Why a typed plugin call did not produce a value.
@@ -101,7 +177,7 @@ fn reported_error(value: &Value) -> Option<String> {
 
 /// Call a plugin command and deserialize the result into a typed response.
 pub async fn call_plugin<T: DeserializeOwned>(
-    plugin_manager: &PluginManager,
+    plugin_manager: &SharedPluginManager,
     plugin_name: &str,
     method: &str,
     args: Value,
@@ -136,7 +212,7 @@ pub async fn call_plugin<T: DeserializeOwned>(
 ///
 /// Returns `Ok(())` on success, or `Err(error_message)` on failure.
 pub async fn call_plugin_ok(
-    plugin_manager: &PluginManager,
+    plugin_manager: &SharedPluginManager,
     plugin_name: &str,
     method: &str,
     args: Value,
@@ -163,7 +239,7 @@ pub async fn call_plugin_ok(
 /// On success, wraps the result in `ApiResponse::success`.
 /// On failure, returns `ApiResponse::error` with the plugin name.
 pub async fn call_plugin_response<T: DeserializeOwned + serde::Serialize>(
-    plugin_manager: &PluginManager,
+    plugin_manager: &SharedPluginManager,
     plugin_name: &str,
     method: &str,
     args: Value,
@@ -179,7 +255,7 @@ pub async fn call_plugin_response<T: DeserializeOwned + serde::Serialize>(
 
 /// Call a plugin command that returns `{"ok": true}` and return an ApiResponse.
 pub async fn call_plugin_ok_response(
-    plugin_manager: &PluginManager,
+    plugin_manager: &SharedPluginManager,
     plugin_name: &str,
     method: &str,
     args: Value,
@@ -201,8 +277,7 @@ pub async fn call_plugin_ok_response(
 macro_rules! plugin_call {
     ($state:expr, $plugin:expr, $method:expr, $args:expr) => {{
         let pm = $state.plugin_manager.plugin_manager();
-        let manager = pm.read().await;
-        $crate::api::helpers::call_plugin_raw(&manager, $plugin, $method, $args).await
+        $crate::api::helpers::call_plugin_raw(&pm, $plugin, $method, $args).await
     }};
 }
 
@@ -216,8 +291,7 @@ macro_rules! plugin_call {
 macro_rules! plugin_call_typed {
     ($state:expr, $plugin:expr, $method:expr, $args:expr, $ty:ty) => {{
         let pm = $state.plugin_manager.plugin_manager();
-        let manager = pm.read().await;
-        $crate::api::helpers::call_plugin::<$ty>(&manager, $plugin, $method, $args).await
+        $crate::api::helpers::call_plugin::<$ty>(&pm, $plugin, $method, $args).await
     }};
 }
 
@@ -231,8 +305,7 @@ macro_rules! plugin_call_typed {
 macro_rules! plugin_call_ok_response {
     ($state:expr, $plugin:expr, $method:expr, $args:expr, $success:expr) => {{
         let pm = $state.plugin_manager.plugin_manager();
-        let manager = pm.read().await;
-        $crate::api::helpers::call_plugin_ok_response(&manager, $plugin, $method, $args, $success)
+        $crate::api::helpers::call_plugin_ok_response(&pm, $plugin, $method, $args, $success)
             .await
     }};
 }

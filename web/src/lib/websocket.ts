@@ -1,4 +1,5 @@
 import { StreamEvent } from './types';
+import { getToken } from './auth';
 
 type EventCallback = (event: StreamEvent) => void;
 
@@ -9,7 +10,12 @@ export class WebSocketClient {
 
   connect() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    // The browser WebSocket constructor cannot set request headers, so the
+    // token has to travel in the query string. The server accepts it there for
+    // this reason alone.
+    const token = getToken();
+    const query = token ? `?token=${encodeURIComponent(token)}` : '';
+    const wsUrl = `${protocol}//${window.location.host}/ws${query}`;
 
     this.ws = new WebSocket(wsUrl);
 

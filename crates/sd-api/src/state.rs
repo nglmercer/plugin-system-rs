@@ -9,10 +9,13 @@ use sd_profiles::ProfileManager;
 use tokio::sync::RwLock;
 
 use crate::api::DashboardLayout;
+use crate::auth::ApiAuth;
 
 #[derive(Clone)]
 pub struct AppState {
     pub events: Arc<EventBus>,
+    /// The API token every `/api` and `/ws` request must present.
+    pub auth: ApiAuth,
     pub action_registry: Arc<RwLock<ActionRegistry>>,
     pub profile_manager: Arc<ProfileManager>,
     pub device_manager: Arc<DeviceManager>,

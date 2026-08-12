@@ -13,6 +13,14 @@ export const Icons = {
     h("circle", { cx: "12", cy: "12", r: "10" }),
     h("polyline", { points: "12 6 12 12 16 14" }),
   ),
+  // A countdown, distinguished from `clock` by the hand sweeping backwards
+  // and the stem on top.
+  timer: () => h("svg", { ...s },
+    h("circle", { cx: "12", cy: "13", r: "8" }),
+    h("polyline", { points: "12 9 12 13 9 15" }),
+    h("line", { x1: "9", y1: "2", x2: "15", y2: "2" }),
+    h("line", { x1: "12", y1: "2", x2: "12", y2: "5" }),
+  ),
   hotkey: () => h("svg", { ...s },
     h("rect", { x: "2", y: "4", width: "20", height: "16", rx: "2" }),
     h("path", { d: "M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M8 16h8" }),
@@ -118,6 +126,7 @@ export function WidgetIcon({ type, size }: { type: string; size?: string }) {
     "obs-control": Icons.obs,
     "obs-scenes": Icons.obsScenes,
     "obs-inputs": Icons.obsInputs,
+    "timer": Icons.timer,
   };
   const Icon = iconMap[type] || Icons.systemMonitor;
   return h("span", { class: "widget-icon", style: size ? { fontSize: size } : {} }, h(Icon, null));

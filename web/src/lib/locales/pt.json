@@ -53,6 +53,7 @@
       "obs-control": "Controle OBS",
       "obs-scenes": "Cenas OBS",
       "obs-inputs": "Entradas OBS",
+      "timer": "Temporizador",
       "fetch": "Buscar Dados"
     },
     "config": {

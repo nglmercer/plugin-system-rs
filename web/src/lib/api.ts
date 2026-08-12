@@ -60,10 +60,54 @@ export async function refreshPlugins(): Promise<PluginStatus[]> {
   return fetchPlugins();
 }
 
-export async function uploadPluginFile(file: File, enabled: boolean): Promise<PluginStatus> {
+/**
+ * A plugin's sidecar manifest, sent alongside the binary on install.
+ *
+ * The server grants exactly the capabilities this manifest lists, and only
+ * after the caller has acknowledged each one by name — so the manifest has to
+ * travel with the upload rather than being discovered afterwards.
+ */
+export interface PluginManifestUpload {
+  /** Raw JSON text of the manifest, exactly as it will be stored. */
+  json: string;
+  /** Capability names read out of that JSON, for the user to confirm. */
+  capabilities: string[];
+}
+
+/** Read a `.manifest.json` file and pull out its capability list. */
+export async function readPluginManifest(file: File): Promise<PluginManifestUpload> {
+  const json = await file.text();
+  let parsed: { capabilities?: unknown };
+  try {
+    parsed = JSON.parse(json);
+  } catch (e) {
+    throw new Error(`Manifest is not valid JSON: ${(e as Error).message}`);
+  }
+  const capabilities = Array.isArray(parsed.capabilities)
+    ? parsed.capabilities.filter((c): c is string => typeof c === "string")
+    : [];
+  return { json, capabilities };
+}
+
+function appendManifest(formData: FormData, manifest?: PluginManifestUpload) {
+  if (!manifest) return;
+  formData.append("manifest", manifest.json);
+  // Sent as one field per capability so a capability name containing a comma
+  // could never smuggle in a second acknowledgement.
+  for (const capability of manifest.capabilities) {
+    formData.append("acknowledge_capability", capability);
+  }
+}
+
+export async function uploadPluginFile(
+  file: File,
+  enabled: boolean,
+  manifest?: PluginManifestUpload,
+): Promise<PluginStatus> {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("enabled", String(enabled));
+  appendManifest(formData, manifest);
 
   const res = await fetch(`${API_BASE}/plugins/upload`, {
     method: "POST",
@@ -76,12 +120,14 @@ export async function updatePluginFile(
   pluginName: string,
   file: File,
   enabled?: boolean,
+  manifest?: PluginManifestUpload,
 ): Promise<PluginStatus> {
   const formData = new FormData();
   formData.append("file", file);
   if (enabled !== undefined) {
     formData.append("enabled", String(enabled));
   }
+  appendManifest(formData, manifest);
 
   const res = await fetch(`${API_BASE}/plugins/${encodeURIComponent(pluginName)}/update`, {
     method: "POST",
@@ -148,6 +194,50 @@ export async function fetchPluginData(pluginName: string) {
   const res = await fetch(`${API_BASE}/plugins/${pluginName}`);
   const data = await res.json();
   return data.data;
+}
+
+/**
+ * Invoke a command on a plugin that has no typed endpoint of its own.
+ *
+ * Throws on a plugin-reported failure so callers can surface the plugin's own
+ * message rather than rendering an empty success.
+ */
+export async function callPluginCommand<T = any>(
+  pluginName: string,
+  method: string,
+  args: Record<string, any> = {},
+): Promise<T> {
+  const res = await fetch(`${API_BASE}/plugins/${encodeURIComponent(pluginName)}/command`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ method, args }),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || `Plugin command '${method}' failed`);
+  }
+  return data.data as T;
+}
+
+export interface TimerSnapshot {
+  name: string;
+  seconds: number;
+  remaining: number;
+  remaining_ms: number;
+  expired: boolean;
+}
+
+export async function fetchTimers(): Promise<TimerSnapshot[]> {
+  const data = await fetchPluginData("timer");
+  return (data?.data?.timers ?? []) as TimerSnapshot[];
+}
+
+export async function startTimer(name: string, seconds: number) {
+  return callPluginCommand("timer", "start", { name, seconds });
+}
+
+export async function stopTimer(name: string) {
+  return callPluginCommand("timer", "stop", { name });
 }
 
 export async function fetchDashboard(): Promise<DashboardLayout> {
@@ -265,9 +355,11 @@ export async function setAppMute(appName: string, muted: boolean) {
 }
 
 export async function fetchObsStatus() {
-  const res = await fetch(`${API_BASE}/obs/status`);
-  const data = await res.json();
-  return data.data;
+  // Goes through `obsGet` like every other OBS read. Reading `data.data`
+  // without checking `success` turned every real failure — OBS closed, wrong
+  // password, plugin disabled — into `undefined`, which the widget rendered as
+  // "OBS plugin not loaded" no matter what had actually gone wrong.
+  return obsGet<any>("/obs/status", null);
 }
 
 export async function connectObs(host: string, port: number, password: string) {

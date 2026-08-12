@@ -1,6 +1,6 @@
 [package]
 name = "plugin-timer-wasm"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Timer plugin compiled as a WASI Preview 2 component"
 

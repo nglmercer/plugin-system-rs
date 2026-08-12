@@ -132,6 +132,15 @@ function VariantPreview({ type, variant }: VariantPreviewProps) {
         case "detailed":
           return h("div", { class: "variant-preview obsinput-detailed" }, h("div", null, "Mic (audio)"), h("div", { class: "mini-bar" }, h("div", { class: "mini-bar-fill", style: { width: "75%", background: "#4caf50" } })), h("div", null, "75%"));
       }
+    case "timer":
+      switch (variant) {
+        case "minimal":
+          return h("div", { class: "variant-preview timer-minimal" }, h("div", { class: "mini-time" }, "4:32"));
+        case "compact":
+          return h("div", { class: "variant-preview timer-compact" }, h("div", { class: "mini-time" }, "4:32"), h("div", { class: "mini-btns" }, h("div", { class: "mini-btn" }, "Start"), h("div", { class: "mini-btn" }, "Stop")));
+        case "detailed":
+          return h("div", { class: "variant-preview timer-detailed" }, h("div", { class: "mini-row" }, h("span", null, "break"), h("span", null, "4:32")), h("div", { class: "mini-bar" }, h("div", { class: "mini-bar-fill", style: { width: "40%", background: "#00d4ff" } })), h("div", { class: "mini-row" }, h("span", null, "pomodoro"), h("span", null, "0:00")));
+      }
     case "fetch":
       switch (variant) {
         case "minimal":

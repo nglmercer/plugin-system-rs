@@ -160,7 +160,7 @@ mod tests {
     fn plugin_result_constructors() {
         assert_eq!(PluginResult::string("hello").as_string(), Some("hello"));
         assert_eq!(PluginResult::int(42).as_int(), Some(42));
-        assert_eq!(PluginResult::float(3.14).as_float(), Some(3.14));
+        assert_eq!(PluginResult::float(2.5).as_float(), Some(2.5));
         assert_eq!(PluginResult::bool(true).as_bool(), Some(true));
         assert_eq!(PluginResult::null().as_string(), None);
     }

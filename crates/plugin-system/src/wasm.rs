@@ -403,9 +403,17 @@ impl streamdeck::plugin::input::Host for HostState {
         Ok(provider.record_hotkey(timeout_ms))
     }
 
+    /// Abandon an in-progress hotkey recording.
+    ///
+    /// The WIT signature returns nothing, so unlike every other guarded call
+    /// there is no way to hand a refusal back to the guest. Swallowing it
+    /// silently is what the caller sees either way — but a plugin calling this
+    /// without the grant is a manifest bug, and the log line is the only place
+    /// it can surface.
     fn reset_recording(&mut self) -> wasmtime::Result<()> {
-        if let Ok(provider) = self.provider(caps::INPUT, &self.capabilities.input) {
-            provider.reset_recording();
+        match self.provider(caps::INPUT, &self.capabilities.input) {
+            Ok(provider) => provider.reset_recording(),
+            Err(e) => log::warn!("reset-recording refused: {e}"),
         }
         Ok(())
     }

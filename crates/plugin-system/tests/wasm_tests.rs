@@ -25,7 +25,7 @@ fn component_path() -> PathBuf {
 
 const MANIFEST: &str = r#"{
     "name": "timer",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "abi": "wasm-component",
     "interfaces": ["Timer"],
     "limits": { "memory_mb": 32, "call_timeout_ms": 5000 }
@@ -83,7 +83,7 @@ fn component_loads_and_reports_its_own_identity() {
     let meta = plugin.metadata();
 
     assert_eq!(meta.name, "timer");
-    assert_eq!(meta.version, "0.1.0");
+    assert_eq!(meta.version, "0.2.0");
     assert_eq!(plugin.interface_ids(), vec!["Timer".to_string()]);
     assert_eq!(plugin.plugin_type_name(), "WasmPlugin");
 }
@@ -144,10 +144,108 @@ fn interface_data_reflects_guest_state() {
     let plugin = arc.read().unwrap();
     let data = plugin.interface_data().expect("interface data");
 
-    assert_eq!(
-        data["timers"],
-        serde_json::json!([{ "name": "brew", "seconds": 180 }])
+    let timers = data["timers"].as_array().expect("timers array");
+    assert_eq!(timers.len(), 1);
+    assert_eq!(timers[0]["name"], serde_json::json!("brew"));
+    assert_eq!(timers[0]["seconds"], serde_json::json!(180));
+    // The countdown is live, so `remaining` is whatever the clock says now —
+    // pinning an exact value would make this test a stopwatch. What must hold
+    // is that it is a real reading of a timer that has not fired.
+    assert_eq!(timers[0]["expired"], serde_json::json!(false));
+    let remaining = timers[0]["remaining"].as_u64().expect("remaining seconds");
+    assert!(
+        remaining > 170 && remaining <= 180,
+        "a 180s timer read immediately should have ~180s left, got {remaining}"
     );
+}
+
+/// The regression this plugin was written to fix: `start` used to store the
+/// duration and hand it straight back forever. A timer must actually elapse.
+#[test]
+fn a_timer_counts_down_and_expires() {
+    let Some((manager, _temp, _)) = load_timer() else {
+        return;
+    };
+
+    call(
+        &manager,
+        "timer",
+        "start",
+        serde_json::json!({ "name": "blink", "seconds": 1 }),
+    )
+    .unwrap();
+
+    let immediately = call(
+        &manager,
+        "timer",
+        "get",
+        serde_json::json!({ "name": "blink" }),
+    )
+    .unwrap();
+    assert_eq!(immediately["expired"], serde_json::json!(false));
+
+    std::thread::sleep(std::time::Duration::from_millis(1_100));
+
+    let after = call(
+        &manager,
+        "timer",
+        "get",
+        serde_json::json!({ "name": "blink" }),
+    )
+    .unwrap();
+    assert_eq!(after["expired"], serde_json::json!(true));
+    assert_eq!(after["remaining"], serde_json::json!(0));
+    // The configured duration is still reported, so a UI can draw progress.
+    assert_eq!(after["seconds"], serde_json::json!(1));
+}
+
+/// Expiry is an edge. `poll` reports it once and then stops, so a host that
+/// turns it into an event does not fire the same event on every tick.
+#[test]
+fn poll_reports_each_expiry_exactly_once() {
+    let Some((manager, _temp, _)) = load_timer() else {
+        return;
+    };
+
+    call(
+        &manager,
+        "timer",
+        "start",
+        serde_json::json!({ "name": "ping", "seconds": 1 }),
+    )
+    .unwrap();
+
+    let before = call(&manager, "timer", "poll", serde_json::json!({})).unwrap();
+    assert_eq!(before["expired"], serde_json::json!([]));
+
+    std::thread::sleep(std::time::Duration::from_millis(1_100));
+
+    let first = call(&manager, "timer", "poll", serde_json::json!({})).unwrap();
+    assert_eq!(first["expired"], serde_json::json!(["ping"]));
+
+    let second = call(&manager, "timer", "poll", serde_json::json!({})).unwrap();
+    assert_eq!(
+        second["expired"],
+        serde_json::json!([]),
+        "an expiry already reported must not be reported again"
+    );
+}
+
+#[test]
+fn a_zero_second_timer_is_rejected() {
+    let Some((manager, _temp, _)) = load_timer() else {
+        return;
+    };
+
+    let result = call(
+        &manager,
+        "timer",
+        "start",
+        serde_json::json!({ "name": "instant", "seconds": 0 }),
+    )
+    .unwrap();
+    assert_eq!(result["ok"], serde_json::json!(false));
+    assert_eq!(result["kind"], serde_json::json!("invalid_args"));
 }
 
 #[test]

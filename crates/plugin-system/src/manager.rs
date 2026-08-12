@@ -24,6 +24,23 @@ struct LoadedPlugin {
     temp_path: Option<PathBuf>,
 }
 
+/// Owner of every loaded plugin, and of the two locks that guard them.
+///
+/// # Lock ordering
+///
+/// There are two levels of lock here — the registry, and the per-plugin lock
+/// inside each `Arc<RwLock<Box<dyn Plugin>>>` it hands out — and they must
+/// always be taken in that order:
+///
+/// 1. `registry` (read **or** write)
+/// 2. the individual plugin's lock
+///
+/// Never acquire `registry.write()` while holding a plugin lock. That is the
+/// natural shape of "mutate a plugin, then re-register it", and it deadlocks
+/// against any request handler sitting in the normal order with a registry
+/// read guard. `unload_plugin` is written the awkward way — drop the read
+/// guard in its own scope, *then* take the write guard — for exactly this
+/// reason; keep it that way.
 pub struct PluginManager {
     registry: SharedRegistry,
     command_registry: SharedCommandRegistry,
@@ -189,7 +206,11 @@ impl PluginManager {
         // limits. It is optional: a component with no manifest is still a
         // component, it just gets the defaults.
         let manifest = detect_manifest(&path)?.unwrap_or_else(|| {
-            PluginManifest::for_component(plugin_stem(&path).as_deref().unwrap_or("plugin"))
+            PluginManifest::for_component(
+                crate::naming::canonical_plugin_name_from_path(&path)
+                    .as_deref()
+                    .unwrap_or("plugin"),
+            )
         });
 
         let bytes = std::fs::read(&path).map_err(PluginError::Io)?;
@@ -367,6 +388,21 @@ impl PluginManager {
     /// standing up a wasmtime store and calling `get-metadata`, which is a lot
     /// of machinery for a listing; a plugin that wants to be described without
     /// being run ships a manifest.
+    /// Describe a plugin on disk, or `None` when it ships no manifest.
+    ///
+    /// Prefer this over [`PluginManager::metadata_from_path`] anywhere the
+    /// answer is optional — a directory listing, a status lookup. Those
+    /// callers used to build an `Err` describing a perfectly normal situation
+    /// and immediately discard it with `.ok()`, which produced an error value
+    /// (and, on the loader path, a log line) for every manifest-less component
+    /// on every scan.
+    pub fn manifest_metadata_from_path(path: impl AsRef<Path>) -> Option<PluginMetadata> {
+        detect_manifest(path.as_ref())
+            .ok()
+            .flatten()
+            .map(Into::into)
+    }
+
     pub fn metadata_from_path(path: impl AsRef<Path>) -> Result<PluginMetadata> {
         let path = path.as_ref();
 
@@ -538,24 +574,6 @@ fn detect_manifest(plugin_path: &Path) -> Result<Option<PluginManifest>> {
         name: stem.to_string(),
         reason: format!("invalid manifest: {e}"),
     })
-}
-
-/// The plugin name implied by a file path.
-///
-/// Only a fallback for a component shipped without a manifest: `get-metadata`
-/// still decides the real name once the guest is instantiated. Strips the
-/// `plugin_`/`plugin-` prefix the build tooling adds, so `plugin_timer.wasm`
-/// implies `timer`.
-fn plugin_stem(path: &Path) -> Option<String> {
-    let stem = path.file_stem()?.to_str()?;
-    let name = stem
-        .strip_prefix("plugin_")
-        .or_else(|| stem.strip_prefix("plugin-"))
-        .unwrap_or(stem);
-    if name.is_empty() {
-        return None;
-    }
-    Some(name.replace('-', "_"))
 }
 
 impl Default for PluginManager {

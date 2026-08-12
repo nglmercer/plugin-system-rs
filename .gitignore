@@ -46,3 +46,16 @@ plugins/*-wasm/target/
 plugins/*.wasm
 plugins/*.manifest.json
 dashboard.json
+
+# Built plugin components and their staged sidecar manifests.
+#
+# Both are build output: `sd-plugins build` compiles plugins/<name>/ and copies
+# the artifact plus that plugin's own `plugin.manifest.json` into plugins/ under
+# the artifact's stem. Committing them meant two manifests for every plugin —
+# the source one and a staged copy — with nothing keeping them in step, so an
+# edited source manifest silently kept granting the old capabilities until
+# someone remembered to rebuild. The source `plugins/<name>/plugin.manifest.json`
+# is the single tracked definition; run `make build-plugins-release` to produce
+# these.
+/plugins/*.wasm
+/plugins/*.manifest.json

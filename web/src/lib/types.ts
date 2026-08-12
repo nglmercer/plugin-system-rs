@@ -68,6 +68,7 @@ export type WidgetType =
   | "obs-control"
   | "obs-scenes"
   | "obs-inputs"
+  | "timer"
   | "fetch";
 
 export interface WidgetConfig {
@@ -273,6 +274,26 @@ export const WIDGET_VARIANTS: {
         value: "detailed",
         label: "Detailed",
         description: "Scenes + transitions + source toggles",
+      },
+    ],
+  },
+  {
+    type: "timer",
+    variants: [
+      {
+        value: "minimal",
+        label: "Minimal",
+        description: "Just the remaining time",
+      },
+      {
+        value: "compact",
+        label: "Compact",
+        description: "Countdown with start and stop",
+      },
+      {
+        value: "detailed",
+        label: "Detailed",
+        description: "All running timers with progress bars",
       },
     ],
   },

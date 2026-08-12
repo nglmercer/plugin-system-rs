@@ -25,15 +25,26 @@ pub(crate) async fn handle_websocket(socket: axum::extract::ws::WebSocket, state
     });
     let _ = sender.send(Message::Text(initial_state.to_string())).await;
 
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<sd_events::StreamEvent>(100);
-    let events = state.events.clone();
-
-    events.subscribe_all(move |event| {
-        let _ = tx.try_send(event.clone());
-    });
+    // Subscribe to the broadcast channel rather than registering a callback:
+    // a `subscribe_all` callback is never unregistered (one leaked per
+    // connection) and only fires while `EventBus::run` is alive, so a stalled
+    // dispatch loop silently froze every client. A receiver drops itself with
+    // the connection and is fed by the channel directly.
+    let mut rx = state.events.subscribe_channel();
 
     let send_task = tokio::spawn(async move {
-        while let Some(event) = rx.recv().await {
+        loop {
+            let event = match rx.recv().await {
+                Ok(event) => event,
+                // The client fell behind its 1024-event buffer. Say so instead
+                // of dropping events invisibly, then keep serving.
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
+                    log::warn!("websocket client lagged; {skipped} event(s) dropped");
+                    continue;
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+            };
+
             let msg = serde_json::json!({
                 "type": "event",
                 "event": event,

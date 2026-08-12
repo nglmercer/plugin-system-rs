@@ -100,6 +100,15 @@ export const WIDGET_CATALOG: {
     defaultRowSpan: 1,
   },
   {
+    type: "timer",
+    label: "Timer",
+    icon: "C",
+    description: "Countdown timers",
+    hasConfig: true,
+    defaultColSpan: 1,
+    defaultRowSpan: 1,
+  },
+  {
     type: "fetch",
     label: "Fetch Data",
     icon: "F",
@@ -126,6 +135,7 @@ export function getDefaultVariant(type: WidgetType): string {
     "obs-control": "compact",
     "obs-scenes": "compact",
     "obs-inputs": "compact",
+    timer: "compact",
     fetch: "compact",
   };
   return variants[type] || "compact";
@@ -163,6 +173,12 @@ export function getDefaultSettings(type: WidgetType): Record<string, any> {
       break;
     case "obs-inputs":
       settings.refreshInterval = 2000;
+      break;
+    case "timer":
+      settings.timerName = "timer";
+      settings.seconds = 300;
+      // Fast enough that the displayed countdown never visibly skips a second.
+      settings.refreshInterval = 1000;
       break;
     case "fetch":
       settings.url = "";

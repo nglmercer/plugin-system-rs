@@ -1,4 +1,8 @@
-use plugin_system::{serde_json, PluginManager};
+pub mod upload;
+
+pub use upload::PluginUpload;
+
+use plugin_system::{serde_json, PluginManager, PluginManifest};
 use sd_actions::ActionRegistry;
 use sd_events::EventBus;
 use sd_paths::mutable_data_dir;
@@ -150,9 +154,8 @@ impl SdPluginManager {
                 .unwrap_or("unknown")
                 .to_string();
             let derived_name = derive_plugin_name(&file_stem);
-            let metadata_name = PluginManager::metadata_from_path(&path)
-                .ok()
-                .map(|metadata| metadata.name);
+            let metadata_name =
+                PluginManager::manifest_metadata_from_path(&path).map(|metadata| metadata.name);
             let enabled_by_file_name = state.is_enabled(&derived_name);
             let enabled_by_metadata = metadata_name
                 .as_ref()
@@ -213,7 +216,7 @@ impl SdPluginManager {
                 let derived_name = derive_plugin_name(&file_stem);
                 let metadata = manager
                     .plugin_metadata(&derived_name)
-                    .or_else(|| PluginManager::metadata_from_path(&path).ok());
+                    .or_else(|| PluginManager::manifest_metadata_from_path(&path));
                 let plugin_name = metadata
                     .as_ref()
                     .map(|metadata| metadata.name.clone())
@@ -272,9 +275,8 @@ impl SdPluginManager {
         let path = manager
             .plugin_path(&name)
             .unwrap_or_else(|| self.find_plugin_path(&name));
-        let metadata_name = PluginManager::metadata_from_path(&path)
-            .ok()
-            .map(|metadata| metadata.name);
+        let metadata_name =
+            PluginManager::manifest_metadata_from_path(&path).map(|metadata| metadata.name);
         let target_name = metadata_name.unwrap_or_else(|| name.clone());
         let already_loaded = manager.is_loaded(&target_name) || manager.is_loaded(&name);
         if enabled {
@@ -314,51 +316,80 @@ impl SdPluginManager {
         self.load_enabled_plugins_from_dir_with_state(&state).await
     }
 
+    /// Install a plugin that arrived over the API.
+    ///
+    /// The upload is admitted by [`upload::authorize_capabilities`] and
+    /// [`upload::authorize_digest`] *before* any byte reaches the plugin
+    /// directory: a refused plugin must leave nothing behind for a later scan
+    /// to pick up.
     pub async fn install_plugin_file(
         &self,
-        bytes: &[u8],
-        filename: &str,
-        enabled: bool,
+        request: PluginUpload<'_>,
     ) -> PluginResult<PluginStatus> {
-        validate_uploaded_filename(filename)?;
+        validate_uploaded_filename(request.filename)?;
 
         let dir = self.plugin_dir_path();
+        upload::authorize_digest(&dir, request.bytes)?;
+
+        let fallback_name = derive_plugin_name(
+            Path::new(request.filename)
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("plugin"),
+        );
+        let manifest = upload::parse_upload_manifest(request.manifest_json, &fallback_name)?;
+        upload::authorize_capabilities(&manifest, request.acknowledged_capabilities)?;
+        validate_plugin_name(&manifest.name)?;
+
         fs::create_dir_all(&dir)?;
 
-        let temp_path = self.temp_plugin_path(filename);
-        fs::write(&temp_path, bytes)?;
-
-        let metadata = PluginManager::metadata_from_path(&temp_path)
-            .map_err(|e| PluginResultError::PluginLoad(e.to_string()))?;
-        validate_plugin_name(&metadata.name)?;
-
-        let final_path = self.plugin_file_path(&metadata.name);
+        let final_path = self.plugin_file_path(&manifest.name);
         if final_path.exists() {
-            let _ = fs::remove_file(&temp_path);
-            return Err(PluginResultError::PluginExists(metadata.name));
+            return Err(PluginResultError::PluginExists(manifest.name));
         }
 
-        fs::rename(&temp_path, &final_path)?;
+        let temp_path = self.temp_plugin_path(request.filename);
+        fs::write(&temp_path, request.bytes)?;
+        if let Err(e) = fs::rename(&temp_path, &final_path) {
+            let _ = fs::remove_file(&temp_path);
+            return Err(PluginResultError::Io(e.to_string()));
+        }
 
+        // The manifest is what the loader reads to decide capabilities, so it
+        // has to land next to the binary — and it has to be the one that was
+        // just authorized, not whatever a later upload might supply.
+        if let Err(e) = write_sidecar_manifest(&final_path, &manifest) {
+            let _ = fs::remove_file(&final_path);
+            return Err(e);
+        }
+
+        let enabled = request.enabled.unwrap_or(true);
         let mut state = PluginState::load()?;
-        state.set_enabled(metadata.name.clone(), enabled);
+        state.set_enabled(manifest.name.clone(), enabled);
         state.save()?;
 
         let mut manager = self.plugin_manager.write().await;
         if enabled {
             manager.load_plugin(&final_path)?;
         }
-        self.plugin_status_from_manager(&manager, &metadata.name)
+        self.plugin_status_from_manager(&manager, &manifest.name)
     }
 
+    /// Replace an installed plugin's binary.
+    ///
+    /// Held to the same admission rules as a fresh install: an update is a new
+    /// binary with a new manifest, and letting it inherit the previous grants
+    /// would make "update" the way around the capability gate.
     pub async fn update_plugin_file(
         &self,
         plugin_name: &str,
-        bytes: &[u8],
-        filename: &str,
-        enabled: Option<bool>,
+        request: PluginUpload<'_>,
     ) -> PluginResult<PluginStatus> {
+        let bytes = request.bytes;
+        let filename = request.filename;
+        let enabled = request.enabled;
         validate_uploaded_filename(filename)?;
+        upload::authorize_digest(&self.plugin_dir_path(), bytes)?;
 
         let mut manager = self.plugin_manager.write().await;
         let mut state = PluginState::load()?;
@@ -370,10 +401,16 @@ impl SdPluginManager {
             _ => return Err(PluginResultError::NotFound(plugin_name.to_string())),
         };
 
-        let target_name = PluginManager::metadata_from_path(&existing_path)
+        let target_name = PluginManager::manifest_metadata_from_path(&existing_path)
             .map(|metadata| metadata.name)
-            .unwrap_or(plugin_name.to_string());
+            .unwrap_or_else(|| plugin_name.to_string());
         validate_plugin_name(&target_name)?;
+
+        // Authorize before unloading anything: a refused update must leave the
+        // installed plugin exactly as it was, still loaded and still working.
+        let manifest = upload::parse_upload_manifest(request.manifest_json, &target_name)?;
+        upload::authorize_capabilities(&manifest, request.acknowledged_capabilities)?;
+        validate_plugin_name(&manifest.name)?;
 
         let was_loaded = manager.is_loaded(&target_name) || manager.is_loaded(plugin_name);
         let was_enabled = state.is_enabled(&target_name) || state.is_enabled(plugin_name);
@@ -389,14 +426,10 @@ impl SdPluginManager {
         let temp_path = self.temp_plugin_path(filename);
         fs::write(&temp_path, bytes)?;
 
-        let metadata = PluginManager::metadata_from_path(&temp_path)
-            .map_err(|e| PluginResultError::PluginLoad(e.to_string()))?;
-        validate_plugin_name(&metadata.name)?;
-
-        let final_path = self.plugin_file_path(&metadata.name);
+        let final_path = self.plugin_file_path(&manifest.name);
         if final_path.exists() && final_path != existing_path {
             let _ = fs::remove_file(&temp_path);
-            return Err(PluginResultError::PluginExists(metadata.name));
+            return Err(PluginResultError::PluginExists(manifest.name));
         }
 
         let backup_path = self.backup_plugin_path(&existing_path);
@@ -411,26 +444,38 @@ impl SdPluginManager {
             }
         }
 
-        if let Err(e) = fs::rename(&temp_path, &final_path) {
+        // The sidecar is a separate file from the binary, so a rollback has to
+        // put both back. Stash the old one before it is overwritten.
+        let old_manifest_path = plugin_system::manifest::manifest_path(&existing_path);
+        let stashed_manifest = fs::read(&old_manifest_path).ok();
+        let restore = |manager: &mut PluginManager| {
+            if let Some(bytes) = &stashed_manifest {
+                let _ = fs::write(&old_manifest_path, bytes);
+            }
             if backup_path.exists() {
                 let _ = fs::rename(&backup_path, &existing_path);
             }
             if was_loaded {
                 let _ = manager.load_plugin(&existing_path);
             }
+        };
+
+        if let Err(e) = fs::rename(&temp_path, &final_path) {
+            restore(&mut manager);
             return Err(PluginResultError::Io(e.to_string()));
         }
 
+        if let Err(e) = write_sidecar_manifest(&final_path, &manifest) {
+            let _ = fs::remove_file(&final_path);
+            restore(&mut manager);
+            return Err(e);
+        }
+
         state.set_enabled(target_name.clone(), false);
-        state.set_enabled(metadata.name.clone(), keep_enabled);
+        state.set_enabled(manifest.name.clone(), keep_enabled);
         if let Err(e) = state.save() {
             let _ = fs::remove_file(&final_path);
-            if backup_path.exists() {
-                let _ = fs::rename(&backup_path, &existing_path);
-            }
-            if was_loaded {
-                let _ = manager.load_plugin(&existing_path);
-            }
+            restore(&mut manager);
             return Err(e);
         }
 
@@ -443,18 +488,13 @@ impl SdPluginManager {
         match load_result {
             Ok(_) => {
                 let _ = fs::remove_file(&backup_path);
-                self.plugin_status_from_manager(&manager, &metadata.name)
+                self.plugin_status_from_manager(&manager, &manifest.name)
             }
             Err(e) => {
                 let _ = fs::remove_file(&final_path);
-                if backup_path.exists() {
-                    let _ = fs::rename(&backup_path, &existing_path);
-                }
                 state.set_enabled(target_name.clone(), was_enabled);
                 let _ = state.save();
-                if was_loaded {
-                    let _ = manager.load_plugin(&existing_path);
-                }
+                restore(&mut manager);
                 Err(PluginResultError::PluginLoad(e.to_string()))
             }
         }
@@ -472,9 +512,9 @@ impl SdPluginManager {
             _ => return Err(PluginResultError::NotFound(plugin_name.to_string())),
         };
 
-        let target_name = PluginManager::metadata_from_path(&path)
+        let target_name = PluginManager::manifest_metadata_from_path(&path)
             .map(|metadata| metadata.name)
-            .unwrap_or(plugin_name.to_string());
+            .unwrap_or_else(|| plugin_name.to_string());
 
         if manager.is_loaded(&target_name) || manager.is_loaded(plugin_name) {
             manager
@@ -483,6 +523,9 @@ impl SdPluginManager {
         }
 
         fs::remove_file(&path)?;
+        // Leaving the sidecar behind would hand its capability grants to
+        // whatever binary later takes the same filename.
+        let _ = fs::remove_file(plugin_system::manifest::manifest_path(&path));
 
         state.disabled.remove(&target_name);
         state.disabled.remove(plugin_name);
@@ -562,7 +605,7 @@ impl SdPluginManager {
                     if derived == name {
                         return path;
                     }
-                    if PluginManager::metadata_from_path(&path)
+                    if PluginManager::manifest_metadata_from_path(&path)
                         .map(|metadata| metadata.name == name)
                         .unwrap_or(false)
                     {
@@ -587,7 +630,7 @@ impl SdPluginManager {
             if !path.exists() {
                 return None;
             }
-            PluginManager::metadata_from_path(&path).ok()
+            PluginManager::manifest_metadata_from_path(&path)
         });
         Ok(PluginStatus {
             name: name.to_string(),
@@ -617,23 +660,29 @@ fn is_plugin_file(path: &Path) -> bool {
 
 /// The plugin name implied by a file stem.
 ///
-/// Strips the `plugin_`/`plugin-` prefix the build tooling adds. The `lib`
-/// prefix and the PID-stamped `.tmp` suffixes are gone with the native loader,
-/// which never needed to exist except to work around `dlopen`.
+/// Delegates to `plugin_system::canonical_plugin_name`, which is the single
+/// definition of this rule. There used to be a second one here that disagreed
+/// with it — `plugin_volume_master_wasm` derived to `volume_master_wasm` while
+/// the manifest called the same plugin `volume-master` — and the enable/disable
+/// state was matched against whichever of the two happened to be at hand.
 fn derive_plugin_name(stem: &str) -> String {
-    let name = stem
-        .strip_prefix("plugin_")
-        .or_else(|| stem.strip_prefix("plugin-"))
-        .unwrap_or(stem);
-    if name.is_empty() {
-        stem.to_string()
-    } else {
-        name.replace('-', "_")
-    }
+    plugin_system::canonical_plugin_name(stem)
 }
 
 fn plugin_file_stem(name: &str) -> String {
-    format!("plugin_{}", name.replace('-', "_"))
+    plugin_system::plugin_file_stem(name)
+}
+
+/// Write the authorized manifest beside the plugin binary.
+///
+/// This is the file the loader reads to decide what the plugin may do, so it
+/// must be the manifest that passed [`upload::authorize_capabilities`] — not
+/// one the plugin can influence afterwards.
+fn write_sidecar_manifest(plugin_path: &Path, manifest: &PluginManifest) -> PluginResult<()> {
+    let path = plugin_system::manifest::manifest_path(plugin_path);
+    let data = serde_json::to_string_pretty(manifest)?;
+    fs::write(&path, data)?;
+    Ok(())
 }
 
 fn validate_uploaded_filename(filename: &str) -> PluginResult<()> {
@@ -697,6 +746,16 @@ pub enum PluginResultError {
     PluginLoad(String),
     InvalidInput(String),
     PluginExists(String),
+    /// The upload asked for capabilities the caller did not agree to grant.
+    /// Carries the full request so a UI can show the user what it is about to
+    /// hand over and ask again.
+    CapabilitiesNotAcknowledged {
+        requested: Vec<String>,
+        missing: Vec<String>,
+    },
+    /// The capability cannot be granted to an upload at all without a decision
+    /// made on the host itself.
+    CapabilityRefused { capability: String, reason: String },
 }
 
 impl std::fmt::Display for PluginResultError {
@@ -710,6 +769,16 @@ impl std::fmt::Display for PluginResultError {
             PluginResultError::PluginLoad(err) => write!(f, "Plugin load failed: {err}"),
             PluginResultError::InvalidInput(err) => write!(f, "Invalid plugin input: {err}"),
             PluginResultError::PluginExists(name) => write!(f, "Plugin '{name}' already exists"),
+            PluginResultError::CapabilitiesNotAcknowledged { requested, missing } => write!(
+                f,
+                "This plugin requests host capabilities that were not acknowledged: {}. \
+                 It requests: {}. Re-send the upload acknowledging each one.",
+                missing.join(", "),
+                requested.join(", ")
+            ),
+            PluginResultError::CapabilityRefused { capability, reason } => {
+                write!(f, "Refusing to grant '{capability}': {reason}")
+            }
         }
     }
 }
@@ -775,7 +844,22 @@ mod tests {
     /// whatever the build produced, so `lib` is now part of the name.
     #[test]
     fn derive_plugin_name_no_longer_strips_the_lib_prefix() {
-        assert_eq!(derive_plugin_name("libplugin_timer"), "libplugin_timer");
+        assert_eq!(derive_plugin_name("libplugin_timer"), "libplugin-timer");
+    }
+
+    /// The drift this crate used to have with the manifests: a built
+    /// artifact's stem must derive the name its own manifest declares.
+    #[test]
+    fn derive_plugin_name_matches_the_shipped_manifest_names() {
+        assert_eq!(
+            derive_plugin_name("plugin_volume_master_wasm"),
+            "volume-master"
+        );
+        assert_eq!(
+            derive_plugin_name("plugin_system_monitor_wasm"),
+            "system-monitor"
+        );
+        assert_eq!(derive_plugin_name("plugin_obs_wasm"), "obs");
     }
 
     #[test]

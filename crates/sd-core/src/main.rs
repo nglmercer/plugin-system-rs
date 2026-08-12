@@ -104,14 +104,19 @@ async fn main() -> Result<()> {
     let dashboard_config = Arc::new(RwLock::new(load_dashboard_config()));
     let server_config = config::load();
     let http_port = Arc::new(AtomicU16::new(server_config.bind_port()));
+    let auth = sd_api::ApiAuth::load_or_create();
     let state = AppState {
         events: events.clone(),
+        auth: auth.clone(),
         action_registry,
         profile_manager,
         device_manager,
         plugin_manager,
         dashboard_config,
-        http_client: reqwest::Client::new(),
+        // Built by sd-api, not here: the proxy's SSRF guard depends on this
+        // client refusing to follow redirects, and that invariant belongs
+        // next to the code that relies on it.
+        http_client: sd_api::proxy_http_client(),
         http_port: http_port.clone(),
     };
 
@@ -132,24 +137,50 @@ async fn main() -> Result<()> {
     http_port.store(port, Ordering::Relaxed);
 
     let local_http_url = format!("http://127.0.0.1:{port}");
-    let network_http_url = format!("http://{local_ip}:{port}");
     let local_ws_url = format!("ws://127.0.0.1:{port}/ws");
-    let network_ws_url = format!("ws://{local_ip}:{port}/ws");
 
     println!("\nStarting HTTP server on http://{actual_addr}");
     println!("Local access: {local_http_url}");
-    println!("Network access: {network_http_url}");
     println!("Local WebSocket endpoint: {local_ws_url}");
-    println!("Network WebSocket endpoint: {network_ws_url}");
     println!("Local API docs: {local_http_url}/api");
-    println!("Network API docs: {network_http_url}/api");
+
+    if actual_addr.ip().is_loopback() {
+        println!(
+            "\nBound to loopback: only this machine can reach the API. To expose it on \
+             your network, set \"host\": \"0.0.0.0\" in {}.",
+            config::CONFIG_FILE
+        );
+    } else {
+        let network_http_url = format!("http://{local_ip}:{port}");
+        println!("Network access: {network_http_url}");
+        println!("Network WebSocket endpoint: ws://{local_ip}:{port}/ws");
+        println!(
+            "\nWARNING: bound to {}, so anyone on your network can reach this API. The \
+             token below is the only thing stopping them from driving your keyboard.",
+            actual_addr.ip()
+        );
+    }
+
+    // The token is what a browser on another device needs in order to connect,
+    // so it has to be discoverable. Printing it beats making the user find the
+    // file; the dashboard on this machine fetches it over loopback instead.
+    println!("\nAPI token: {}", auth.token());
+    println!("Token file: {}", sd_api::token_path().display());
+    println!("Remote clients: append ?token=<token> to the dashboard URL.");
+
     println!("\nSystem tray icon active. Right-click for options.");
     println!("Press Ctrl+C to stop\n");
 
     let shutdown_tray = shutdown.clone();
     tray::spawn_tray(shutdown_tray, pid_lock.path().to_path_buf(), port);
 
-    axum::serve(listener, app).await?;
+    // `into_make_service_with_connect_info` so `/api/auth/token` can tell a
+    // loopback caller from a remote one.
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await?;
 
     Ok(())
 }
@@ -162,8 +193,7 @@ fn bind_addr(server: &config::ServerConfig) -> SocketAddr {
                 .expect("SD_CORE_BIND_ADDR must be a valid SocketAddr like 0.0.0.0:3000");
         }
     }
-    let port = server.bind_port();
-    SocketAddr::from(([0, 0, 0, 0], port))
+    SocketAddr::new(server.bind_host(), server.bind_port())
 }
 
 fn ctrlc_handler(shutdown: Arc<AtomicBool>, pid_lock_path: PathBuf) {

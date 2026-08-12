@@ -30,25 +30,11 @@ pub(crate) struct LocalIpInfo {
 pub(crate) async fn get_system_stats(
     State(state): State<AppState>,
 ) -> Json<ApiResponse<SystemStats>> {
-    let plugin_manager = state.plugin_manager.plugin_manager();
-    let manager = plugin_manager.read().await;
+    let pm = state.plugin_manager.plugin_manager();
 
-    let stats = if let Ok(plugin_arc) = manager.get_plugin_arc("system-monitor") {
-        let _ = crate::api::helpers::call_plugin_ok(
-            &manager,
-            "system-monitor",
-            "refresh",
-            serde_json::json!({}),
-        )
-        .await;
-        let plugin = plugin_arc.read().expect("plugin lock poisoned");
-        if let Some(data) = plugin.interface_data() {
-            serde_json::from_value(data).unwrap_or_else(|_| SystemStats::default())
-        } else {
-            SystemStats::default()
-        }
-    } else {
-        SystemStats::default()
+    let stats = match crate::api::helpers::refresh_and_read(&pm, "system-monitor").await {
+        Some(data) => serde_json::from_value(data).unwrap_or_else(|_| SystemStats::default()),
+        None => SystemStats::default(),
     };
 
     Json(ApiResponse::success(stats))
@@ -61,8 +47,21 @@ pub(crate) async fn get_local_ip(
         .map(|ip| ip.to_string())
         .unwrap_or_else(|_| "127.0.0.1".to_string());
     let port = state.http_port.load(std::sync::atomic::Ordering::Relaxed);
-    let url = format!("http://{}:{}", ip, port);
+    // The token rides along in the URL because that URL's whole purpose is to
+    // be scanned from a phone, which cannot fetch the token over loopback the
+    // way the local dashboard does. Only an already-authenticated caller gets
+    // this far, so it hands the secret to nobody who does not have it.
+    let url = format!(
+        "http://{}:{}/?token={}",
+        ip,
+        port,
+        urlencode(state.auth.token())
+    );
     Json(ApiResponse::success(LocalIpInfo { ip, port, url }))
+}
+
+fn urlencode(value: &str) -> String {
+    form_urlencoded::byte_serialize(value.as_bytes()).collect()
 }
 
 impl Default for SystemStats {

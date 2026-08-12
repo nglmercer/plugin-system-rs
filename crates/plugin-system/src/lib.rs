@@ -30,6 +30,7 @@ pub mod loader;
 pub mod macros;
 pub mod manager;
 pub mod manifest;
+pub mod naming;
 pub mod plugin_info;
 pub mod registry;
 pub mod traits;
@@ -49,6 +50,7 @@ pub use handler::{
 pub use loader::UrlLoader;
 pub use loader::{FileLoader, MultiLoader, PluginLoader};
 pub use manager::{PluginManager, PLUGIN_EXTENSION};
+pub use naming::{canonical_plugin_name, canonical_plugin_name_from_path, plugin_file_stem};
 pub use plugin_info::{PluginInfo, PluginResult};
 pub use registry::{new_shared_registry, PluginRegistry, SharedRegistry};
 pub use serde_json;

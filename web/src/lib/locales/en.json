@@ -53,6 +53,7 @@
       "obs-control": "OBS Control",
       "obs-scenes": "OBS Scenes",
       "obs-inputs": "OBS Inputs",
+      "timer": "Timer",
       "fetch": "Fetch Data"
     },
     "config": {

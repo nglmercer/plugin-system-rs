@@ -7,8 +7,37 @@ import {
   uploadPluginFile,
   updatePluginFile,
   uninstallPlugin,
+  readPluginManifest,
 } from '../lib/api';
+import type { PluginManifestUpload } from '../lib/api';
 import type { PluginStatus } from '../lib/types';
+
+/**
+ * Ask before handing a plugin any host capability.
+ *
+ * The server refuses to grant a capability that was not acknowledged by name,
+ * and this is the acknowledgement: the user is told exactly what the plugin is
+ * asking for before anything is written to disk. Declining is the default.
+ */
+function confirmCapabilities(manifest: PluginManifestUpload | null): boolean {
+  if (!manifest || manifest.capabilities.length === 0) return true;
+
+  const described = manifest.capabilities
+    .map(capability => `  • ${capability}${CAPABILITY_WARNINGS[capability] ?? ''}`)
+    .join('\n');
+
+  return confirm(
+    `This plugin requests the following host capabilities:\n\n${described}\n\n` +
+      'Only continue if you trust the source of this plugin. Grant them?',
+  );
+}
+
+const CAPABILITY_WARNINGS: Record<string, string> = {
+  input: ' — can press keys and see everything you type',
+  audio: ' — can read and change system and per-app volume',
+  websocket: ' — can open outbound network connections',
+  'system-info': ' — can read CPU, memory and process counts',
+};
 
 type PluginsTab = 'installed' | 'install';
 
@@ -34,8 +63,10 @@ export function Plugins() {
   const [updating, setUpdating] = useState<string | null>(null);
   const [uninstalling, setUninstalling] = useState<string | null>(null);
   const [installFile, setInstallFile] = useState<File | null>(null);
+  const [installManifest, setInstallManifest] = useState<PluginManifestUpload | null>(null);
   const [installEnabled, setInstallEnabled] = useState(true);
   const [updateFiles, setUpdateFiles] = useState<Record<string, File>>({});
+  const [updateManifests, setUpdateManifests] = useState<Record<string, PluginManifestUpload>>({});
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -101,8 +132,29 @@ export function Plugins() {
     setInstallFile(input.files?.[0] ?? null);
   }
 
+  async function handleInstallManifest(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) {
+      setInstallManifest(null);
+      return;
+    }
+
+    setError(null);
+    try {
+      setInstallManifest(await readPluginManifest(file));
+    } catch (error) {
+      setInstallManifest(null);
+      setError(toErrorMessage(error));
+    }
+  }
+
   async function handleInstall() {
     if (!installFile) {
+      return;
+    }
+
+    if (!confirmCapabilities(installManifest)) {
       return;
     }
 
@@ -110,8 +162,9 @@ export function Plugins() {
     setMessage(null);
     setError(null);
     try {
-      await uploadPluginFile(installFile, installEnabled);
+      await uploadPluginFile(installFile, installEnabled, installManifest ?? undefined);
       setInstallFile(null);
+      setInstallManifest(null);
       setMessage('Plugin installed');
       await loadPlugins();
     } catch (error) {
@@ -134,9 +187,33 @@ export function Plugins() {
     }));
   }
 
+  async function handleUpdateManifest(pluginName: string, event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    setError(null);
+    try {
+      const manifest = await readPluginManifest(file);
+      setUpdateManifests(current => ({ ...current, [pluginName]: manifest }));
+    } catch (error) {
+      setError(toErrorMessage(error));
+    }
+  }
+
   async function handleUpdate(plugin: PluginStatus) {
     const file = updateFiles[plugin.name];
     if (!file) {
+      return;
+    }
+
+    const manifest = updateManifests[plugin.name] ?? null;
+    // An update is a new binary with new grants, so it is confirmed the same
+    // way an install is — inheriting the old plugin's capabilities silently
+    // would make "update" the way around this prompt.
+    if (!confirmCapabilities(manifest)) {
       return;
     }
 
@@ -144,10 +221,13 @@ export function Plugins() {
     setMessage(null);
     setError(null);
     try {
-      await updatePluginFile(plugin.name, file, plugin.enabled);
+      await updatePluginFile(plugin.name, file, plugin.enabled, manifest ?? undefined);
       const nextFiles = { ...updateFiles };
       delete nextFiles[plugin.name];
       setUpdateFiles(nextFiles);
+      const nextManifests = { ...updateManifests };
+      delete nextManifests[plugin.name];
+      setUpdateManifests(nextManifests);
       setMessage('Plugin updated');
       await loadPlugins();
     } catch (error) {
@@ -194,7 +274,7 @@ export function Plugins() {
     h('section', { class: 'plugin-actions' },
       h('div', null,
         h('h2', null, 'Plugins'),
-        h('p', { class: 'page-help' }, 'Install, update, enable, or disable native plugins.')
+        h('p', { class: 'page-help' }, 'Install, update, enable, or disable WebAssembly plugins.')
       ),
       h('button', {
         class: 'reload-btn',
@@ -254,14 +334,30 @@ export function Plugins() {
           disabled: installing || !installFile,
         }, installing ? 'Installing...' : 'Install')
       ),
-      installFile ? h('p', { class: 'plugin-file-name' }, installFile.name) : null
+      h('div', { class: 'plugin-upload-row' },
+        h('label', { class: 'plugin-manifest-label' }, 'Manifest (optional)'),
+        h('input', {
+          type: 'file',
+          accept: manifestAccept(),
+          onChange: handleInstallManifest,
+        })
+      ),
+      h('p', { class: 'page-help' },
+        'The manifest declares the host capabilities the plugin may use. Without one, ' +
+        'the plugin is installed with no capabilities at all.'
+      ),
+      installFile ? h('p', { class: 'plugin-file-name' }, installFile.name) : null,
+      installManifest && installManifest.capabilities.length > 0
+        ? h('p', { class: 'plugin-capabilities' },
+            `Requests: ${installManifest.capabilities.join(', ')}`)
+        : null
     ),
 
     activeTab === 'installed' && h('div', { class: 'plugin-list' },
       plugins.length === 0
         ? h('div', { class: 'plugin-empty' },
             h('p', { class: 'plugin-empty-title' }, 'No plugins installed'),
-            h('p', { class: 'plugin-empty-hint' }, 'Install a .so/.dll/.dylib plugin file or place one in the plugin directory.')
+            h('p', { class: 'plugin-empty-hint' }, 'Install a .wasm plugin component or place one in the plugin directory.')
           )
         : plugins.map(plugin =>
             h('div', { class: `plugin-item ${plugin.loaded ? 'loaded' : ''} ${!plugin.enabled ? 'disabled' : ''}`, key: plugin.name },
@@ -289,6 +385,23 @@ export function Plugins() {
                     style: { display: 'none' },
                     onChange: event => handleUpdateFile(plugin.name, event),
                   }),
+                  h('input', {
+                    id: `plugin-update-manifest-${plugin.name}`,
+                    type: 'file',
+                    accept: manifestAccept(),
+                    style: { display: 'none' },
+                    onChange: event => handleUpdateManifest(plugin.name, event),
+                  }),
+                  h('button', {
+                    class: 'secondary-btn',
+                    onClick: () => {
+                      const input = document.getElementById(
+                        `plugin-update-manifest-${plugin.name}`,
+                      );
+                      input?.click();
+                    },
+                    disabled: installing || updating !== null || toggling !== null || uninstalling !== null,
+                  }, updateManifests[plugin.name] ? 'Manifest ✓' : 'Manifest'),
                   h('button', {
                     class: 'secondary-btn',
                     onClick: () => {
@@ -320,7 +433,14 @@ export function Plugins() {
 }
 
 function pluginAccept() {
-  return '.dll,.so,.dylib';
+  // Native shared libraries are no longer loadable — a plugin is a WASI
+  // component. Offering the old extensions filtered out the only file the
+  // server accepts.
+  return '.wasm';
+}
+
+function manifestAccept() {
+  return '.json';
 }
 
 function toErrorMessage(error: unknown) {

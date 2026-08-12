@@ -131,6 +131,35 @@ export function WizardConfig({
         onChange: (v) => set("refreshInterval", v),
       }),
 
+    widget.type === "timer" &&
+      h(
+        "div",
+        null,
+        h(
+          FormField,
+          { label: "Timer name" },
+          h(FormInput, {
+            value: settings.timerName || "",
+            placeholder: "timer",
+            onInput: (v) => set("timerName", v),
+          }),
+        ),
+        h(
+          FormField,
+          { label: "Duration (seconds)" },
+          h(FormInput, {
+            value: String(settings.seconds ?? 300),
+            type: "number",
+            onInput: (v) => set("seconds", Math.max(1, Number(v) || 1)),
+          }),
+        ),
+        h(IntervalField, {
+          value: settings.refreshInterval || 1000,
+          min: 250,
+          onChange: (v) => set("refreshInterval", v),
+        }),
+      ),
+
     widget.type === "fetch" &&
       h(FetchConfig, { settings, updateSetting }),
   );

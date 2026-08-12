@@ -9,7 +9,7 @@ import { WidgetContent } from "./WidgetContent";
 import { WidgetContextMenu } from "./WidgetContextMenu";
 import { DeckToolbar } from "./DeckToolbar";
 import { DeckGrid } from "./DeckGrid";
-import { Icons } from "./Icons";
+import { Icons } from "../ui/icons/Icons";
 import { t } from "../lib/i18n";
 import { CssEditor } from "./CssEditor";
 import {

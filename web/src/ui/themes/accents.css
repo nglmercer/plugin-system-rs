@@ -1,0 +1,40 @@
+/*
+ * Accent presets. Each preset overrides the accent tokens; values are
+ * tuned per mode so contrast holds in both dark and light themes.
+ * Cyan is the default and needs no override.
+ */
+[data-accent="orange"] {
+  --sd-accent: var(--sd-orange-400);
+  --sd-accent-hover: var(--sd-orange-500);
+}
+[data-theme="light"][data-accent="orange"] {
+  --sd-accent: var(--sd-orange-700);
+  --sd-accent-hover: var(--sd-orange-800);
+}
+
+[data-accent="green"] {
+  --sd-accent: var(--sd-green-400);
+  --sd-accent-hover: var(--sd-green-500);
+}
+[data-theme="light"][data-accent="green"] {
+  --sd-accent: var(--sd-green-700);
+  --sd-accent-hover: var(--sd-green-800);
+}
+
+[data-accent="purple"] {
+  --sd-accent: var(--sd-purple-400);
+  --sd-accent-hover: var(--sd-purple-500);
+}
+[data-theme="light"][data-accent="purple"] {
+  --sd-accent: var(--sd-purple-700);
+  --sd-accent-hover: var(--sd-purple-800);
+}
+
+[data-accent="red"] {
+  --sd-accent: var(--sd-red-400);
+  --sd-accent-hover: var(--sd-red-500);
+}
+[data-theme="light"][data-accent="red"] {
+  --sd-accent: var(--sd-red-700);
+  --sd-accent-hover: var(--sd-red-800);
+}

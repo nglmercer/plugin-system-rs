@@ -4,7 +4,7 @@ use axum::{
     Router,
 };
 use sd_paths::resolve_web_dist;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
 use tower_http::trace::TraceLayer;
 
@@ -13,14 +13,46 @@ use crate::{
         actions, dashboard_handlers, devices, hotkeys, icons, obs, plugins, profiles, proxy, system,
         volume, websocket,
     },
+    auth,
     state::AppState,
 };
 
+/// Origins allowed to call the API cross-site during frontend development.
+///
+/// The shipped dashboard is served from this same origin and needs no CORS at
+/// all. The old `allow_origin(Any)` existed only so `vite dev` on :5173 could
+/// reach the daemon, and it bought that convenience by letting *every* page on
+/// the internet script the API from the user's browser. Naming the dev servers
+/// keeps the convenience without the hole. Set `SD_CORS_ALLOWED_ORIGINS` (comma
+/// separated) to add your own.
+fn allowed_origins() -> Vec<axum::http::HeaderValue> {
+    let configured = std::env::var("SD_CORS_ALLOWED_ORIGINS").unwrap_or_default();
+    let mut origins: Vec<String> = configured
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    origins.extend(
+        [
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+        ]
+        .into_iter()
+        .map(String::from),
+    );
+
+    origins
+        .into_iter()
+        .filter_map(|origin| origin.parse().ok())
+        .collect()
+}
+
 pub fn create_router(state: AppState) -> Router {
     let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+        .allow_origin(allowed_origins())
+        .allow_methods(tower_http::cors::Any)
+        .allow_headers(tower_http::cors::Any);
 
     // Honour an explicit override, otherwise probe a sequence of likely
     // locations (exe-relative first, then CWD-relative). This makes the
@@ -45,7 +77,9 @@ pub fn create_router(state: AppState) -> Router {
             }
         }));
 
-    Router::new()
+    // Everything that can act on the host, read its state, or reach the
+    // network on the caller's behalf. All of it sits behind the token check.
+    let protected = Router::new()
         .route("/api/devices", get(devices::list_devices))
         .route(
             "/api/devices/:device_id/press/:button_index",
@@ -85,6 +119,10 @@ pub fn create_router(state: AppState) -> Router {
         .route(
             "/api/plugins/:plugin_name/enabled",
             put(plugins::set_plugin_enabled),
+        )
+        .route(
+            "/api/plugins/:plugin_name/command",
+            post(plugins::call_plugin_command),
         )
         .route("/api/system-stats", get(system::get_system_stats))
         .route("/api/local-ip", get(system::get_local_ip))
@@ -129,6 +167,21 @@ pub fn create_router(state: AppState) -> Router {
         )
         .route("/api/proxy", post(proxy::proxy_handler))
         .route("/ws", get(websocket::websocket_handler))
+        // `route_layer` rather than `layer`: the check must apply to these
+        // routes only, and must not run for requests that fall through to the
+        // static file service below.
+        .route_layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            auth::require_token,
+        ));
+
+    // The only unauthenticated endpoint, and it enforces its own rule: it
+    // answers loopback callers only. The dashboard is served from this origin
+    // and has no other way to bootstrap the token.
+    let public = Router::new().route("/api/auth/token", get(auth::get_token));
+
+    protected
+        .merge(public)
         .nest_service("/", static_files)
         .layer(cors)
         .layer(TraceLayer::new_for_http())

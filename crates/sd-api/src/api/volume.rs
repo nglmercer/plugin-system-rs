@@ -115,15 +115,17 @@ fn parse_volume_data(data: serde_json::Value) -> Option<VolumeDataResponse> {
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string(),
+            // Top level only. There used to be a fallback to the same keys
+            // nested inside `state`, which the plugin has never emitted — so
+            // it was dead code that would have quietly absorbed exactly the
+            // kind of shape change it looked like it was guarding against.
             platform_supported: data
                 .get("platform_supported")
                 .and_then(|v| v.as_bool())
-                .or_else(|| state.get("platform_supported").and_then(|v| v.as_bool()))
                 .unwrap_or(false),
             per_app_supported: data
                 .get("per_app_supported")
                 .and_then(|v| v.as_bool())
-                .or_else(|| state.get("per_app_supported").and_then(|v| v.as_bool()))
                 .unwrap_or(false),
         },
         apps: apps.iter().map(parse_app).collect(),
@@ -134,24 +136,10 @@ pub(crate) async fn get_volume_state(
     State(state): State<AppState>,
 ) -> Json<ApiResponse<VolumeDataResponse>> {
     let pm = state.plugin_manager.plugin_manager();
-    let manager = pm.read().await;
 
-    // First refresh the data
-    let _ = crate::api::helpers::call_plugin_ok(
-        &manager,
-        "volume-master",
-        "refresh",
-        serde_json::json!({}),
-    )
-    .await;
-
-    // Then read the interface data
-    if let Ok(plugin_arc) = manager.get_plugin_arc("volume-master") {
-        let plugin = plugin_arc.read().expect("plugin lock poisoned");
-        if let Some(data) = plugin.interface_data() {
-            if let Some(resp) = parse_volume_data(data) {
-                return Json(ApiResponse::success(resp));
-            }
+    if let Some(data) = crate::api::helpers::refresh_and_read(&pm, "volume-master").await {
+        if let Some(resp) = parse_volume_data(data) {
+            return Json(ApiResponse::success(resp));
         }
     }
 
@@ -162,30 +150,14 @@ pub(crate) async fn get_app_volumes(
     State(state): State<AppState>,
 ) -> Json<ApiResponse<Vec<AppVolumeResponse>>> {
     let pm = state.plugin_manager.plugin_manager();
-    let manager = pm.read().await;
 
-    // First refresh the data
-    let _ = crate::api::helpers::call_plugin_ok(
-        &manager,
-        "volume-master",
-        "refresh",
-        serde_json::json!({}),
-    )
-    .await;
-
-    // Then read the interface data
-    if let Ok(plugin_arc) = manager.get_plugin_arc("volume-master") {
-        let plugin = plugin_arc.read().expect("plugin lock poisoned");
-        if let Some(data) = plugin.interface_data() {
-            let apps = data
-                .get("apps")
-                .and_then(|a| a.as_array())
-                .map(|arr| {
-                    arr.iter().map(parse_app).collect()
-                })
-                .unwrap_or_default();
-            return Json(ApiResponse::success(apps));
-        }
+    if let Some(data) = crate::api::helpers::refresh_and_read(&pm, "volume-master").await {
+        let apps = data
+            .get("apps")
+            .and_then(|a| a.as_array())
+            .map(|arr| arr.iter().map(parse_app).collect())
+            .unwrap_or_default();
+        return Json(ApiResponse::success(apps));
     }
 
     Json(ApiResponse::error("Volume plugin not available"))
@@ -196,11 +168,10 @@ pub(crate) async fn set_master_volume(
     Json(req): Json<SetVolumeRequest>,
 ) -> Json<ApiResponse<String>> {
     let pm = state.plugin_manager.plugin_manager();
-    let manager = pm.read().await;
     let args = serde_json::json!({"volume": req.volume});
     Json(
         crate::api::helpers::call_plugin_ok_response(
-            &manager,
+            &pm,
             "volume-master",
             "set_volume",
             args,
@@ -215,11 +186,10 @@ pub(crate) async fn set_master_mute(
     Json(req): Json<SetMuteRequest>,
 ) -> Json<ApiResponse<String>> {
     let pm = state.plugin_manager.plugin_manager();
-    let manager = pm.read().await;
     let args = serde_json::json!({"muted": req.muted});
     Json(
         crate::api::helpers::call_plugin_ok_response(
-            &manager,
+            &pm,
             "volume-master",
             "set_mute",
             args,
@@ -234,7 +204,6 @@ pub(crate) async fn set_app_volume(
     Json(req): Json<SetAppVolumeRequest>,
 ) -> Json<ApiResponse<String>> {
     let pm = state.plugin_manager.plugin_manager();
-    let manager = pm.read().await;
     let args = serde_json::json!({
         "app_id": req.app_id.unwrap_or_default(),
         "app_name": req.app_name,
@@ -242,7 +211,7 @@ pub(crate) async fn set_app_volume(
     });
     Json(
         crate::api::helpers::call_plugin_ok_response(
-            &manager,
+            &pm,
             "volume-master",
             "set_app_volume",
             args,
@@ -257,7 +226,6 @@ pub(crate) async fn set_app_mute(
     Json(req): Json<SetAppMuteRequest>,
 ) -> Json<ApiResponse<String>> {
     let pm = state.plugin_manager.plugin_manager();
-    let manager = pm.read().await;
     let args = serde_json::json!({
         "app_id": req.app_id.unwrap_or_default(),
         "app_name": req.app_name,
@@ -265,7 +233,7 @@ pub(crate) async fn set_app_mute(
     });
     Json(
         crate::api::helpers::call_plugin_ok_response(
-            &manager,
+            &pm,
             "volume-master",
             "set_app_mute",
             args,
@@ -281,14 +249,18 @@ mod tests {
 
     #[test]
     fn parses_volume_data_with_apps_and_support_flags() {
+        // The shape `plugin-volume-master-wasm` actually serializes: the
+        // support flags sit beside `state`, not inside it. The previous
+        // version of this test nested them, which meant it only ever
+        // exercised a fallback branch the plugin has never produced.
         let data = serde_json::json!({
             "state": {
                 "master_volume": 42.5,
                 "muted": false,
-                "default_device_name": "Speakers",
-                "platform_supported": true,
-                "per_app_supported": true
+                "default_device_name": "Speakers"
             },
+            "platform_supported": true,
+            "per_app_supported": true,
             "apps": [
                 {
                     "name": "Firefox",
@@ -319,10 +291,10 @@ mod tests {
             "state": {
                 "master_volume": 0.0,
                 "muted": true,
-                "default_device_name": "",
-                "platform_supported": false,
-                "per_app_supported": false
-            }
+                "default_device_name": ""
+            },
+            "platform_supported": false,
+            "per_app_supported": false
         });
 
         let parsed = parse_volume_data(data).unwrap();

@@ -10,6 +10,7 @@ import { VolumeAppsWidget } from "./VolumeAppsWidget";
 import { ObsWidget } from "./ObsWidget";
 import { ObsScenesWidget } from "./ObsScenesWidget";
 import { ObsInputsWidget } from "./ObsInputsWidget";
+import { TimerWidget } from "./TimerWidget";
 import { FetchWidget } from "./FetchWidget";
 
 export function WidgetContent({ widget }: { widget: WidgetConfig }) {
@@ -34,6 +35,8 @@ export function WidgetContent({ widget }: { widget: WidgetConfig }) {
       return h(ObsScenesWidget, { settings: widget.settings });
     case "obs-inputs":
       return h(ObsInputsWidget, { settings: widget.settings });
+    case "timer":
+      return h(TimerWidget, { settings: widget.settings });
     case "fetch":
       return h(FetchWidget, { settings: widget.settings });
     default:

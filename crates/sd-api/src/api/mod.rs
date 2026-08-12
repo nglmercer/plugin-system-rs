@@ -14,5 +14,6 @@ pub(crate) mod volume;
 pub(crate) mod websocket;
 
 pub use dashboard::{load_dashboard_config, DashboardLayout, DashboardWidget};
+pub use proxy::proxy_http_client;
 
 pub(crate) mod icons;

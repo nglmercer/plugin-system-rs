@@ -1,0 +1,23 @@
+/* Semantic tokens for the light theme. */
+[data-theme="light"] {
+  --sd-bg-page: var(--sd-neutral-100);
+  --sd-bg-card: var(--sd-neutral-0);
+  --sd-bg-card-hover: var(--sd-neutral-50);
+  --sd-bg-input: var(--sd-neutral-200);
+  --sd-bg-nav: var(--sd-neutral-0);
+  --sd-border: var(--sd-neutral-300);
+  --sd-border-hover: var(--sd-neutral-400);
+  --sd-text: var(--sd-neutral-900);
+  --sd-text-secondary: #555;
+  --sd-text-muted: var(--sd-neutral-550);
+  --sd-text-dim: var(--sd-neutral-500);
+  --sd-accent: var(--sd-cyan-700);
+  --sd-accent-hover: var(--sd-cyan-800);
+  --sd-on-accent: var(--sd-neutral-100);
+  --sd-success: var(--sd-status-green-700);
+  --sd-warning: var(--sd-status-amber-700);
+  --sd-error: var(--sd-status-red-700);
+  --sd-slider-track: #ddd;
+  --sd-shadow-color: rgba(0, 0, 0, 0.08);
+  --sd-overlay: rgba(0, 0, 0, 0.6);
+}

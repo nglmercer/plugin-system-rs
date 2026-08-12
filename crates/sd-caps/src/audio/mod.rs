@@ -114,12 +114,25 @@ impl NativeAudioProvider {
         }
     }
 
-    fn with<T>(&self, f: impl FnOnce(&mut dyn VolumeControl) -> Result<T, String>) -> Result<T, String> {
+    fn with<T>(
+        &self,
+        f: impl FnOnce(&mut dyn VolumeControl) -> Result<T, String>,
+    ) -> Result<T, String> {
         let mut guard = self
             .controller
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         f(guard.as_mut())
+    }
+}
+
+/// `new` is infallible and takes no arguments, so `Default` is simply the
+/// right name for it — and clippy's `new_without_default` is right to say so.
+/// It probes the platform like `new` does, since a provider that has not
+/// probed would report support it cannot deliver.
+impl Default for NativeAudioProvider {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

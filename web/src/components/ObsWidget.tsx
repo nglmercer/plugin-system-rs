@@ -45,8 +45,11 @@ export function ObsWidget({ settings }: { settings: Record<string, any> }) {
         // the plugin is genuinely missing — not merely not connected to OBS.
         setError("OBS plugin not loaded");
       }
-    } catch {
-      setError("Failed to fetch OBS status");
+    } catch (e) {
+      // The server's own message says what actually failed ("not connected to
+      // OBS", "obs plugin unavailable"); a fixed string here hid all of it
+      // behind one wrong-looking diagnosis.
+      setError(e instanceof Error ? e.message : "Failed to fetch OBS status");
     }
     setLoading(false);
   }, []);

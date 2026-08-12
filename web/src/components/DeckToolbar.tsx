@@ -1,5 +1,5 @@
 import { h } from "preact";
-import { Icons } from "./Icons";
+import { Icons } from "../ui/icons/Icons";
 import { t } from "../lib/i18n";
 
 /**

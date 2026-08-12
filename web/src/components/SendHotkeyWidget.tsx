@@ -1,7 +1,7 @@
 import { h } from "preact";
 import { useState } from "preact/hooks";
 import { sendHotkeyCombo, executeAction } from "../lib/api";
-import { Icons } from "./Icons";
+import { Icons } from "../ui/icons/Icons";
 
 export function SendHotkeyWidget({ settings }: { settings: Record<string, any> }) {
   const [executing, setExecuting] = useState(false);
