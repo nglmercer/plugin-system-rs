@@ -1,5 +1,11 @@
 # FFI → WASI Migration Plan
 
+> **Status: Phases 0 and 1 are implemented and merged on `feat/wasi-migration`.**
+> A real component plugin loads and runs in `sd-core` today. Phase 2 (macro
+> parity) is next; Phase 3 (capabilities) is the decision point described in
+> §9. See [§8 Implementation notes](#8-implementation-notes-phases-01) for
+> what the build taught us that this plan got wrong.
+
 Migrating the plugin ABI from `libloading` + Rust-vtable FFI to WebAssembly
 components running on WASI Preview 2.
 
@@ -50,7 +56,8 @@ fn interface_data(&self) -> Option<Value>;
 
 Five of the six map onto WIT unchanged. Only `interface_ids` fights back —
 `&'static str` cannot come out of a guest, and `CAbiPlugin` already leaks
-`Box::leak` to satisfy it (`cabi.rs:175`). It becomes `Vec<String>`.
+`Box::leak` to satisfy it (`cabi.rs:175`). It became `Vec<String>` in Phase 0,
+and the leak is gone.
 
 `PluginContext` (registry + command registry) does **not** cross the boundary
 as a pointer; it becomes an *imported* WIT interface the guest calls back into.
@@ -65,43 +72,45 @@ big-bang cutover and no point where the app is broken.
 
 ## 3. The WIT contract
 
-`crates/plugin-system/wit/plugin.wit`:
+The contract lives at **`crates/plugin-system/wit/plugin.wit`**, which is the
+single source of truth — guest crates point `wit-bindgen` at that path rather
+than vendoring a copy, because a contract with two definitions is a contract
+that drifts. Abridged:
 
 ```wit
 package streamdeck:plugin@0.1.0;
 
 interface types {
+  record dependency { name: string, version-req: string }
   record metadata {
     name: string, version: string,
-    authors: list<string>,
-    dependencies: list<tuple<string, string>>,
+    authors: list<string>, dependencies: list<dependency>,
   }
   variant command-error { not-found(string), invalid-args(string), failed(string) }
+  enum log-level { trace, debug, info, warn, error }
 }
 
 /// Implemented by the guest.
 interface guest {
   use types.{metadata, command-error};
-  resource plugin {
-    constructor();
-    metadata: func() -> metadata;
-    on-load: func();
-    on-unload: func();
-    handle-command: func(method: string, args-json: string)
-      -> result<string, command-error>;
-    interface-ids: func() -> list<string>;
-    interface-data: func() -> option<string>;
-  }
+  // Named `get-metadata`, not `metadata`: WIT will not let a function
+  // shadow the type it returns.
+  get-metadata: func() -> metadata;
+  on-load: func();
+  on-unload: func();
+  handle-command: func(method: string, args-json: string)
+    -> result<string, command-error>;
+  interface-ids: func() -> list<string>;
+  interface-data: func() -> option<string>;
 }
 
-/// Implemented by the host, imported by the guest.
+/// Implemented by the host, imported by the guest. Everything a plugin can
+/// reach outside its sandbox arrives through here.
 interface host {
-  log: func(level: u8, msg: string);
+  use types.{log-level};
+  log: func(level: log-level, message: string);
   call-plugin: func(plugin: string, method: string, args-json: string)
     -> result<string, string>;
-  emit-event: func(topic: string, payload-json: string);
-  config-get: func(key: string) -> option<string>;
-  config-set: func(key: string, value: string);
 }
 
 world streamdeck-plugin {
@@ -109,6 +118,12 @@ world streamdeck-plugin {
   export guest;
 }
 ```
+
+Plugin instances are plain exported functions rather than a WIT `resource`.
+Each plugin already gets its own `Store`, so an instance *is* the singleton —
+a resource handle would add ceremony to model something the isolation boundary
+gives us for free. `emit-event` and the config accessors are deferred to
+Phase 3, when there is a consumer for them.
 
 JSON stays the payload format. Modelling each command's arguments in WIT would
 be more type-safe but would force every widget, every `sd-api` handler, and
@@ -208,7 +223,7 @@ detection (`cabi.rs:49`), plus:
 Each phase ends with everything building and all tests green. Stop after any
 phase and the system is coherent.
 
-### Phase 0 — Prep (no WASI yet)
+### Phase 0 — Prep (no WASI yet) ✅ done
 - `interface_ids() -> Vec<String>`; delete the `Box::leak` in `cabi.rs:175`.
 - Extend `Manifest` with `abi` / `capabilities` / `limits`; keep `c-flat`
   detection working.
@@ -216,7 +231,7 @@ phase and the system is coherent.
   behaviour — these become the conformance suite both backends must pass.
 - **Deliverable:** identical behaviour, boundary tightened.
 
-### Phase 1 — Runtime + pilot
+### Phase 1 — Runtime + pilot ✅ done
 - New crate `plugin-wasm` (feature `wasm` on `plugin-system`): wasmtime,
   `WasmPlugin: Plugin`, `wit/plugin.wit`, host `log` + `call-plugin` imports.
 - Port **plugin-timer** to `wasm32-wasip2`. Pure logic, no capabilities.
@@ -268,7 +283,74 @@ One capability per PR, each with a native host implementation and a port:
 | Third-party FFI plugins exist in the wild | Phase 5 is gated on a deprecation release; `native-ffi` feature keeps them loadable |
 | wasmtime adds binary size / build time | Measure in Phase 1; it is a hard gate on proceeding |
 
-## 8. Recommendation
+## 8. Implementation notes (Phases 0–1)
+
+What the build actually taught us, including where this plan was wrong.
+
+**Corrections to the plan above**
+
+- The WIT function `metadata` collides with the `metadata` *type* it returns;
+  it is `get-metadata` in the shipped contract.
+- Capping a store at one instance breaks every component. A single component
+  expands to several core wasm instances (inner modules plus adapters), so an
+  instance count constrains the toolchain's output rather than the plugin's
+  appetite. Memory is the meaningful ceiling; there is no instance cap.
+- The guest crates live *outside* the cargo workspace. Their `wit-bindgen`
+  glue emits wasm-only imports that cannot link into a native `cdylib`, so a
+  workspace-wide `cargo build` would fail on them.
+- `PluginManager::metadata_from_path` used `dlopen`, which cannot open a
+  `.wasm` at all. It now reads the sidecar manifest first — which is also
+  what the native loader already preferred, so this is a simplification
+  rather than a special case.
+
+**Design decisions worth keeping**
+
+- Identity comes from the guest's `get-metadata`, not the manifest, so a
+  plugin cannot be renamed by editing its sidecar. A mismatch is logged.
+- A plugin calling itself through `call-plugin` would re-enter a `Store` that
+  is already mutably borrowed. Self-calls are refused rather than deadlocking.
+- `WasmRuntime` owns one engine plus a 10 ms epoch ticker thread. Deadlines
+  are armed per call, not per instance, so a plugin gets a fresh budget each
+  time rather than a lifetime allowance.
+- Registration bookkeeping is now shared by the c-flat and wasm loaders
+  (`PluginManager::register_and_load`), so a third backend costs less.
+
+**Verified, not assumed**
+
+The containment claims are covered by tests against a fixture that misbehaves
+on demand (`plugins/plugin-misbehaving-wasm`). Each of these takes down the
+process under `dlopen`:
+
+| Behaviour | Result |
+|---|---|
+| Infinite loop | Epoch deadline fires; command returns `kind: "trap"` |
+| Panic | Unwinds to a trap at the boundary; host unaffected |
+| Unbounded allocation | Hits the store's memory ceiling; traps |
+| Filesystem access | No preopened directories exist to reach |
+
+End-to-end, `sd-core --features wasm` discovers `plugin_timer.wasm`, loads it,
+and serves it through the unchanged API:
+
+```console
+$ curl localhost:PORT/api/plugins/timer
+{"success":true,"data":{"name":"timer","version":"0.1.0",
+ "interfaces":["Timer"],"data":{"timers":[]}},"error":null}
+```
+
+That response crosses the component boundary twice (`interface-ids` and
+`interface-data`) through handlers that were never modified — which is the
+whole bet of the `WasmPlugin: Plugin` approach paying off.
+
+**Known gaps**
+
+- Guest source is not yet shared with the native plugin; `plugin-timer-wasm`
+  reimplements the logic. Phase 2 fixes this.
+- `capabilities` in the manifest is parsed and exposed but not yet enforced,
+  because no capability exists to grant. Enforcement lands with Phase 3.
+- The wasm guest crates are built manually; `sd-plugins build --wasm` is
+  Phase 2 work.
+
+## 9. Recommendation
 
 Do Phases 0–2. They are self-contained, they fix the genuine soundness bug in
 the current ABI, and they produce a working sandboxed plugin end to end for

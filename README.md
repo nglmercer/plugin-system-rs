@@ -78,7 +78,7 @@ The server starts on `http://localhost:3000`. Open your browser or scan the QR c
 ```
 streamdeck/
 ├── crates/
-│   ├── plugin-system/      Core plugin framework (libloading-based)
+│   ├── plugin-system/      Core plugin framework (native + wasm loaders)
 │   ├── plugin-macros/      Proc macros for plugin exports
 │   ├── sd-types/           Shared types (ActionId, ProfileId, etc.)
 │   ├── sd-events/          Event bus for inter-plugin communication
@@ -94,9 +94,33 @@ streamdeck/
 │   ├── plugin-system-monitor/  System resource monitoring
 │   ├── plugin-key-simulator/  Key simulation plugin
 │   ├── plugin-volume-master/  Multiplatform volume control
-│   └── plugin-obs/         OBS Studio WebSocket control
+│   ├── plugin-obs/         OBS Studio WebSocket control
+│   └── plugin-timer-wasm/  Timer as a WASI component (migration pilot)
 └── web/                    Preact web UI
 ```
+
+### Plugin ABIs
+
+A plugin declares its ABI in a sidecar `<plugin>.manifest.json`; the loader
+dispatches on it, so the three kinds coexist in one `plugins/` directory.
+
+| ABI | Artifact | Notes |
+|-----|----------|-------|
+| `native` (default) | `.so` / `.dll` / `.dylib` | Rust trait object. Fastest, but host and plugin must be built together. |
+| `c-flat` | `.so` / `.dll` / `.dylib` | Flat C ABI, JSON in/out. Stable across compilers and languages. |
+| `wasm-component` | `.wasm` | Sandboxed, one artifact for every platform. Requires `--features wasm`. |
+
+WebAssembly plugins run with a memory ceiling and a per-call deadline, and get
+no filesystem, environment, or network access they were not granted — so a
+plugin that hangs, panics, or leaks fails on its own instead of taking down
+the server. Build the host with support for them:
+
+```bash
+cargo build --release -p sd-core --features wasm
+```
+
+The migration from the native FFI to this backend is documented in
+[`docs/wasi-migration.md`](docs/wasi-migration.md).
 
 ## Quick Start
 
@@ -302,7 +326,8 @@ impl Plugin for MyPlugin {
 ## Tech Stack
 
 - **Backend**: Rust, tokio, axum
-- **Plugin System**: libloading, custom proc macros
+- **Plugin System**: libloading + custom proc macros, with an optional
+  WebAssembly component backend (wasmtime / WASI Preview 2)
 - **Frontend**: Preact, TypeScript, Vite
 - **Communication**: REST + WebSocket
 - **OBS Integration**: obws (WebSocket 5.x)

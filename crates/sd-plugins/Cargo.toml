@@ -3,6 +3,11 @@ name = "sd-plugins"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = []
+# Load WebAssembly component plugins in addition to native ones.
+wasm = ["plugin-system/wasm"]
+
 [dependencies]
 sd-types = { path = "../sd-types" }
 sd-events = { path = "../sd-events" }
