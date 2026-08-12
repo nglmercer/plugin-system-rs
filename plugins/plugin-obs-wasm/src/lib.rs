@@ -409,6 +409,17 @@ impl ObsPlugin {
             .map(str::to_string)
             .ok_or_else(|| CommandError::InvalidArgs(format!("expected a string `{key}`")))
     }
+
+    /// Read the first key that is present, for calls whose argument has been
+    /// spelled two ways across the API and the plugin.
+    fn arg_str_any(args: &serde_json::Value, keys: &[&str]) -> Result<String, CommandError> {
+        keys.iter()
+            .find_map(|k| args.get(*k).and_then(|v| v.as_str()))
+            .map(str::to_string)
+            .ok_or_else(|| {
+                CommandError::InvalidArgs(format!("expected a string `{}`", keys[0]))
+            })
+    }
 }
 
 impl Guest for ObsPlugin {
@@ -583,7 +594,8 @@ impl Guest for ObsPlugin {
             },
 
             "set_transition" => {
-                let name = Self::arg_str(&args, "transition_name")?;
+                // sd-api sends `name`; older callers send `transition_name`.
+                let name = Self::arg_str_any(&args, &["name", "transition_name"])?;
                 match Self::request(
                     "SetCurrentSceneTransition",
                     Some(serde_json::json!({ "transitionName": name })),
@@ -625,8 +637,10 @@ impl Guest for ObsPlugin {
                 }
             }
 
+            // A bare boolean: sd-api deserializes this reply straight into
+            // `bool`, so an `{ok, enabled}` wrapper never parses.
             "get_studio_mode" => match Self::request("GetStudioModeEnabled", None) {
-                Ok(v) => serde_json::json!({ "ok": true, "enabled": v["studioModeEnabled"] }),
+                Ok(v) => serde_json::json!(v["studioModeEnabled"].as_bool().unwrap_or(false)),
                 Err(e) => failed(e),
             },
 
@@ -751,6 +765,23 @@ mod tests {
         assert_eq!(ObsPlugin::transitions_payload(&empty), serde_json::json!([]));
         assert_eq!(ObsPlugin::scene_items_payload(&empty), serde_json::json!([]));
         assert_eq!(ObsPlugin::scenes_payload(&empty)["scenes"], serde_json::json!([]));
+    }
+
+    /// sd-api spells the transition argument `name`; the plugin originally
+    /// read `transition_name` only, so every call failed as InvalidArgs.
+    #[test]
+    fn accepts_both_spellings_of_the_transition_argument() {
+        let api = serde_json::json!({"name": "Fade"});
+        assert_eq!(
+            ObsPlugin::arg_str_any(&api, &["name", "transition_name"]).unwrap(),
+            "Fade"
+        );
+        let legacy = serde_json::json!({"transition_name": "Cut"});
+        assert_eq!(
+            ObsPlugin::arg_str_any(&legacy, &["name", "transition_name"]).unwrap(),
+            "Cut"
+        );
+        assert!(ObsPlugin::arg_str_any(&serde_json::json!({}), &["name"]).is_err());
     }
 
     #[test]
