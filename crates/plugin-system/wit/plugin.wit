@@ -87,10 +87,21 @@ interface audio {
   }
 
   record app-volume {
-    /// Stable-enough identifier to address the stream again; on most
-    /// platforms this is the application name.
+    /// Addresses this exact stream. One application can own several — a
+    /// browser plays a stream per tab — so this is the backend's stream
+    /// handle, not the application name.
     id: string,
+    /// Application name, e.g. "Firefox".
     name: string,
+    /// What this particular stream is playing, e.g. a tab or track title.
+    /// Empty when the backend does not report one.
+    title: string,
+    /// Freedesktop icon name hint, e.g. "firefox". Empty when unknown.
+    ///
+    /// A name rather than image bytes: resolving it against the icon theme is
+    /// the host's job, and shipping pixels across the component boundary on
+    /// every poll would be wasteful.
+    icon: string,
     volume: f32,
     muted: bool,
     pid: option<u32>,

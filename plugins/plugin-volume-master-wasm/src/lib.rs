@@ -36,7 +36,14 @@ struct VolumeState {
 
 #[derive(Debug, Clone, Serialize)]
 struct AppVolume {
+    /// Addresses this exact stream. One app can own several — a browser plays
+    /// one per tab — so commands carry this rather than the app name.
+    id: String,
     name: String,
+    /// What the stream is playing, e.g. a tab title. Empty when unknown.
+    title: String,
+    /// Freedesktop icon name; the frontend resolves it via `/api/icon/:name`.
+    icon: String,
     volume: f32,
     muted: bool,
     pid: Option<u32>,
@@ -91,7 +98,10 @@ impl VolumeMasterPlugin {
                         data.apps = apps
                             .into_iter()
                             .map(|a| AppVolume {
+                                id: a.id,
                                 name: a.name,
+                                title: a.title,
+                                icon: a.icon,
                                 volume: a.volume,
                                 muted: a.muted,
                                 pid: a.pid,
@@ -115,6 +125,29 @@ impl VolumeMasterPlugin {
         args.get(key)
             .and_then(|v| v.as_bool())
             .ok_or_else(|| CommandError::InvalidArgs(format!("expected a boolean `{key}`")))
+    }
+
+    /// Which stream a command targets.
+    ///
+    /// Prefers `app_id`, falling back to `app_name` so a caller written
+    /// against the old command shape keeps working — at the cost of ambiguity
+    /// when one app owns several streams, which is exactly what `app_id`
+    /// exists to resolve.
+    fn arg_target(args: &serde_json::Value) -> Result<String, CommandError> {
+        if let Some(id) = args.get("app_id").and_then(|v| v.as_str()) {
+            if !id.is_empty() {
+                return Ok(id.to_string());
+            }
+        }
+        Self::arg_str(args, "app_name")
+    }
+
+    /// Match the cached entry a command just changed, by id then by name.
+    fn find_app<'a>(apps: &'a mut [AppVolume], target: &str) -> Option<&'a mut AppVolume> {
+        if let Some(index) = apps.iter().position(|a| a.id == target) {
+            return apps.get_mut(index);
+        }
+        apps.iter_mut().find(|a| a.name == target)
     }
 
     fn arg_str(args: &serde_json::Value, key: &str) -> Result<String, CommandError> {
@@ -179,11 +212,11 @@ impl Guest for VolumeMasterPlugin {
             }
 
             "set_app_volume" => {
-                let name = Self::arg_str(&args, "app_name")?;
+                let target = Self::arg_target(&args)?;
                 let volume = Self::arg_f32(&args, "volume")?;
-                audio::set_app_volume(&name, volume).map_err(CommandError::Failed)?;
+                audio::set_app_volume(&target, volume).map_err(CommandError::Failed)?;
                 DATA.with(|d| {
-                    if let Some(app) = d.borrow_mut().apps.iter_mut().find(|a| a.name == name) {
+                    if let Some(app) = Self::find_app(&mut d.borrow_mut().apps, &target) {
                         app.volume = volume;
                     }
                 });
@@ -191,11 +224,11 @@ impl Guest for VolumeMasterPlugin {
             }
 
             "set_app_mute" => {
-                let name = Self::arg_str(&args, "app_name")?;
+                let target = Self::arg_target(&args)?;
                 let muted = Self::arg_bool(&args, "muted")?;
-                audio::set_app_mute(&name, muted).map_err(CommandError::Failed)?;
+                audio::set_app_mute(&target, muted).map_err(CommandError::Failed)?;
                 DATA.with(|d| {
-                    if let Some(app) = d.borrow_mut().apps.iter_mut().find(|a| a.name == name) {
+                    if let Some(app) = Self::find_app(&mut d.borrow_mut().apps, &target) {
                         app.muted = muted;
                     }
                 });

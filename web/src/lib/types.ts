@@ -74,8 +74,21 @@ export interface WidgetConfig {
   id: string;
   type: WidgetType;
   title: string;
+  /**
+   * Footprint in grid cells. Named `colSpan`/`rowSpan` for continuity with
+   * the flow layout these replaced; in the deck they are simply width and
+   * height.
+   */
   colSpan: number;
   rowSpan: number;
+  /**
+   * Explicit position, in cell units. Optional so a layout saved before the
+   * deck existed still loads — `normalizeLayout` assigns coordinates to any
+   * widget missing them, once.
+   */
+  x?: number;
+  y?: number;
+  page?: number;
   settings: Record<string, any>;
 }
 
@@ -300,7 +313,12 @@ export const WIZARD_STEPS: WizardStep[] = [
 
 export interface DashboardLayout {
   widgets: WidgetConfig[];
+  /** Cells across one page. */
   columns: number;
+  /** Cells down one page. Absent in pre-deck layouts. */
+  rows?: number;
+  /** Cell width / height. 1 gives square keys like deck hardware. */
+  aspect?: number;
   customCss?: string;
 }
 

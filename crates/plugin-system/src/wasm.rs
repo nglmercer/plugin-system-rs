@@ -288,6 +288,8 @@ impl streamdeck::plugin::audio::Host for HostState {
                 .map(|a| wit_audio::AppVolume {
                     id: a.id,
                     name: a.name,
+                    title: a.title,
+                    icon: a.icon,
                     volume: a.volume,
                     muted: a.muted,
                     pid: a.pid,

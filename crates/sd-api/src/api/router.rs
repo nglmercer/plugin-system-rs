@@ -10,7 +10,7 @@ use tower_http::trace::TraceLayer;
 
 use crate::{
     api::{
-        actions, dashboard_handlers, devices, hotkeys, obs, plugins, profiles, proxy, system,
+        actions, dashboard_handlers, devices, hotkeys, icons, obs, plugins, profiles, proxy, system,
         volume, websocket,
     },
     state::AppState,
@@ -88,6 +88,9 @@ pub fn create_router(state: AppState) -> Router {
         )
         .route("/api/system-stats", get(system::get_system_stats))
         .route("/api/local-ip", get(system::get_local_ip))
+        // Resolves a freedesktop icon name (as reported by an audio stream)
+        // against the system icon theme. 404 is a normal answer.
+        .route("/api/icon/:name", get(icons::get_icon))
         .route("/api/volume", get(volume::get_volume_state))
         .route("/api/volume/master", put(volume::set_master_volume))
         .route("/api/volume/mute", put(volume::set_master_mute))

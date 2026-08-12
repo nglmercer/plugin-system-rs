@@ -1,6 +1,8 @@
 import { h } from "preact";
 import { useState, useEffect, useRef, useCallback } from "preact/hooks";
 import { WidgetType, DashboardLayout, WidgetConfig } from "../lib/types";
+import { DeckGrid } from "./DeckGrid";
+import { DEFAULT_GRID, Placement } from "../lib/deckLayout";
 import { fetchDashboard, saveDashboard } from "../lib/api";
 import { buildDefaultWidget, generateId } from "./widgetHelpers";
 import { WidgetLibrary } from "./WidgetLibrary";
@@ -9,6 +11,38 @@ import { WidgetContent } from "./WidgetContent";
 import { Icons } from "./Icons";
 import { t } from "../lib/i18n";
 import { CssEditor } from "./CssEditor";
+
+/** Small +/- control used by the arrange toolbar. */
+function stepper(
+  value: number,
+  onChange: (next: number) => void,
+  min: number,
+  max: number,
+) {
+  return h(
+    "div",
+    { class: "deck-stepper" },
+    h(
+      "button",
+      {
+        onClick: () => onChange(value - 1),
+        disabled: value <= min,
+        "aria-label": "Decrease",
+      },
+      "-",
+    ),
+    h("span", null, String(value)),
+    h(
+      "button",
+      {
+        onClick: () => onChange(value + 1),
+        disabled: value >= max,
+        "aria-label": "Increase",
+      },
+      "+",
+    ),
+  );
+}
 
 interface ContextMenuState {
   visible: boolean;
@@ -20,8 +54,12 @@ interface ContextMenuState {
 export function WidgetGrid() {
   const [layout, setLayout] = useState<DashboardLayout>({
     widgets: [],
-    columns: 3,
+    columns: DEFAULT_GRID.columns,
+    rows: DEFAULT_GRID.rows,
+    aspect: DEFAULT_GRID.aspect,
   });
+  const [arranging, setArranging] = useState(false);
+  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showLibrary, setShowLibrary] = useState(false);
   const [wizardWidget, setWizardWidget] = useState<string | null>(null);
@@ -67,6 +105,37 @@ export function WidgetGrid() {
   function persist(next: DashboardLayout) {
     setLayout(next);
     saveDashboard(next);
+  }
+
+  /**
+   * Write completed drag/resize results back onto the widgets.
+   *
+   * The deck hands back placements for *every* widget, not just the one that
+   * moved, because displacing one can re-pack others. Applying the whole map
+   * keeps the saved layout and the rendered one identical.
+   */
+  function handlePlacementsChange(placements: Map<string, Placement>) {
+    persist({
+      ...layout,
+      widgets: layout.widgets.map((w) => {
+        const p = placements.get(w.id);
+        return p
+          ? { ...w, x: p.x, y: p.y, page: p.page, colSpan: p.w, rowSpan: p.h }
+          : w;
+      }),
+    });
+  }
+
+  /**
+   * Change the page shape.
+   *
+   * Positions are deliberately left alone: `normalizeLayout` re-packs anything
+   * that no longer fits, on the next render, and keeps everything that still
+   * does. Rewriting coordinates here would discard arrangements that survive
+   * the resize perfectly well.
+   */
+  function setGrid(patch: { columns?: number; rows?: number }) {
+    persist({ ...layout, ...patch });
   }
 
   function handleAddWidget(type: WidgetType) {
@@ -192,7 +261,39 @@ export function WidgetGrid() {
       h("h2", null, t("dashboard.title")),
       h(
         "div",
-        { class: "dashboard-header-actions" },
+        { class: "dashboard-header-actions deck-toolbar" },
+        arranging &&
+          h(
+            "div",
+            { class: "deck-toolbar-group" },
+            h("label", null, t("dashboard.columns")),
+            stepper(
+              layout.columns,
+              (v) => setGrid({ columns: v }),
+              1,
+              12,
+            ),
+          ),
+        arranging &&
+          h(
+            "div",
+            { class: "deck-toolbar-group" },
+            h("label", null, t("dashboard.rows")),
+            stepper(
+              layout.rows ?? DEFAULT_GRID.rows,
+              (v) => setGrid({ rows: v }),
+              1,
+              12,
+            ),
+          ),
+        h(
+          "button",
+          {
+            class: `deck-edit-toggle${arranging ? " is-active" : ""}`,
+            onClick: () => setArranging((v) => !v),
+          },
+          arranging ? t("dashboard.done") : t("dashboard.edit"),
+        ),
         h(
           "button",
           { class: "add-widget-btn", onClick: () => setShowCssEditor(true) },
@@ -214,36 +315,18 @@ export function WidgetGrid() {
           h("div", { class: "empty-text" }, t("dashboard.empty")),
           h("div", { class: "empty-sub" }, t("dashboard.emptyHint")),
         )
-      : h(
-          "div",
-          {
-            class: "dashboard-grid",
-            style: { gridTemplateColumns: `repeat(${layout.columns}, 1fr)` },
-          },
-          layout.widgets.map((widget) =>
-            h(
-              "div",
-              {
-                key: widget.id,
-                class: `dashboard-widget variant-${widget.settings.variant || "compact"}`,
-                style: {
-                  gridColumn: `span ${widget.colSpan}`,
-                  gridRow: `span ${widget.rowSpan}`,
-                },
-                onContextMenu: (e: Event) => handlePointerDown(e, widget.id),
-                onPointerdown: (e: Event) => handlePointerDown(e, widget.id),
-                onPointerup: handlePointerUp,
-                onPointermove: handlePointerMove,
-                onPointercancel: handlePointerUp,
-              },
-              h(
-                "div",
-                { class: "widget-content" },
-                h(WidgetContent, { widget }),
-              ),
-            ),
-          ),
-        ),
+      : h(DeckGrid, {
+          widgets: layout.widgets,
+          columns: layout.columns,
+          rows: layout.rows ?? DEFAULT_GRID.rows,
+          aspect: layout.aspect ?? DEFAULT_GRID.aspect,
+          editing: arranging,
+          page,
+          onPageChange: setPage,
+          onPlacementsChange: handlePlacementsChange,
+          onWidgetContextMenu: (e: Event, id: string) => handlePointerDown(e, id),
+          renderWidget: (widget: WidgetConfig) => h(WidgetContent, { widget }),
+        }),
     contextMenu.visible &&
       h(
         "div",

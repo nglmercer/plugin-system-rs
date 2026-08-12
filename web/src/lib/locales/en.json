@@ -13,7 +13,13 @@
     "addWidget": "Add Widget",
     "empty": "No widgets added yet",
     "emptyHint": "Click \"Add Widget\" to get started",
-    "loading": "Loading dashboard..."
+    "loading": "Loading dashboard...",
+    "edit": "Arrange",
+    "done": "Done",
+    "columns": "Cols",
+    "rows": "Rows",
+    "page": "Page",
+    "addPage": "Add page"
   },
   "widget": {
     "library": "Widget Library",

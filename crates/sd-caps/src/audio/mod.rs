@@ -52,9 +52,16 @@ pub struct VolumeState {
 }
 
 /// One application's stream, as the platform backends report it.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct AppVolume {
+    /// Backend handle addressing this exact stream. Empty means the backend
+    /// has no stream-level identity, in which case the name is used instead.
+    pub id: String,
     pub name: String,
+    /// What the stream is playing, when the backend knows. Empty otherwise.
+    pub title: String,
+    /// Freedesktop icon name hint. Empty when unknown.
+    pub icon: String,
     pub volume: f32,
     pub muted: bool,
     pub pid: Option<u32>,
@@ -141,12 +148,14 @@ impl AudioProvider for NativeAudioProvider {
         self.with(|c| c.get_app_volumes()).map(|apps| {
             apps.into_iter()
                 .map(|a| plugin_system::AppVolume {
-                    // Every backend addresses streams by application name, so
-                    // that is what the id has to be. Kept as a distinct field
-                    // rather than reusing `name` so a backend that grows a
-                    // stabler handle can supply one without a contract change.
-                    id: a.name.clone(),
+                    // Backends that can identify a single stream supply an id;
+                    // the rest fall back to the application name, which is
+                    // ambiguous when an app owns several streams but is the
+                    // best those platforms can offer.
+                    id: if a.id.is_empty() { a.name.clone() } else { a.id },
                     name: a.name,
+                    title: a.title,
+                    icon: a.icon,
                     volume: a.volume,
                     muted: a.muted,
                     pid: a.pid,

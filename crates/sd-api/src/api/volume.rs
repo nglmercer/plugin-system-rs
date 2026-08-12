@@ -14,7 +14,14 @@ pub(crate) struct VolumeStateResponse {
 
 #[derive(Serialize, Deserialize)]
 pub(crate) struct AppVolumeResponse {
+    /// Addresses this exact stream, which is not the same as the application:
+    /// a browser owns one stream per tab and they are controlled separately.
+    id: String,
     name: String,
+    /// What the stream is playing, e.g. a tab title. Empty when unknown.
+    title: String,
+    /// Freedesktop icon name; the client fetches it from `/api/icon/:name`.
+    icon: String,
     volume: f32,
     muted: bool,
     pid: Option<u32>,
@@ -38,14 +45,51 @@ pub(crate) struct SetMuteRequest {
 
 #[derive(Deserialize)]
 pub(crate) struct SetAppVolumeRequest {
+    /// Preferred: addresses one stream. Optional so existing callers that
+    /// only know the app name keep working.
+    #[serde(default)]
+    app_id: Option<String>,
     app_name: String,
     volume: f32,
 }
 
 #[derive(Deserialize)]
 pub(crate) struct SetAppMuteRequest {
+    #[serde(default)]
+    app_id: Option<String>,
     app_name: String,
     muted: bool,
+}
+
+/// Read one app entry from a plugin's `interface_data`.
+///
+/// Shared by the two endpoints that expose app streams, so a field added to
+/// the plugin payload only has to be wired up once.
+fn parse_app(a: &serde_json::Value) -> AppVolumeResponse {
+    let str_field = |key: &str| {
+        a.get(key)
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string()
+    };
+    let name = str_field("name");
+
+    AppVolumeResponse {
+        // Falls back to the name so a plugin predating stream ids still
+        // yields something addressable.
+        id: a
+            .get("id")
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+            .unwrap_or_else(|| name.clone()),
+        title: str_field("title"),
+        icon: str_field("icon"),
+        name,
+        volume: a.get("volume").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
+        muted: a.get("muted").and_then(|v| v.as_bool()).unwrap_or(false),
+        pid: a.get("pid").and_then(|v| v.as_u64()).map(|p| p as u32),
+    }
 }
 
 fn parse_volume_data(data: serde_json::Value) -> Option<VolumeDataResponse> {
@@ -82,19 +126,7 @@ fn parse_volume_data(data: serde_json::Value) -> Option<VolumeDataResponse> {
                 .or_else(|| state.get("per_app_supported").and_then(|v| v.as_bool()))
                 .unwrap_or(false),
         },
-        apps: apps
-            .into_iter()
-            .map(|a| AppVolumeResponse {
-                name: a
-                    .get("name")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string(),
-                volume: a.get("volume").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
-                muted: a.get("muted").and_then(|v| v.as_bool()).unwrap_or(false),
-                pid: a.get("pid").and_then(|v| v.as_u64()).map(|p| p as u32),
-            })
-            .collect(),
+        apps: apps.iter().map(parse_app).collect(),
     })
 }
 
@@ -149,18 +181,7 @@ pub(crate) async fn get_app_volumes(
                 .get("apps")
                 .and_then(|a| a.as_array())
                 .map(|arr| {
-                    arr.iter()
-                        .map(|a| AppVolumeResponse {
-                            name: a
-                                .get("name")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("")
-                                .to_string(),
-                            volume: a.get("volume").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
-                            muted: a.get("muted").and_then(|v| v.as_bool()).unwrap_or(false),
-                            pid: a.get("pid").and_then(|v| v.as_u64()).map(|p| p as u32),
-                        })
-                        .collect()
+                    arr.iter().map(parse_app).collect()
                 })
                 .unwrap_or_default();
             return Json(ApiResponse::success(apps));
@@ -214,7 +235,11 @@ pub(crate) async fn set_app_volume(
 ) -> Json<ApiResponse<String>> {
     let pm = state.plugin_manager.plugin_manager();
     let manager = pm.read().await;
-    let args = serde_json::json!({"app_name": req.app_name, "volume": req.volume});
+    let args = serde_json::json!({
+        "app_id": req.app_id.unwrap_or_default(),
+        "app_name": req.app_name,
+        "volume": req.volume,
+    });
     Json(
         crate::api::helpers::call_plugin_ok_response(
             &manager,
@@ -233,7 +258,11 @@ pub(crate) async fn set_app_mute(
 ) -> Json<ApiResponse<String>> {
     let pm = state.plugin_manager.plugin_manager();
     let manager = pm.read().await;
-    let args = serde_json::json!({"app_name": req.app_name, "muted": req.muted});
+    let args = serde_json::json!({
+        "app_id": req.app_id.unwrap_or_default(),
+        "app_name": req.app_name,
+        "muted": req.muted,
+    });
     Json(
         crate::api::helpers::call_plugin_ok_response(
             &manager,

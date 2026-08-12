@@ -36,7 +36,26 @@ fn percent_from_channel_volumes(cv: &ChannelVolumes) -> f32 {
 
 const POLL_MS: u64 = 10;
 
-type SinkInput = (u32, String, f32, bool, Option<u32>);
+/// One playback stream, as PulseAudio describes it.
+///
+/// A tuple previously; named fields once it grew past "index and name",
+/// because positional access to six values is how the wrong one gets read.
+#[derive(Clone, Debug)]
+pub struct SinkInput {
+    /// PulseAudio's sink-input index. Unique per stream and stable while the
+    /// stream lives, which is what makes it usable as an address — the
+    /// application name is not, since one app can own several streams.
+    pub index: u32,
+    pub app_name: String,
+    /// `media.name`: what this stream is playing. A browser reports the tab
+    /// title here, which is the only thing distinguishing its streams.
+    pub title: String,
+    /// Freedesktop icon name, for the host to resolve against the icon theme.
+    pub icon: String,
+    pub volume: f32,
+    pub muted: bool,
+    pub pid: Option<u32>,
+}
 
 // ---------------------------------------------------------------------------
 // PulseController
@@ -160,10 +179,33 @@ impl PulseController {
         val.ok_or_else(|| "No default sink".to_string())
     }
 
-    fn get_sink_input_infos(
-        ml: &mut Mainloop,
-        intro: &mut Introspector,
-    ) -> Vec<(u32, String, f32, bool, Option<u32>)> {
+    /// Resolve a stream address to a PulseAudio sink-input index.
+    ///
+    /// Accepts the index as a string, which is what `get_app_volumes` reports.
+    /// Falls back to matching the application name so a caller holding an
+    /// older id still works — but that fallback is genuinely ambiguous when an
+    /// app owns several streams, and it takes the first match. Addressing by
+    /// index is the only way to hit a specific browser tab.
+    fn resolve_stream(&mut self, id: &str) -> Result<u32, String> {
+        let wanted_index = id.parse::<u32>().ok();
+
+        self.with_introspect(|ml, intro| {
+            let list = Self::get_sink_input_infos(ml, intro);
+
+            if let Some(index) = wanted_index {
+                if list.iter().any(|s| s.index == index) {
+                    return Ok(index);
+                }
+            }
+
+            list.iter()
+                .find(|s| s.app_name == id)
+                .map(|s| s.index)
+                .ok_or_else(|| format!("audio stream '{id}' not found"))
+        })
+    }
+
+    fn get_sink_input_infos(ml: &mut Mainloop, intro: &mut Introspector) -> Vec<SinkInput> {
         let inputs: Arc<Mutex<Vec<SinkInput>>> = Arc::new(Mutex::new(Vec::new()));
         let inp = inputs.clone();
 
@@ -186,12 +228,43 @@ impl PulseController {
                     .proplist
                     .get_str(proplist::properties::APPLICATION_PROCESS_ID)
                     .and_then(|s| s.parse::<u32>().ok());
-                let vol = percent_from_channel_volumes(&info.volume);
-                let muted = info.mute;
 
-                inp.lock()
-                    .unwrap()
-                    .push((info.index, app_name, vol, muted, pid));
+                // `media.name` is what a mixer shows next to the app name, and
+                // for a browser it is the only thing telling one tab's stream
+                // from another's. Falls back to the stream's own name.
+                let title = info
+                    .proplist
+                    .get_str(proplist::properties::MEDIA_NAME)
+                    .unwrap_or_else(|| raw_name.clone());
+                // Skip a title that merely repeats the app name; showing
+                // "Firefox - Firefox" is worse than showing nothing.
+                let title = if title.eq_ignore_ascii_case(&app_name) {
+                    String::new()
+                } else {
+                    title
+                };
+
+                // Apps rarely set an explicit icon name, so the binary name is
+                // the practical fallback: `firefox` the process maps to
+                // `firefox.png` in the icon theme far more often than not.
+                let icon = info
+                    .proplist
+                    .get_str(proplist::properties::APPLICATION_ICON_NAME)
+                    .or_else(|| {
+                        info.proplist
+                            .get_str(proplist::properties::APPLICATION_PROCESS_BINARY)
+                    })
+                    .unwrap_or_default();
+
+                inp.lock().unwrap().push(SinkInput {
+                    index: info.index,
+                    app_name,
+                    title,
+                    icon,
+                    volume: percent_from_channel_volumes(&info.volume),
+                    muted: info.mute,
+                    pid,
+                });
             }
         });
         let _ = Self::poll_op(ml, || op.get_state());
@@ -284,11 +357,14 @@ impl VolumeControl for PulseController {
             let list = Self::get_sink_input_infos(ml, intro);
             Ok(list
                 .into_iter()
-                .map(|(_, name, volume, muted, pid)| AppVolume {
-                    name,
-                    volume,
-                    muted,
-                    pid,
+                .map(|s| AppVolume {
+                    id: s.index.to_string(),
+                    name: s.app_name,
+                    title: s.title,
+                    icon: s.icon,
+                    volume: s.volume,
+                    muted: s.muted,
+                    pid: s.pid,
                 })
                 .collect())
         })
@@ -296,14 +372,7 @@ impl VolumeControl for PulseController {
 
     fn set_app_volume(&mut self, app_name: &str, volume: f32) -> Result<(), String> {
         let clamped = volume.clamp(0.0, 100.0);
-
-        let index = self.with_introspect(|ml, intro| {
-            let list = Self::get_sink_input_infos(ml, intro);
-            list.iter()
-                .find(|(_, name, _, _, _)| name == app_name)
-                .map(|(idx, _, _, _, _)| *idx)
-                .ok_or_else(|| format!("App '{}' not found", app_name))
-        })?;
+        let index = self.resolve_stream(app_name)?;
 
         self.with_introspect(|ml, intro| {
             let new_cv = channel_volumes_from_percent(clamped);
@@ -323,13 +392,7 @@ impl VolumeControl for PulseController {
     }
 
     fn set_app_muted(&mut self, app_name: &str, muted: bool) -> Result<(), String> {
-        let index = self.with_introspect(|ml, intro| {
-            let list = Self::get_sink_input_infos(ml, intro);
-            list.iter()
-                .find(|(_, name, _, _, _)| name == app_name)
-                .map(|(idx, _, _, _, _)| *idx)
-                .ok_or_else(|| format!("App '{}' not found", app_name))
-        })?;
+        let index = self.resolve_stream(app_name)?;
 
         self.with_introspect(|ml, intro| {
             let success: Arc<Mutex<Option<bool>>> = Arc::new(Mutex::new(None));

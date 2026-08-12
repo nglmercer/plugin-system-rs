@@ -352,6 +352,17 @@ impl VolumeControl for WindowsController {
             }
 
             apps.push(AppVolume {
+                // WASAPI sessions are per-process and this backend's lookups
+                // are name-based, so no stream-level id is supplied and the
+                // shared conversion falls back to the name. Consequence: an
+                // app with several sessions is addressed as one, unlike on
+                // PulseAudio where each stream is separately controllable.
+                id: String::new(),
+                // The session's own title is not read yet; the icon hint is
+                // the app name lowercased, which the host icon lookup treats
+                // as a best-effort guess.
+                title: String::new(),
+                icon: name.to_lowercase(),
                 name,
                 volume: session.volume * 100.0,
                 muted: session.muted,

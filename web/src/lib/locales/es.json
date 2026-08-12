@@ -13,7 +13,13 @@
     "addWidget": "Agregar Widget",
     "empty": "No hay widgets agregados",
     "emptyHint": "Haz clic en \"Agregar Widget\" para comenzar",
-    "loading": "Cargando panel..."
+    "loading": "Cargando panel...",
+    "edit": "Organizar",
+    "done": "Listo",
+    "columns": "Cols",
+    "rows": "Filas",
+    "page": "Página",
+    "addPage": "Añadir página"
   },
   "widget": {
     "library": "Biblioteca de Widgets",

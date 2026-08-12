@@ -4,6 +4,7 @@ import { initI18n } from './lib/i18n';
 import './styles/theme.css';
 import './styles/base.css';
 import './styles/dashboard.css';
+import './styles/deck.css';
 import './styles/library.css';
 import './styles/widgets.css';
 import './styles/wizard.css';

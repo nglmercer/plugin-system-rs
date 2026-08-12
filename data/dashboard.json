@@ -6,6 +6,9 @@
       "title": "System Monitor",
       "colSpan": 1,
       "rowSpan": 1,
+      "x": 0,
+      "y": 0,
+      "page": 0,
       "settings": {
         "refreshInterval": 2000,
         "variant": "compact"
@@ -17,6 +20,9 @@
       "title": "Clock",
       "colSpan": 1,
       "rowSpan": 1,
+      "x": 1,
+      "y": 0,
+      "page": 0,
       "settings": {
         "format": "digital",
         "variant": "detailed"
@@ -28,6 +34,9 @@
       "title": "a",
       "colSpan": 1,
       "rowSpan": 1,
+      "x": 2,
+      "y": 0,
+      "page": 0,
       "settings": {
         "keys": "win+v",
         "variant": "compact"
@@ -39,6 +48,9 @@
       "title": "Volume Control",
       "colSpan": 1,
       "rowSpan": 1,
+      "x": 0,
+      "y": 1,
+      "page": 0,
       "settings": {
         "refreshInterval": 2000,
         "variant": "detailed"
@@ -48,8 +60,11 @@
       "id": "89vtxejb",
       "type": "volume-apps",
       "title": "App Volume",
-      "colSpan": 1,
-      "rowSpan": 1,
+      "colSpan": 3,
+      "rowSpan": 2,
+      "x": 1,
+      "y": 1,
+      "page": 0,
       "settings": {
         "refreshInterval": 2000,
         "variant": "detailed"
@@ -61,6 +76,9 @@
       "title": "OBS Scenes",
       "colSpan": 1,
       "rowSpan": 1,
+      "x": 4,
+      "y": 1,
+      "page": 0,
       "settings": {
         "refreshInterval": 2000,
         "variant": "detailed"
@@ -72,6 +90,9 @@
       "title": "OBS Control",
       "colSpan": 1,
       "rowSpan": 1,
+      "x": 0,
+      "y": 2,
+      "page": 0,
       "settings": {
         "host": "127.0.0.1",
         "password": "",
@@ -86,6 +107,9 @@
       "title": "OBS Inputs",
       "colSpan": 2,
       "rowSpan": 1,
+      "x": 3,
+      "y": 0,
+      "page": 0,
       "settings": {
         "refreshInterval": 2000,
         "variant": "detailed"
@@ -97,6 +121,9 @@
       "title": "Fetch Data",
       "colSpan": 1,
       "rowSpan": 1,
+      "x": 0,
+      "y": 0,
+      "page": 1,
       "settings": {
         "method": "GET",
         "mode": "proxy",
@@ -106,5 +133,5 @@
       }
     }
   ],
-  "columns": 3
+  "columns": 4
 }

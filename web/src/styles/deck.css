@@ -1,0 +1,303 @@
+/* Deck layout
+ *
+ * Positions come from `deckLayout.ts` as absolute pixel boxes, so there is no
+ * grid or flex sizing here on purpose — CSS must not second-guess the math.
+ * What lives in this file is appearance, gesture affordances and transitions.
+ */
+
+.deck-root {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.deck-page {
+  position: relative;
+  width: 100%;
+  /* Height is set inline from the computed geometry. */
+  touch-action: manipulation;
+}
+
+/* While arranging, the browser must not steal the drag for scrolling. */
+.deck-page.is-editing {
+  touch-action: none;
+}
+
+/* --- Cell guides ------------------------------------------------------- */
+
+.deck-guides {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.deck-guide {
+  position: absolute;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  opacity: 0.35;
+}
+
+/* --- Drop target ------------------------------------------------------- */
+
+.deck-drop-hint {
+  position: absolute;
+  border: 2px solid var(--accent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  pointer-events: none;
+  z-index: 1;
+  transition: left 0.08s ease, top 0.08s ease, width 0.08s ease, height 0.08s ease;
+}
+
+/* --- Widgets ----------------------------------------------------------- */
+
+.deck-widget {
+  position: absolute;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+  -webkit-touch-callout: none;
+  /* Only settled widgets animate; the dragged one follows the pointer
+     directly, and easing it would feel like lag. */
+  transition: left 0.16s ease, top 0.16s ease, width 0.16s ease, height 0.16s ease;
+  z-index: 2;
+}
+
+.deck-widget.is-dragging {
+  transition: none;
+  z-index: 10;
+  cursor: grabbing;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  border-color: var(--accent);
+  opacity: 0.92;
+}
+
+.deck-page.is-editing .deck-widget {
+  cursor: grab;
+}
+
+/* Widget internals must not swallow the drag gesture while arranging. */
+.deck-page.is-editing .deck-widget-content {
+  pointer-events: none;
+}
+
+.deck-widget-content {
+  flex: 1;
+  padding: 0.75rem;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* --- Resize handle ----------------------------------------------------- */
+
+.deck-resize-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 22px;
+  height: 22px;
+  cursor: nwse-resize;
+  z-index: 11;
+  /* Two stacked chevrons, drawn rather than shipped as an asset. */
+  background:
+    linear-gradient(
+      135deg,
+      transparent 0 55%,
+      var(--text-dim) 55% 66%,
+      transparent 66% 74%,
+      var(--text-dim) 74% 85%,
+      transparent 85%
+    );
+  border-bottom-right-radius: 10px;
+  touch-action: none;
+}
+
+.deck-resize-handle:hover {
+  background:
+    linear-gradient(
+      135deg,
+      transparent 0 55%,
+      var(--accent) 55% 66%,
+      transparent 66% 74%,
+      var(--accent) 74% 85%,
+      transparent 85%
+    );
+}
+
+/* --- Pager ------------------------------------------------------------- */
+
+.deck-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.deck-pager-arrow {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  width: 30px;
+  height: 30px;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.deck-pager-arrow:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.deck-pager-arrow:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.deck-dots {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.deck-dot {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border-radius: 50%;
+  border: none;
+  background: var(--border);
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
+}
+
+.deck-dot:hover {
+  background: var(--text-dim);
+}
+
+.deck-dot.is-active {
+  background: var(--accent);
+  transform: scale(1.3);
+}
+
+/* --- Edit-mode toolbar ------------------------------------------------- */
+
+.deck-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.deck-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.deck-toolbar-group label {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.deck-stepper {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.deck-stepper button {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  border-radius: 4px;
+  cursor: pointer;
+  line-height: 1;
+  font-size: 0.9rem;
+}
+
+.deck-stepper button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.deck-stepper button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.deck-stepper span {
+  min-width: 1.5rem;
+  text-align: center;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.deck-edit-toggle {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.deck-edit-toggle:hover {
+  border-color: var(--accent);
+}
+
+.deck-edit-toggle.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg-page);
+  font-weight: bold;
+}
+
+/* --- Mobile ------------------------------------------------------------ */
+
+@media (max-width: 768px) {
+  .deck-toolbar-group label {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .deck-widget-content {
+    padding: 0.5rem;
+  }
+  /* A finger needs more than 22px. */
+  .deck-resize-handle {
+    width: 30px;
+    height: 30px;
+  }
+  .deck-pager {
+    gap: 0.5rem;
+  }
+  .deck-dot {
+    width: 10px;
+    height: 10px;
+  }
+}

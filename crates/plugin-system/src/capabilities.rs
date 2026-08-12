@@ -55,10 +55,20 @@ pub struct VolumeState {
 }
 
 /// One application's audio stream.
+///
+/// An application can own several streams at once — a browser typically plays
+/// one per tab — so [`AppVolume::id`] addresses the *stream*, not the app.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AppVolume {
+    /// Backend handle for this exact stream.
     pub id: String,
+    /// Application name, e.g. "Firefox".
     pub name: String,
+    /// What this stream is playing, e.g. a tab or track title. Empty when the
+    /// backend does not report one.
+    pub title: String,
+    /// Freedesktop icon name hint, e.g. "firefox". Empty when unknown.
+    pub icon: String,
     pub volume: f32,
     pub muted: bool,
     pub pid: Option<u32>,

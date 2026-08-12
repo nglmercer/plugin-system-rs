@@ -1495,3 +1495,80 @@
     color: var(--text-secondary);
     font-family: monospace;
 }
+
+/* --- Application icons -------------------------------------------------- */
+
+.app-icon {
+  border-radius: 4px;
+  flex-shrink: 0;
+  object-fit: contain;
+  /* Icons vary wildly in padding; a subtle backdrop keeps a row of mixed
+     sources looking deliberate rather than ragged. */
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.app-icon-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  line-height: 1;
+  user-select: none;
+}
+
+/* --- Stream labels ------------------------------------------------------ */
+
+/* An app name plus the stream title, stacked. Both truncate rather than
+   wrap: a tab title can be arbitrarily long and must not reflow the row. */
+.volapps-item-labels {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  gap: 1px;
+}
+
+.volapps-item-title {
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.volapps-item-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The icon sits beside the labels, so these headers become flex rows. */
+.volapps-item-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.volapps-item-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  gap: 1px;
+}
+
+.volapps-mini-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.volapps-mini-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

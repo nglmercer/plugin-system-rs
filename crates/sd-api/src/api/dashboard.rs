@@ -8,10 +8,23 @@ pub struct DashboardWidget {
     #[serde(rename = "type")]
     pub widget_type: String,
     pub title: String,
+    /// Footprint in grid cells.
     #[serde(rename = "colSpan")]
     pub col_span: u32,
     #[serde(rename = "rowSpan")]
     pub row_span: u32,
+    /// Explicit position, in cell units.
+    ///
+    /// Optional because layouts written before the deck existed have no
+    /// coordinates at all; the client assigns them on first load and saves
+    /// them back. Skipped when absent so an unplaced widget stays unplaced
+    /// rather than being pinned to (0, 0).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub x: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub y: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page: Option<u32>,
     #[serde(default)]
     pub settings: serde_json::Value,
 }
@@ -19,8 +32,25 @@ pub struct DashboardWidget {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct DashboardLayout {
     pub widgets: Vec<DashboardWidget>,
+    /// Cells across one page.
     pub columns: u32,
+    /// Cells down one page. Absent in pre-deck layouts, where the grid had no
+    /// fixed height and widgets simply flowed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rows: Option<u32>,
+    /// Cell width / height. 1 gives square keys like deck hardware.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aspect: Option<f32>,
+    /// Renamed because the client sends `customCss`. Without this the field
+    /// silently never round-tripped: the server wrote `custom_css`, the
+    /// client read `customCss`, and every saved stylesheet was lost on
+    /// restart. `alias` keeps any snake_case file already on disk loadable.
+    #[serde(
+        default,
+        rename = "customCss",
+        alias = "custom_css",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub custom_css: Option<String>,
 }
 
@@ -28,7 +58,10 @@ impl Default for DashboardLayout {
     fn default() -> Self {
         Self {
             widgets: Vec::new(),
-            columns: 3,
+            // Matches DEFAULT_GRID in web/src/lib/deckLayout.ts.
+            columns: 4,
+            rows: Some(3),
+            aspect: Some(1.35),
             custom_css: None,
         }
     }
