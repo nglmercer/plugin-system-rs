@@ -27,30 +27,23 @@ use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_void};
 
 use crate::context::PluginContext;
+use crate::manifest::{Abi, PluginManifest};
 use crate::traits::{Plugin, PluginMetadata};
-use serde::{Deserialize, Serialize};
 
-/// Plugin manifest with C-ABI extension fields.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CAbiManifest {
-    #[serde(flatten)]
-    pub base: super::manifest::Manifest,
-    /// Set to `"c-flat"` to enable C-ABI dispatch.
-    #[serde(default)]
-    pub abi: Option<String>,
-    /// Optional set of interface ids the plugin implements.
-    #[serde(default)]
-    pub interfaces: Vec<String>,
-    /// Optional pre-load configuration JSON.
-    #[serde(default)]
-    pub config: Option<serde_json::Value>,
-}
+/// The C-ABI manifest is now just the unified [`PluginManifest`] with
+/// `"abi": "c-flat"`. Kept as an alias so existing callers keep compiling.
+#[deprecated(
+    since = "0.2.0",
+    note = "use `plugin_system::manifest::PluginManifest`, which describes every ABI"
+)]
+pub type CAbiManifest = PluginManifest;
 
 pub fn is_cabi_manifest(value: &serde_json::Value) -> bool {
     value
         .get("abi")
         .and_then(|v| v.as_str())
-        .map(|s| s.eq_ignore_ascii_case("c-flat") || s.eq_ignore_ascii_case("c_abi"))
+        .and_then(|s| Abi::parse(s).ok())
+        .map(|abi| abi == Abi::CFlat)
         .unwrap_or(false)
 }
 
@@ -93,7 +86,7 @@ impl CAbiPlugin {
     /// has been called.
     pub fn from_library(
         lib: libloading::Library,
-        manifest: &CAbiManifest,
+        manifest: &PluginManifest,
         prefix: Option<&str>,
     ) -> Result<Self, String> {
         let prefixed = |base: &str| -> String {
@@ -166,14 +159,8 @@ impl Plugin for CAbiPlugin {
         "CAbiPlugin"
     }
 
-    fn interface_ids(&self) -> Vec<&'static str> {
-        // Each interface id is owned by `self.interface_ids`; leak them into
-        // `'static str` so the trait signature is satisfied. The number of
-        // ids is small (typically 0-5) so the leak is bounded.
-        self.interface_ids
-            .iter()
-            .map(|s| Box::leak(s.clone().into_boxed_str()) as &'static str)
-            .collect()
+    fn interface_ids(&self) -> Vec<String> {
+        self.interface_ids.clone()
     }
 
     fn interface_data(&self) -> Option<serde_json::Value> {

@@ -29,6 +29,7 @@ pub use registry::{new_shared_registry, PluginRegistry, SharedRegistry};
 pub use serde_json;
 pub use traits::{command_to_json, CommandResult, Plugin, PluginDependency, PluginMetadata};
 
-pub use cabi::{is_cabi_manifest, CAbiManifest, CAbiPlugin};
+pub use cabi::{is_cabi_manifest, CAbiPlugin};
+pub use manifest::{load_plugin_manifest, Abi, Manifest, PluginManifest, ResourceLimits};
 
 pub use plugin_macros::{command, define_plugin, plugin_export, plugin_interface};

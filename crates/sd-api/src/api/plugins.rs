@@ -142,11 +142,7 @@ pub(crate) async fn get_plugin_data(
         Ok(plugin_arc) => {
             let plugin = plugin_arc.read().expect("plugin lock poisoned");
             let meta = plugin.metadata();
-            let interfaces: Vec<String> = plugin
-                .interface_ids()
-                .into_iter()
-                .map(String::from)
-                .collect();
+            let interfaces: Vec<String> = plugin.interface_ids();
             let data = plugin
                 .interface_data()
                 .unwrap_or_else(|| serde_json::json!({}));

@@ -49,7 +49,13 @@ pub trait Plugin: Any + Send + Sync {
         None
     }
 
-    fn interface_ids(&self) -> Vec<&'static str> {
+    /// Interface ids this plugin implements.
+    ///
+    /// Returns owned strings rather than `&'static str` so that plugins whose
+    /// ids are only known at runtime — C-ABI plugins reading them from a
+    /// manifest, or WASM guests returning them across the component boundary —
+    /// can implement this without leaking memory.
+    fn interface_ids(&self) -> Vec<String> {
         Vec::new()
     }
 

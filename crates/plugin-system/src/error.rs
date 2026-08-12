@@ -35,6 +35,23 @@ pub enum PluginError {
     #[error("Plugin '{name}' panicked during on_load: {reason}")]
     OnLoadPanic { name: String, reason: String },
 
+    #[error("Plugin '{name}' uses the '{abi}' ABI which this host cannot load: {reason}")]
+    UnsupportedAbi {
+        name: String,
+        abi: &'static str,
+        reason: String,
+    },
+
+    #[error("Plugin '{name}' requested capability '{capability}' which the host did not grant")]
+    CapabilityDenied { name: String, capability: String },
+
+    #[error("Plugin '{name}' trapped during '{method}': {reason}")]
+    GuestTrap {
+        name: String,
+        method: String,
+        reason: String,
+    },
+
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 

@@ -84,9 +84,9 @@ fn cabi_manifest_parses_with_interfaces() {
         "abi": "c-flat",
         "interfaces": ["Timer", "Counter"]
     });
-    let m: plugin_system::CAbiManifest = serde_json::from_value(v).unwrap();
-    assert_eq!(m.base.name, "demo");
-    assert_eq!(m.abi.as_deref(), Some("c-flat"));
+    let m: plugin_system::PluginManifest = serde_json::from_value(v).unwrap();
+    assert_eq!(m.name, "demo");
+    assert_eq!(m.abi, plugin_system::Abi::CFlat);
     assert_eq!(m.interfaces, vec!["Timer", "Counter"]);
 }
 

@@ -389,8 +389,8 @@ fn generate_interface_ids_method(interface_ids: &[String]) -> proc_macro2::Token
         .map(|id| LitStr::new(id, proc_macro2::Span::call_site()));
 
     quote! {
-        fn interface_ids(&self) -> Vec<&'static str> {
-            vec![#(#ids),*]
+        fn interface_ids(&self) -> Vec<String> {
+            vec![#(#ids.to_string()),*]
         }
     }
 }

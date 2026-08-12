@@ -7,6 +7,9 @@ edition = "2021"
 default = ["file-loader"]
 url-loader = ["ureq", "ureq/_tls", "dirs"]
 file-loader = []
+# WebAssembly component plugins (WASI Preview 2). Off by default so hosts that
+# only load native plugins do not pull in the wasmtime runtime.
+wasm = []
 
 [dependencies]
 libloading = "0.8"

@@ -6,6 +6,7 @@ use crate::context::PluginContext;
 use crate::error::{PluginError, Result};
 use crate::handler::{new_shared_command_registry, SharedCommandRegistry};
 use crate::loader::{FileLoader, PluginLoader};
+use crate::manifest::{Abi, PluginManifest};
 use crate::registry::{new_shared_registry, SharedRegistry};
 use crate::traits::{Plugin, PluginMetadata};
 
@@ -356,12 +357,23 @@ impl PluginManager {
 
         log::info!("Loading plugin from {}", path_display);
 
-        // Detect C-ABI ("c-flat") plugin via sidecar *.manifest.json before
-        // resolving Rust trait-object symbols, since a C plugin will not
-        // export the same shape.
-        if let Some(cabi_manifest) = detect_cabi_manifest(original_path.unwrap_or(&path))? {
-            log::info!("Detected C-ABI (c-flat) manifest for {}", path_display);
-            return self.load_cabi_plugin(&path, &cabi_manifest, original_path);
+        // Consult the sidecar *.manifest.json before resolving Rust
+        // trait-object symbols: a non-native plugin will not export that
+        // shape, so the ABI has to be decided first.
+        if let Some(manifest) = detect_manifest(original_path.unwrap_or(&path))? {
+            match manifest.abi {
+                Abi::CFlat => {
+                    log::info!("Loading {} via the c-flat ABI", path_display);
+                    return self.load_cabi_plugin(&path, &manifest, original_path);
+                }
+                Abi::WasmComponent => {
+                    log::info!("Loading {} as a WASM component", path_display);
+                    return self.load_wasm_plugin(&path, &manifest);
+                }
+                // Native plugins fall through to symbol resolution below; the
+                // manifest, if present, only supplies metadata.
+                Abi::Native => {}
+            }
         }
 
         let lib = unsafe {
@@ -765,10 +777,27 @@ impl PluginManager {
     // ---- C-ABI ("c-flat") plugin loading ----------------------------------
 
     /// Load a C-ABI plugin via the sidecar manifest.
+    /// Load a WebAssembly component plugin.
+    ///
+    /// The runtime lives behind the `wasm` feature so hosts that only load
+    /// native plugins do not pay for wasmtime. Without it, a `.wasm` plugin
+    /// is reported as unsupported rather than silently skipped.
+    #[cfg(not(feature = "wasm"))]
+    fn load_wasm_plugin(&mut self, path: &Path, manifest: &PluginManifest) -> Result<String> {
+        Err(PluginError::UnsupportedAbi {
+            name: manifest.name.clone(),
+            abi: "wasm-component",
+            reason: format!(
+                "{} declares the wasm-component ABI, but this host was built without the `wasm` feature",
+                path.display()
+            ),
+        })
+    }
+
     fn load_cabi_plugin(
         &mut self,
         path: &Path,
-        manifest: &crate::cabi::CAbiManifest,
+        manifest: &PluginManifest,
         original_path: Option<&Path>,
     ) -> Result<String> {
         // Open the library and hand ownership to the CAbiPlugin.
@@ -841,31 +870,15 @@ impl PluginManager {
 /// [`crate::cabi::CAbiManifest`] if it declares `"abi": "c-flat"` (or
 /// `"c_abi"`). Returns `Ok(None)` when no manifest is present or when the
 /// manifest doesn't enable the C-ABI path.
-fn detect_cabi_manifest(lib_path: &Path) -> Result<Option<crate::cabi::CAbiManifest>> {
+fn detect_manifest(lib_path: &Path) -> Result<Option<PluginManifest>> {
     let stem = match lib_path.file_stem().and_then(|s| s.to_str()) {
         Some(s) => s,
         None => return Ok(None),
     };
-    let parent = lib_path.parent().unwrap_or_else(|| Path::new(""));
-    let manifest_path = parent.join(format!("{stem}.manifest.json"));
-    if !manifest_path.exists() {
-        return Ok(None);
-    }
-    let bytes = std::fs::read(&manifest_path).map_err(PluginError::Io)?;
-    let value: serde_json::Value =
-        serde_json::from_slice(&bytes).map_err(|e| PluginError::PluginLoad {
-            name: stem.to_string(),
-            reason: format!("invalid manifest JSON: {e}"),
-        })?;
-    if !crate::cabi::is_cabi_manifest(&value) {
-        return Ok(None);
-    }
-    let manifest: crate::cabi::CAbiManifest =
-        serde_json::from_value(value).map_err(|e| PluginError::PluginLoad {
-            name: stem.to_string(),
-            reason: format!("invalid C-ABI manifest: {e}"),
-        })?;
-    Ok(Some(manifest))
+    crate::manifest::load_plugin_manifest(lib_path).map_err(|e| PluginError::PluginLoad {
+        name: stem.to_string(),
+        reason: format!("invalid manifest: {e}"),
+    })
 }
 
 impl Default for PluginManager {
