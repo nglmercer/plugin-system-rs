@@ -35,18 +35,54 @@ const RESPONSE_TIMEOUT_MS: u32 = 5_000;
 /// streaming events cannot keep us reading forever.
 const MAX_FRAMES_PER_REQUEST: usize = 32;
 
+/// Message for "there is no session". Matched to keep it out of the warn log.
+const NOT_CONNECTED: &str = "not connected to OBS";
+
 /// What widgets see. Field names match the native plugin so the frontend was
 /// untouched by the port.
+/// The status payload. Field names match `ObsStatusResponse` in `sd-api`, so
+/// the handler deserializes it directly.
 #[derive(Debug, Clone, Default, Serialize)]
 struct ObsData {
     connected: bool,
-    url: String,
+    /// Echoed back so the widget can show what it is (or would be) talking to
+    /// even while disconnected.
+    host: String,
+    port: u16,
+    stream_active: bool,
+    record_active: bool,
+    record_paused: bool,
+    virtual_cam_active: bool,
+    replay_buffer_active: bool,
     current_scene: String,
+    studio_mode: bool,
+    cpu_usage: f64,
+    memory_usage: f64,
+    fps: f64,
+    /// Not part of the API contract, but useful to widgets and harmless to
+    /// callers that ignore unknown fields.
     scenes: Vec<String>,
-    streaming: bool,
-    recording: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     last_error: Option<String>,
+}
+
+impl ObsData {
+    /// Reset everything that describes a live connection, keeping the address
+    /// so the widget can still show where it would reconnect to.
+    fn clear_live_state(&mut self) {
+        self.connected = false;
+        self.current_scene.clear();
+        self.scenes.clear();
+        self.stream_active = false;
+        self.record_active = false;
+        self.record_paused = false;
+        self.virtual_cam_active = false;
+        self.replay_buffer_active = false;
+        self.studio_mode = false;
+        self.cpu_usage = 0.0;
+        self.memory_usage = 0.0;
+        self.fps = 0.0;
+    }
 }
 
 struct Session {
@@ -64,7 +100,15 @@ struct ObsPlugin;
 impl ObsPlugin {
     fn set_error(message: impl Into<String>) {
         let message = message.into();
-        host_log(LogLevel::Warn, &message);
+        // "not connected" is the normal resting state when OBS is closed or
+        // the user has not hit Connect, and every widget polls. Logging that
+        // at warn buried the real failures in noise.
+        let level = if message.contains(NOT_CONNECTED) {
+            LogLevel::Debug
+        } else {
+            LogLevel::Warn
+        };
+        host_log(level, &message);
         DATA.with(|d| d.borrow_mut().last_error = Some(message));
     }
 
@@ -97,7 +141,9 @@ impl ObsPlugin {
     }
 
     /// Open a connection and complete the identify handshake.
-    fn connect(url: &str, password: &str) -> Result<(), String> {
+    fn connect(host: &str, port: u16, password: &str) -> Result<(), String> {
+        let url = format!("ws://{host}:{port}");
+        let url = url.as_str();
         // Drop any previous session first, or a reconnect leaks a socket.
         Self::disconnect();
 
@@ -132,7 +178,8 @@ impl ObsPlugin {
         DATA.with(|d| {
             let mut data = d.borrow_mut();
             data.connected = true;
-            data.url = url.to_string();
+            data.host = host.to_string();
+            data.port = port;
             data.last_error = None;
         });
 
@@ -146,14 +193,7 @@ impl ObsPlugin {
                 let _ = ws::close(session.handle);
             }
         });
-        DATA.with(|d| {
-            let mut data = d.borrow_mut();
-            data.connected = false;
-            data.current_scene.clear();
-            data.scenes.clear();
-            data.streaming = false;
-            data.recording = false;
-        });
+        DATA.with(|d| d.borrow_mut().clear_live_state());
     }
 
     /// Issue a request and return its response data.
@@ -163,7 +203,7 @@ impl ObsPlugin {
     ) -> Result<serde_json::Value, String> {
         let (handle, request_id) = SESSION.with(|s| {
             let mut slot = s.borrow_mut();
-            let session = slot.as_mut().ok_or("not connected to OBS")?;
+            let session = slot.as_mut().ok_or(NOT_CONNECTED)?;
             let id = session.next_request_id;
             session.next_request_id += 1;
             Ok::<_, String>((session.handle, format!("sd-{id}")))
@@ -214,11 +254,64 @@ impl ObsPlugin {
         }
 
         if let Ok(v) = Self::request("GetStreamStatus", None) {
-            DATA.with(|d| d.borrow_mut().streaming = v["outputActive"].as_bool().unwrap_or(false));
+            DATA.with(|d| d.borrow_mut().stream_active = v["outputActive"].as_bool().unwrap_or(false));
         }
 
         if let Ok(v) = Self::request("GetRecordStatus", None) {
-            DATA.with(|d| d.borrow_mut().recording = v["outputActive"].as_bool().unwrap_or(false));
+            DATA.with(|d| {
+                let mut data = d.borrow_mut();
+                data.record_active = v["outputActive"].as_bool().unwrap_or(false);
+                data.record_paused = v["outputPaused"].as_bool().unwrap_or(false);
+            });
+        }
+
+        if let Ok(v) = Self::request("GetVirtualCamStatus", None) {
+            DATA.with(|d| {
+                d.borrow_mut().virtual_cam_active = v["outputActive"].as_bool().unwrap_or(false)
+            });
+        }
+
+        if let Ok(v) = Self::request("GetReplayBufferStatus", None) {
+            DATA.with(|d| {
+                d.borrow_mut().replay_buffer_active = v["outputActive"].as_bool().unwrap_or(false)
+            });
+        }
+
+        if let Ok(v) = Self::request("GetStudioModeEnabled", None) {
+            DATA.with(|d| {
+                d.borrow_mut().studio_mode = v["studioModeEnabled"].as_bool().unwrap_or(false)
+            });
+        }
+
+        // Stats drive the small readouts in the detailed widget; a server that
+        // does not answer simply leaves them at zero.
+        if let Ok(v) = Self::request("GetStats", None) {
+            DATA.with(|d| {
+                let mut data = d.borrow_mut();
+                data.cpu_usage = v["cpuUsage"].as_f64().unwrap_or(0.0);
+                data.memory_usage = v["memoryUsage"].as_f64().unwrap_or(0.0);
+                data.fps = v["activeFps"].as_f64().unwrap_or(0.0);
+            });
+        }
+    }
+
+    /// Split `ws://host:port` back into its parts.
+    ///
+    /// Only needs to handle what this plugin itself produces plus the obvious
+    /// hand-written forms; anything unparseable falls back to the defaults
+    /// rather than failing the connect outright.
+    fn split_url(url: &str) -> (String, u16) {
+        let rest = url
+            .strip_prefix("ws://")
+            .or_else(|| url.strip_prefix("wss://"))
+            .unwrap_or(url);
+        let rest = rest.split('/').next().unwrap_or(rest);
+        match rest.rsplit_once(':') {
+            Some((host, port)) => (
+                host.to_string(),
+                port.parse().unwrap_or(4455),
+            ),
+            None => (rest.to_string(), 4455),
         }
     }
 
@@ -284,17 +377,28 @@ impl Guest for ObsPlugin {
 
         let value = match method.as_str() {
             "connect" => {
-                let url = args
-                    .get("url")
-                    .and_then(|v| v.as_str())
-                    .map(str::to_string)
-                    .unwrap_or_else(|| "ws://localhost:4455".to_string());
+                // The API sends host and port separately; an explicit `url`
+                // is still accepted for callers that have one.
+                let (host, port) = match args.get("url").and_then(|v| v.as_str()) {
+                    Some(url) => Self::split_url(url),
+                    None => (
+                        args.get("host")
+                            .and_then(|v| v.as_str())
+                            .filter(|h| !h.is_empty())
+                            .unwrap_or("127.0.0.1")
+                            .to_string(),
+                        args.get("port")
+                            .and_then(|v| v.as_u64())
+                            .filter(|p| *p > 0 && *p <= u16::MAX as u64)
+                            .unwrap_or(4455) as u16,
+                    ),
+                };
                 let password = args
                     .get("password")
                     .and_then(|v| v.as_str())
                     .unwrap_or_default();
 
-                match Self::connect(&url, password) {
+                match Self::connect(&host, port, password) {
                     Ok(()) => {
                         Self::refresh();
                         serde_json::json!({ "ok": true })
@@ -308,9 +412,19 @@ impl Guest for ObsPlugin {
                 serde_json::json!({ "ok": true })
             }
 
-            "refresh" | "get_status" => {
+            // Returns the status object *flat*, because `sd-api`
+            // deserializes the whole reply straight into `ObsStatusResponse`.
+            // Wrapping it in `{ok, status}` made every call fail to parse and
+            // surface as "obs plugin not available", which pointed at the
+            // wrong thing entirely — the plugin was loaded and answering.
+            "get_status" => {
                 Self::refresh();
-                DATA.with(|d| serde_json::json!({ "ok": true, "status": &*d.borrow() }))
+                DATA.with(|d| serde_json::to_value(&*d.borrow()).unwrap_or_default())
+            }
+
+            "refresh" => {
+                Self::refresh();
+                serde_json::json!({ "ok": true })
             }
 
             "start_stream" => simple!("StartStream"),
@@ -460,3 +574,46 @@ impl Guest for ObsPlugin {
 }
 
 export!(ObsPlugin);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn splits_the_urls_this_plugin_produces() {
+        assert_eq!(
+            ObsPlugin::split_url("ws://127.0.0.1:4455"),
+            ("127.0.0.1".to_string(), 4455)
+        );
+        assert_eq!(
+            ObsPlugin::split_url("wss://obs.example.com:4460"),
+            ("obs.example.com".to_string(), 4460)
+        );
+    }
+
+    /// A missing port or scheme must not fail the connect; it falls back to
+    /// the obs-websocket default.
+    #[test]
+    fn falls_back_to_the_default_port() {
+        assert_eq!(
+            ObsPlugin::split_url("ws://localhost"),
+            ("localhost".to_string(), 4455)
+        );
+        assert_eq!(
+            ObsPlugin::split_url("localhost"),
+            ("localhost".to_string(), 4455)
+        );
+        assert_eq!(
+            ObsPlugin::split_url("ws://host:notaport"),
+            ("host".to_string(), 4455)
+        );
+    }
+
+    #[test]
+    fn ignores_a_trailing_path() {
+        assert_eq!(
+            ObsPlugin::split_url("ws://127.0.0.1:4455/ws"),
+            ("127.0.0.1".to_string(), 4455)
+        );
+    }
+}

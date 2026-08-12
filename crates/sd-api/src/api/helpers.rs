@@ -66,7 +66,19 @@ pub async fn call_plugin<T: DeserializeOwned>(
     args: Value,
 ) -> Option<T> {
     let result = call_plugin_raw(plugin_manager, plugin_name, method, args).await?;
-    serde_json::from_value(result).ok()
+    match serde_json::from_value(result.clone()) {
+        Ok(value) => Some(value),
+        Err(e) => {
+            // Distinguishing this from "no such plugin" matters: a shape
+            // mismatch means the plugin answered and the contract drifted,
+            // which is a different bug from the plugin being absent — and
+            // silently returning None made it look like the latter.
+            log::error!(
+                "plugin '{plugin_name}' returned an unexpected shape from '{method}': {e}; got {result}"
+            );
+            None
+        }
+    }
 }
 
 /// Call a plugin command that returns `{"ok": true}` or `{"ok": false, "error": "..."}`.
@@ -107,7 +119,11 @@ pub async fn call_plugin_response<T: DeserializeOwned + serde::Serialize>(
 ) -> ApiResponse<T> {
     match call_plugin::<T>(plugin_manager, plugin_name, method, args).await {
         Some(data) => ApiResponse::success(data),
-        None => ApiResponse::error(format!("{} plugin not available", plugin_name)),
+        // Covers both "not loaded" and "answered with the wrong shape"; the
+        // log line written by `call_plugin` says which.
+        None => ApiResponse::error(format!(
+            "{plugin_name} plugin unavailable or returned an unexpected response"
+        )),
     }
 }
 

@@ -16,7 +16,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use wasmtime::component::{Component, Linker, ResourceTable};
-use wasmtime::{Config, Engine, Store, StoreLimits, StoreLimitsBuilder};
+use wasmtime::{Cache, CacheConfig, Config, Engine, Store, StoreLimits, StoreLimitsBuilder};
 use wasmtime_wasi::p2::add_to_linker_sync;
 use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
 
@@ -51,6 +51,20 @@ pub struct WasmRuntime {
     shutdown: Arc<AtomicBool>,
 }
 
+/// Where compiled plugin artifacts are cached.
+///
+/// Follows the XDG basedir convention rather than pulling in a crate for it:
+/// this is the only path this crate needs to resolve.
+fn cache_directory() -> Option<std::path::PathBuf> {
+    if let Some(xdg) = std::env::var_os("XDG_CACHE_HOME") {
+        if !xdg.is_empty() {
+            return Some(std::path::PathBuf::from(xdg).join("sd-core/wasm"));
+        }
+    }
+    let home = std::env::var_os("HOME")?;
+    Some(std::path::PathBuf::from(home).join(".cache/sd-core/wasm"))
+}
+
 impl WasmRuntime {
     pub fn new() -> Result<Arc<Self>> {
         let mut config = Config::new();
@@ -58,6 +72,32 @@ impl WasmRuntime {
         // Epoch interruption is what turns "plugin loops forever" from a hung
         // server into an error return.
         config.epoch_interruption(true);
+
+        // Compiling a component with Cranelift costs seconds per plugin, and
+        // the result only changes when the plugin binary does. Caching it on
+        // disk turns every start after the first into a load rather than a
+        // compile.
+        //
+        // A cache failure is never fatal: the worst case is the compile we
+        // would have done anyway.
+        match cache_directory() {
+            Some(dir) => {
+                let mut cache_config = CacheConfig::new();
+                cache_config.with_directory(&dir);
+                match Cache::new(cache_config) {
+                    Ok(cache) => {
+                        log::debug!("wasm compilation cache at {}", dir.display());
+                        config.cache(Some(cache));
+                    }
+                    Err(e) => log::warn!(
+                        "wasm compilation cache disabled ({e}); plugins will recompile on every start"
+                    ),
+                }
+            }
+            None => log::warn!(
+                "no cache directory available; plugins will recompile on every start"
+            ),
+        }
 
         let engine = Engine::new(&config).map_err(|e| PluginError::PluginLoad {
             name: "<wasm-runtime>".into(),
