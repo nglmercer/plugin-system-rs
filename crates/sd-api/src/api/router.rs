@@ -149,6 +149,8 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/obs/inputs/volume", put(obs::set_input_volume))
         .route("/api/obs/inputs/mute", put(obs::set_input_mute))
         .route("/api/obs/virtualcam/toggle", post(obs::toggle_virtual_cam))
+        .route("/api/obs/replay/start", post(obs::start_replay_buffer))
+        .route("/api/obs/replay/stop", post(obs::stop_replay_buffer))
         .route("/api/obs/replay/save", post(obs::save_replay))
         .route("/api/obs/transitions", get(obs::get_transitions))
         .route("/api/obs/transitions/current", post(obs::set_transition))
@@ -161,6 +163,26 @@ pub fn create_router(state: AppState) -> Router {
             "/api/obs/studio-mode",
             get(obs::get_studio_mode).post(obs::set_studio_mode),
         )
+        .route("/api/obs/preview/current", post(obs::set_preview_scene))
+        .route(
+            "/api/obs/studio-mode/transition",
+            post(obs::trigger_studio_transition),
+        )
+        .route("/api/obs/media-inputs", get(obs::get_media_inputs))
+        .route(
+            "/api/obs/media-inputs/action",
+            post(obs::media_input_action),
+        )
+        .route("/api/obs/filters", get(obs::get_filters))
+        .route("/api/obs/filters/enabled", put(obs::set_filter_enabled))
+        .route("/api/obs/profiles", get(obs::get_profiles))
+        .route("/api/obs/profiles/current", post(obs::set_profile))
+        .route("/api/obs/scene-collections", get(obs::get_scene_collections))
+        .route(
+            "/api/obs/scene-collections/current",
+            post(obs::set_scene_collection),
+        )
+        .route("/api/obs/screenshot/save", post(obs::save_screenshot))
         .route(
             "/api/dashboard",
             get(dashboard_handlers::get_dashboard).put(dashboard_handlers::save_dashboard),

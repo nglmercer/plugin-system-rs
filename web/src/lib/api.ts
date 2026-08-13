@@ -330,12 +330,42 @@ export async function setAppMute(app: AppAddress, muted: boolean) {
   return data.success;
 }
 
-export async function fetchObsStatus() {
+/** What the obs plugin reports about the connection and every output. */
+export interface ObsStatus {
+  connected: boolean;
+  host: string;
+  port: number;
+  stream_active: boolean;
+  record_active: boolean;
+  record_paused: boolean;
+  virtual_cam_active: boolean;
+  replay_buffer_active: boolean;
+  current_scene: string;
+  preview_scene: string;
+  studio_mode: boolean;
+  stream_duration_ms: number;
+  record_duration_ms: number;
+  cpu_usage: number;
+  memory_usage: number;
+  fps: number;
+}
+
+export async function fetchObsStatus(): Promise<ObsStatus | null> {
   // Goes through `obsGet` like every other OBS read. Reading `data.data`
   // without checking `success` turned every real failure — OBS closed, wrong
   // password, plugin disabled — into `undefined`, which the widget rendered as
   // "OBS plugin not loaded" no matter what had actually gone wrong.
-  return obsGet<any>("/obs/status", null);
+  return obsGet<ObsStatus | null>("/obs/status", null);
+}
+
+export async function setStudioMode(enabled: boolean) {
+  const res = await fetch(`${API_BASE}/obs/studio-mode`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  });
+  const data = await res.json();
+  return data.success;
 }
 
 export async function connectObs(host: string, port: number, password: string) {
@@ -473,4 +503,122 @@ export async function setSceneItemEnabled(sceneName: string, itemId: number, ena
   });
   const data = await res.json();
   return data.success;
+}
+
+export async function startReplayBuffer() {
+  const res = await fetch(`${API_BASE}/obs/replay/start`, { method: "POST" });
+  const data = await res.json();
+  return data.success;
+}
+
+export async function stopReplayBuffer() {
+  const res = await fetch(`${API_BASE}/obs/replay/stop`, { method: "POST" });
+  const data = await res.json();
+  return data.success;
+}
+
+export async function setPreviewScene(sceneName: string) {
+  const res = await fetch(`${API_BASE}/obs/preview/current`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scene_name: sceneName }),
+  });
+  const data = await res.json();
+  return data.success;
+}
+
+export async function triggerStudioTransition() {
+  const res = await fetch(`${API_BASE}/obs/studio-mode/transition`, { method: "POST" });
+  const data = await res.json();
+  return data.success;
+}
+
+export interface ObsMediaInput {
+  name: string;
+  kind: string;
+  /** playing, paused, stopped, ended, opening... */
+  state: string;
+  duration_ms: number;
+  cursor_ms: number;
+}
+
+export async function fetchObsMediaInputs(): Promise<ObsMediaInput[]> {
+  return obsGet<ObsMediaInput[]>("/obs/media-inputs", []);
+}
+
+/** Short verbs: play, pause, stop, restart, next, previous. */
+export async function mediaInputAction(inputName: string, action: string) {
+  const res = await fetch(`${API_BASE}/obs/media-inputs/action`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ input_name: inputName, action }),
+  });
+  const data = await res.json();
+  return data.success;
+}
+
+export interface ObsFilter {
+  name: string;
+  kind: string;
+  enabled: boolean;
+  index: number;
+}
+
+export async function fetchObsFilters(sourceName: string): Promise<ObsFilter[]> {
+  return obsGet<ObsFilter[]>(`/obs/filters?source_name=${encodeURIComponent(sourceName)}`, []);
+}
+
+export async function setFilterEnabled(sourceName: string, filterName: string, enabled: boolean) {
+  const res = await fetch(`${API_BASE}/obs/filters/enabled`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ source_name: sourceName, filter_name: filterName, enabled }),
+  });
+  const data = await res.json();
+  return data.success;
+}
+
+export interface ObsNamedList {
+  current: string;
+  items: string[];
+}
+
+export async function fetchObsProfiles(): Promise<ObsNamedList> {
+  return obsGet<ObsNamedList>("/obs/profiles", { current: "", items: [] });
+}
+
+export async function setCurrentProfile(name: string) {
+  const res = await fetch(`${API_BASE}/obs/profiles/current`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  const data = await res.json();
+  return data.success;
+}
+
+export async function fetchObsSceneCollections(): Promise<ObsNamedList> {
+  return obsGet<ObsNamedList>("/obs/scene-collections", { current: "", items: [] });
+}
+
+export async function setCurrentSceneCollection(name: string) {
+  const res = await fetch(`${API_BASE}/obs/scene-collections/current`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  const data = await res.json();
+  return data.success;
+}
+
+/** Saves to OBS's configured screenshot folder; source defaults to the program scene. */
+export async function saveObsScreenshot(sourceName?: string, format?: string) {
+  const res = await fetch(`${API_BASE}/obs/screenshot/save`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ source_name: sourceName, format }),
+  });
+  const data = await res.json();
+  if (!data.success) throw new Error(data.error || "Screenshot failed");
+  return data.data;
 }

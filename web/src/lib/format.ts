@@ -25,3 +25,13 @@ export function formatUptime(totalSeconds: number): string {
   if (hours > 0) return `${hours}h ${minutes}m`;
   return `${minutes}m`;
 }
+
+/** Milliseconds as a timecode (`1:02:03`, or `2:03` under an hour). */
+export function formatTimecode(totalMs: number): string {
+  const safe = Math.max(0, Math.floor(totalMs / 1000));
+  const hours = Math.floor(safe / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
+  const secs = safe % 60;
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(secs)}` : `${minutes}:${pad(secs)}`;
+}

@@ -12,7 +12,9 @@ import { clockWidget } from "./definitions/clock";
 import { fetchWidget } from "./definitions/fetch";
 import { obsControlWidget } from "./definitions/obsControl";
 import { obsInputsWidget } from "./definitions/obsInputs";
+import { obsMediaWidget } from "./definitions/obsMedia";
 import { obsScenesWidget } from "./definitions/obsScenes";
+import { obsStudioWidget } from "./definitions/obsStudio";
 import { openUrlWidget } from "./definitions/openUrl";
 import { pluginDataWidget } from "./definitions/pluginData";
 import { sendHotkeyWidget } from "./definitions/sendHotkey";
@@ -35,6 +37,8 @@ export const BUILTIN_WIDGETS = [
   obsControlWidget,
   obsScenesWidget,
   obsInputsWidget,
+  obsStudioWidget,
+  obsMediaWidget,
   fetchWidget,
   pluginDataWidget,
 ];

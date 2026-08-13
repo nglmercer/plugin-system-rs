@@ -1,0 +1,151 @@
+/* Studio mode widget — preview/program pair, transition and snapshot. */
+
+.studio-variant {
+  gap: 0.4rem;
+}
+
+.studio-variant.minimal {
+  align-items: center;
+  justify-content: center;
+}
+
+.studio-toggle {
+  flex-shrink: 0;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-sm);
+  background: var(--sd-slider-track);
+  color: var(--sd-text-secondary);
+  padding: 0.2rem 0.55rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background var(--sd-duration-fast) var(--sd-ease),
+    border-color var(--sd-duration-fast) var(--sd-ease),
+    color var(--sd-duration-fast) var(--sd-ease);
+}
+.studio-toggle.active {
+  background: var(--sd-accent);
+  border-color: var(--sd-accent);
+  color: var(--sd-on-accent);
+}
+.studio-toggle:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.studio-scene-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sd-text-secondary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: center;
+  width: 100%;
+}
+
+.studio-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.3rem;
+}
+.studio-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  padding: 0.3rem 0.4rem;
+  border-radius: var(--sd-radius-sm);
+  background: var(--sd-bg-inset);
+}
+.studio-slot-label {
+  color: var(--sd-text-dim);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.studio-slot-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sd-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.studio-actions {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.studio-transition-btn {
+  flex: 1;
+  border: none;
+  border-radius: var(--sd-radius-sm);
+  background: var(--sd-accent);
+  color: var(--sd-on-accent);
+  padding: 0.3rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity var(--sd-duration-fast) var(--sd-ease);
+}
+.studio-transition-btn:hover:not(:disabled) {
+  opacity: 0.85;
+}
+.studio-transition-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.studio-scene-btn {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-sm);
+  background: var(--sd-bg-inset);
+  color: var(--sd-text-secondary);
+  padding: 0.3rem 0.5rem;
+  font-size: 0.75rem;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--sd-duration-fast) var(--sd-ease),
+    border-color var(--sd-duration-fast) var(--sd-ease);
+}
+.studio-scene-btn:hover:not(:disabled) {
+  background: var(--sd-bg-card-hover);
+}
+.studio-scene-btn.active {
+  background: var(--sd-accent);
+  border-color: var(--sd-accent);
+  color: var(--sd-on-accent);
+  font-weight: 700;
+}
+.studio-scene-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.studio-select {
+  width: 100%;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-sm);
+  background: var(--sd-bg-input);
+  color: var(--sd-text);
+  font-family: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.studio-select:focus {
+  outline: none;
+  border-color: var(--sd-accent);
+}
+
+.studio-hint {
+  color: var(--sd-text-dim);
+  font-size: 0.7rem;
+  line-height: 1.4;
+}

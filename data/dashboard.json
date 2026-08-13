@@ -6,12 +6,12 @@
       "title": "System Monitor",
       "colSpan": 1,
       "rowSpan": 1,
-      "x": 0,
-      "y": 0,
+      "x": 3,
+      "y": 2,
       "page": 0,
       "settings": {
         "refreshInterval": 2000,
-        "variant": "compact"
+        "variant": "detailed"
       }
     },
     {
@@ -20,8 +20,8 @@
       "title": "Clock",
       "colSpan": 1,
       "rowSpan": 1,
-      "x": 1,
-      "y": 0,
+      "x": 3,
+      "y": 1,
       "page": 0,
       "settings": {
         "format": "digital",
@@ -34,7 +34,7 @@
       "title": "a",
       "colSpan": 1,
       "rowSpan": 1,
-      "x": 2,
+      "x": 3,
       "y": 0,
       "page": 0,
       "settings": {
@@ -48,7 +48,7 @@
       "title": "Volume Control",
       "colSpan": 1,
       "rowSpan": 2,
-      "x": 3,
+      "x": 2,
       "y": 1,
       "page": 0,
       "settings": {
@@ -60,7 +60,7 @@
       "id": "89vtxejb",
       "type": "volume-apps",
       "title": "App Volume",
-      "colSpan": 3,
+      "colSpan": 2,
       "rowSpan": 2,
       "x": 0,
       "y": 1,
@@ -78,7 +78,7 @@
       "rowSpan": 1,
       "x": 3,
       "y": 0,
-      "page": 0,
+      "page": 1,
       "settings": {
         "refreshInterval": 2000,
         "variant": "compact"
@@ -91,7 +91,7 @@
       "colSpan": 1,
       "rowSpan": 1,
       "x": 3,
-      "y": 0,
+      "y": 1,
       "page": 1,
       "settings": {
         "host": "127.0.0.1",
@@ -112,7 +112,7 @@
       "page": 1,
       "settings": {
         "refreshInterval": 2000,
-        "variant": "detailed"
+        "variant": "compact"
       }
     }
   ],

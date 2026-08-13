@@ -60,6 +60,25 @@ export const Icons = {
     h("line", { x1: "12", y1: "19", x2: "12", y2: "23" }),
     h("line", { x1: "8", y1: "23", x2: "16", y2: "23" }),
   ),
+  // A play badge: media sources and their transport controls.
+  obsMedia: () => h("svg", { ...s },
+    h("circle", { cx: "12", cy: "12", r: "10" }),
+    h("polygon", { points: "10 8 16 12 10 16 10 8" }),
+  ),
+  // A funnel: effects applied to a source.
+  obsFilters: () => h("svg", { ...s },
+    h("polygon", { points: "22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" }),
+  ),
+  // Preview beside program: studio mode.
+  obsStudio: () => h("svg", { ...s },
+    h("rect", { x: "2", y: "5", width: "9", height: "12", rx: "1" }),
+    h("rect", { x: "13", y: "5", width: "9", height: "12", rx: "1" }),
+    h("line", { x1: "13", y1: "21", x2: "22", y2: "21" }),
+  ),
+  // A folder: profiles and scene collections.
+  obsCollections: () => h("svg", { ...s },
+    h("path", { d: "M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" }),
+  ),
   // A cloud with a downward arrow: data arriving from somewhere else.
   fetch: () => h("svg", { ...s },
     h("path", { d: "M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" }),

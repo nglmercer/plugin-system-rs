@@ -1,0 +1,80 @@
+/* Media sources widget — transport buttons and progress. */
+
+.media-variant {
+  gap: 0.4rem;
+}
+
+.media-variant.minimal {
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  text-align: center;
+}
+
+.media-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sd-text);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.media-state {
+  color: var(--sd-text-dim);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.media-state.playing { color: var(--sd-success); }
+.media-state.paused { color: var(--sd-warning); }
+
+.media-controls {
+  display: flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.media-btn {
+  width: 26px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-sm);
+  background: var(--sd-slider-track);
+  color: var(--sd-text);
+  font-size: 0.6rem;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background var(--sd-duration-fast) var(--sd-ease),
+    border-color var(--sd-duration-fast) var(--sd-ease);
+}
+.media-btn:hover:not(:disabled) {
+  background: var(--sd-border-hover);
+}
+.media-btn.active {
+  background: var(--sd-accent);
+  border-color: var(--sd-accent);
+  color: var(--sd-on-accent);
+}
+.media-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.media-bar {
+  height: 4px;
+  border-radius: var(--sd-radius-pill);
+  background: var(--sd-slider-track);
+  overflow: hidden;
+}
+.media-bar-fill {
+  height: 100%;
+  border-radius: var(--sd-radius-pill);
+  background: var(--sd-accent);
+  transition: width var(--sd-duration-slow) var(--sd-ease);
+}

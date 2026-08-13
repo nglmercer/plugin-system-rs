@@ -55,7 +55,13 @@ struct ObsData {
     virtual_cam_active: bool,
     replay_buffer_active: bool,
     current_scene: String,
+    /// Only populated while studio mode is on; empty otherwise.
+    preview_scene: String,
     studio_mode: bool,
+    /// How long the current stream/recording has been running, in
+    /// milliseconds. Zero while the output is not active.
+    stream_duration_ms: u64,
+    record_duration_ms: u64,
     cpu_usage: f64,
     memory_usage: f64,
     fps: f64,
@@ -72,6 +78,7 @@ impl ObsData {
     fn clear_live_state(&mut self) {
         self.connected = false;
         self.current_scene.clear();
+        self.preview_scene.clear();
         self.scenes.clear();
         self.stream_active = false;
         self.record_active = false;
@@ -79,6 +86,8 @@ impl ObsData {
         self.virtual_cam_active = false;
         self.replay_buffer_active = false;
         self.studio_mode = false;
+        self.stream_duration_ms = 0;
+        self.record_duration_ms = 0;
         self.cpu_usage = 0.0;
         self.memory_usage = 0.0;
         self.fps = 0.0;
@@ -254,7 +263,11 @@ impl ObsPlugin {
         }
 
         if let Ok(v) = Self::request("GetStreamStatus", None) {
-            DATA.with(|d| d.borrow_mut().stream_active = v["outputActive"].as_bool().unwrap_or(false));
+            DATA.with(|d| {
+                let mut data = d.borrow_mut();
+                data.stream_active = v["outputActive"].as_bool().unwrap_or(false);
+                data.stream_duration_ms = v["outputDuration"].as_u64().unwrap_or(0);
+            });
         }
 
         if let Ok(v) = Self::request("GetRecordStatus", None) {
@@ -262,6 +275,7 @@ impl ObsPlugin {
                 let mut data = d.borrow_mut();
                 data.record_active = v["outputActive"].as_bool().unwrap_or(false);
                 data.record_paused = v["outputPaused"].as_bool().unwrap_or(false);
+                data.record_duration_ms = v["outputDuration"].as_u64().unwrap_or(0);
             });
         }
 
@@ -281,6 +295,22 @@ impl ObsPlugin {
             DATA.with(|d| {
                 d.borrow_mut().studio_mode = v["studioModeEnabled"].as_bool().unwrap_or(false)
             });
+        }
+
+        // The preview scene only exists while studio mode is on; asking for it
+        // otherwise is a guaranteed error per poll, so skip it.
+        let studio_on = DATA.with(|d| d.borrow().studio_mode);
+        if studio_on {
+            if let Ok(v) = Self::request("GetCurrentPreviewScene", None) {
+                DATA.with(|d| {
+                    d.borrow_mut().preview_scene = v["currentPreviewSceneName"]
+                        .as_str()
+                        .unwrap_or_default()
+                        .to_string()
+                });
+            }
+        } else {
+            DATA.with(|d| d.borrow_mut().preview_scene.clear());
         }
 
         // Stats drive the small readouts in the detailed widget; a server that
@@ -353,18 +383,64 @@ impl ObsPlugin {
                             "name": i["inputName"].as_str().unwrap_or_default(),
                             "kind": i["inputKind"].as_str().unwrap_or_default(),
                             "uuid": i["inputUuid"].as_str().unwrap_or_default(),
-                            // GetInputList does not carry mute or volume;
-                            // fetching them would be one request per input.
-                            // Reported as defaults rather than omitted, so the
-                            // response still satisfies the contract.
+                            // Filled in by `enrich_inputs` for inputs that
+                            // actually carry audio; a color source has no
+                            // mixer state to read.
                             "muted": false,
                             "volume": 0.0,
+                            "has_audio": false,
                         })
                     })
                     .collect()
             })
             .unwrap_or_default();
         serde_json::Value::Array(inputs)
+    }
+
+    /// Read mute and volume for every input that has audio.
+    ///
+    /// `GetInputList` does not carry mixer state, so this is two extra
+    /// requests per input — but only inputs OBS answers for. The mute query
+    /// doubles as the probe: it fails for inputs without audio (a color
+    /// source, a capture card with no sound), and those keep the defaults and
+    /// `has_audio: false` instead of flooding the log with expected errors.
+    fn enrich_inputs(inputs: &mut serde_json::Value) {
+        let Some(items) = inputs.as_array_mut() else {
+            return;
+        };
+
+        for item in items {
+            let Some(name) = item.get("name").and_then(|v| v.as_str()).map(str::to_string) else {
+                continue;
+            };
+
+            let mute = Self::request(
+                "GetInputMute",
+                Some(serde_json::json!({ "inputName": name })),
+            );
+            let Ok(mute) = mute else { continue };
+
+            let obj = match item.as_object_mut() {
+                Some(obj) => obj,
+                None => continue,
+            };
+            obj.insert("has_audio".into(), serde_json::json!(true));
+            obj.insert(
+                "muted".into(),
+                serde_json::json!(mute["inputMuted"].as_bool().unwrap_or(false)),
+            );
+
+            if let Ok(volume) = Self::request(
+                "GetInputVolume",
+                Some(serde_json::json!({ "inputName": name })),
+            ) {
+                // The multiplier is what OBS's own mixer uses (1.0 = 0 dB).
+                // It can exceed 1.0 when the input is boosted; the widget's
+                // 0–1 slider clamps the display rather than inventing gain.
+                let mul = volume["inputVolumeMul"].as_f64().unwrap_or(0.0);
+                obj.insert("volume".into(), serde_json::json!(mul.min(1.0)));
+            }
+        }
     }
 
     fn transitions_payload(v: &serde_json::Value) -> serde_json::Value {
@@ -403,11 +479,94 @@ impl ObsPlugin {
         serde_json::Value::Array(items)
     }
 
+    /// Input kinds OBS can actually play back. Anything else has no transport
+    /// controls, so it stays out of the media widget entirely.
+    const MEDIA_INPUT_KINDS: &'static [&'static str] =
+        &["ffmpeg_source", "media_source", "vlc_source"];
+
+    /// One media input plus its transport state.
+    ///
+    /// `status` is the (possibly failed) answer to `GetMediaInputStatus`; a
+    /// source that cannot report a state still shows up, as stopped, so the
+    /// widget lists what is really there.
+    fn media_entry(name: &str, kind: &str, status: Result<serde_json::Value, String>) -> serde_json::Value {
+        let (state, duration_ms, cursor_ms) = match status {
+            Ok(v) => (
+                v["mediaState"].as_str().unwrap_or("stopped").to_string(),
+                v["mediaDuration"].as_u64().unwrap_or(0),
+                v["mediaCursor"].as_u64().unwrap_or(0),
+            ),
+            Err(_) => ("stopped".to_string(), 0, 0),
+        };
+        serde_json::json!({
+            "name": name,
+            "kind": kind,
+            "state": state,
+            "duration_ms": duration_ms,
+            "cursor_ms": cursor_ms,
+        })
+    }
+
+    fn filters_payload(v: &serde_json::Value) -> serde_json::Value {
+        let filters: Vec<serde_json::Value> = v["filters"]
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .map(|f| {
+                        serde_json::json!({
+                            "name": f["filterName"].as_str().unwrap_or_default(),
+                            "kind": f["filterKind"].as_str().unwrap_or_default(),
+                            "enabled": f["filterEnabled"].as_bool().unwrap_or(false),
+                            "index": f["filterIndex"].as_i64().unwrap_or(0),
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        serde_json::Value::Array(filters)
+    }
+
+    /// Profiles and scene collections share a shape: the current name plus a
+    /// list of `{name}` entries. One reader for both.
+    fn named_list_payload(
+        v: &serde_json::Value,
+        current_field: &str,
+        list_field: &str,
+    ) -> serde_json::Value {
+        let items: Vec<serde_json::Value> = v[list_field]
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|item| item["name"].as_str().map(|n| serde_json::json!(n)))
+                    .collect()
+            })
+            .unwrap_or_default();
+        serde_json::json!({
+            "current": v[current_field].as_str().unwrap_or_default(),
+            "items": items,
+        })
+    }
+
     fn arg_str(args: &serde_json::Value, key: &str) -> Result<String, CommandError> {
         args.get(key)
             .and_then(|v| v.as_str())
             .map(str::to_string)
             .ok_or_else(|| CommandError::InvalidArgs(format!("expected a string `{key}`")))
+    }
+
+    /// The widget speaks short verbs; OBS wants the long ones.
+    fn media_action_for(action: &str) -> Result<&'static str, CommandError> {
+        match action {
+            "play" => Ok("MEDIA_INPUT_ACTION_PLAY"),
+            "pause" => Ok("MEDIA_INPUT_ACTION_PAUSE"),
+            "stop" => Ok("MEDIA_INPUT_ACTION_STOP"),
+            "restart" => Ok("MEDIA_INPUT_ACTION_RESTART"),
+            "next" => Ok("MEDIA_INPUT_ACTION_NEXT"),
+            "previous" => Ok("MEDIA_INPUT_ACTION_PREVIOUS"),
+            other => Err(CommandError::InvalidArgs(format!(
+                "unknown media action '{other}'"
+            ))),
+        }
     }
 
     /// Read the first key that is present, for calls whose argument has been
@@ -532,6 +691,8 @@ impl Guest for ObsPlugin {
             "stop_record" => simple!("StopRecord"),
             "toggle_record_pause" => simple!("ToggleRecordPause"),
             "toggle_virtual_cam" => simple!("ToggleVirtualCam"),
+            "start_replay_buffer" => simple!("StartReplayBuffer"),
+            "stop_replay_buffer" => simple!("StopReplayBuffer"),
             "save_replay" => simple!("SaveReplayBuffer"),
 
             "get_scenes" => match Self::request("GetSceneList", None) {
@@ -554,7 +715,11 @@ impl Guest for ObsPlugin {
             }
 
             "get_inputs" => match Self::request("GetInputList", None) {
-                Ok(v) => Self::inputs_payload(&v),
+                Ok(v) => {
+                    let mut payload = Self::inputs_payload(&v);
+                    Self::enrich_inputs(&mut payload);
+                    payload
+                }
                 Err(e) => failed(e),
             },
 
@@ -564,9 +729,15 @@ impl Guest for ObsPlugin {
                     .get("volume")
                     .and_then(|v| v.as_f64())
                     .ok_or_else(|| CommandError::InvalidArgs("expected a number `volume`".into()))?;
+                // The widget slider is a 0–1 fraction, which maps straight to
+                // OBS's volume multiplier. Sending it as decibels (the old
+                // behaviour) put every input within 1 dB of full volume.
                 match Self::request(
                     "SetInputVolume",
-                    Some(serde_json::json!({ "inputName": name, "inputVolumeDb": volume })),
+                    Some(serde_json::json!({
+                        "inputName": name,
+                        "inputVolumeMul": volume.max(0.0)
+                    })),
                 ) {
                     Ok(_) => serde_json::json!({ "ok": true }),
                     Err(e) => failed(e),
@@ -652,15 +823,167 @@ impl Guest for ObsPlugin {
                     "SetStudioModeEnabled",
                     Some(serde_json::json!({ "studioModeEnabled": enabled })),
                 ) {
+                    Ok(_) => {
+                        Self::refresh();
+                        serde_json::json!({ "ok": true })
+                    }
+                    Err(e) => failed(e),
+                }
+            }
+
+            "set_preview_scene" => {
+                let name = Self::arg_str(&args, "scene_name")?;
+                match Self::request(
+                    "SetCurrentPreviewScene",
+                    Some(serde_json::json!({ "sceneName": name })),
+                ) {
+                    Ok(_) => {
+                        DATA.with(|d| d.borrow_mut().preview_scene = name);
+                        serde_json::json!({ "ok": true })
+                    }
+                    Err(e) => failed(e),
+                }
+            }
+
+            "trigger_studio_transition" => simple!("TriggerStudioModeTransition"),
+
+            "get_media_inputs" => match Self::request("GetInputList", None) {
+                Ok(v) => {
+                    let entries: Vec<serde_json::Value> = v["inputs"]
+                        .as_array()
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|i| {
+                                    let name = i["inputName"].as_str()?.to_string();
+                                    let kind = i["inputKind"].as_str().unwrap_or_default();
+                                    if !Self::MEDIA_INPUT_KINDS.contains(&kind) {
+                                        return None;
+                                    }
+                                    let status = Self::request(
+                                        "GetMediaInputStatus",
+                                        Some(serde_json::json!({ "inputName": name })),
+                                    );
+                                    Some(Self::media_entry(&name, kind, status))
+                                })
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    serde_json::Value::Array(entries)
+                }
+                Err(e) => failed(e),
+            },
+
+            "media_input_action" => {
+                let name = Self::arg_str(&args, "input_name")?;
+                let action = Self::arg_str(&args, "action")?;
+                let media_action = Self::media_action_for(&action)?;
+                match Self::request(
+                    "TriggerMediaInputAction",
+                    Some(serde_json::json!({
+                        "inputName": name,
+                        "mediaAction": media_action
+                    })),
+                ) {
+                    Ok(_) => serde_json::json!({ "ok": true }),
+                    Err(e) => failed(e),
+                }
+            },
+
+            "get_filters" => {
+                let source = Self::arg_str(&args, "source_name")?;
+                match Self::request(
+                    "GetSourceFilterList",
+                    Some(serde_json::json!({ "sourceName": source })),
+                ) {
+                    Ok(v) => Self::filters_payload(&v),
+                    Err(e) => failed(e),
+                }
+            }
+
+            "set_filter_enabled" => {
+                let source = Self::arg_str(&args, "source_name")?;
+                let filter = Self::arg_str(&args, "filter_name")?;
+                let enabled = args.get("enabled").and_then(|v| v.as_bool()).ok_or_else(|| {
+                    CommandError::InvalidArgs("expected a boolean `enabled`".into())
+                })?;
+                match Self::request(
+                    "SetSourceFilterEnabled",
+                    Some(serde_json::json!({
+                        "sourceName": source,
+                        "filterName": filter,
+                        "filterEnabled": enabled
+                    })),
+                ) {
                     Ok(_) => serde_json::json!({ "ok": true }),
                     Err(e) => failed(e),
                 }
             }
 
-            "get_stats" => match Self::request("GetStats", None) {
-                Ok(v) => serde_json::json!({ "ok": true, "stats": v }),
+            "get_profiles" => match Self::request("GetProfileList", None) {
+                Ok(v) => Self::named_list_payload(&v, "currentProfileName", "profiles"),
                 Err(e) => failed(e),
             },
+
+            "set_profile" => {
+                let name = Self::arg_str(&args, "name")?;
+                match Self::request(
+                    "SetCurrentProfile",
+                    Some(serde_json::json!({ "profileName": name })),
+                ) {
+                    Ok(_) => serde_json::json!({ "ok": true }),
+                    Err(e) => failed(e),
+                }
+            }
+
+            "get_scene_collections" => match Self::request("GetSceneCollectionList", None) {
+                Ok(v) => {
+                    Self::named_list_payload(&v, "currentSceneCollectionName", "sceneCollections")
+                }
+                Err(e) => failed(e),
+            },
+
+            "set_scene_collection" => {
+                let name = Self::arg_str(&args, "name")?;
+                match Self::request(
+                    "SetCurrentSceneCollection",
+                    Some(serde_json::json!({ "sceneCollectionName": name })),
+                ) {
+                    Ok(_) => serde_json::json!({ "ok": true }),
+                    Err(e) => failed(e),
+                }
+            }
+
+            "save_screenshot" => {
+                // Defaults to the program scene, which is what "take a
+                // snapshot" means nine times out of ten.
+                let source = match args.get("source_name").and_then(|v| v.as_str()) {
+                    Some(s) if !s.is_empty() => s.to_string(),
+                    _ => DATA.with(|d| d.borrow().current_scene.clone()),
+                };
+                if source.is_empty() {
+                    return Err(CommandError::InvalidArgs(
+                        "no source to capture: pass `source_name` or connect first".into(),
+                    ));
+                }
+                let format = args
+                    .get("format")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("png");
+                match Self::request(
+                    "SaveSourceScreenshot",
+                    Some(serde_json::json!({
+                        "sourceName": source,
+                        "imageFormat": format
+                    })),
+                ) {
+                    // OBS answers with the whole image in base64. The widget
+                    // only cares that it landed in OBS's screenshot folder,
+                    // and dragging megabytes through the reply buys nothing —
+                    // drop it on the guest side of the boundary.
+                    Ok(_) => serde_json::json!({ "ok": true, "source": source }),
+                    Err(e) => failed(e),
+                }
+            }
 
             other => {
                 return Err(CommandError::NotFound(format!(
@@ -738,6 +1061,11 @@ mod tests {
         assert!(inputs.is_array());
         assert_eq!(inputs[0]["name"], "Mic");
         assert_eq!(inputs[0]["kind"], "pulse_input");
+        // Mixer state starts at the defaults; `enrich_inputs` fills it in for
+        // inputs that actually carry audio once a session exists.
+        assert_eq!(inputs[0]["muted"], false);
+        assert_eq!(inputs[0]["volume"], 0.0);
+        assert_eq!(inputs[0]["has_audio"], false);
 
         let transitions = ObsPlugin::transitions_payload(&serde_json::json!({
             "transitions": [{"transitionName": "Fade", "transitionKind": "fade_transition",
@@ -754,6 +1082,82 @@ mod tests {
         assert_eq!(items[0]["id"], 7);
         assert_eq!(items[0]["name"], "Cam");
         assert_eq!(items[0]["enabled"], true);
+    }
+
+    /// A media input whose status cannot be read (or one that reports fine)
+    /// still shows up, so the widget lists what is really there.
+    #[test]
+    fn media_entries_fall_back_to_stopped() {
+        let ok = ObsPlugin::media_entry(
+            "Intro Video",
+            "ffmpeg_source",
+            Ok(serde_json::json!({
+                "mediaState": "playing",
+                "mediaDuration": 12000,
+                "mediaCursor": 3500
+            })),
+        );
+        assert_eq!(ok["state"], "playing");
+        assert_eq!(ok["duration_ms"], 12000);
+        assert_eq!(ok["cursor_ms"], 3500);
+
+        let failed =
+            ObsPlugin::media_entry("Broken", "media_source", Err("no such input".into()));
+        assert_eq!(failed["name"], "Broken");
+        assert_eq!(failed["state"], "stopped");
+        assert_eq!(failed["duration_ms"], 0);
+    }
+
+    #[test]
+    fn filters_payload_maps_the_obs_field_names() {
+        let filters = ObsPlugin::filters_payload(&serde_json::json!({
+            "filters": [
+                {"filterName": "Noise Gate", "filterKind": "noise_gate_filter",
+                 "filterEnabled": true, "filterIndex": 0},
+                {"filterName": "Compressor", "filterKind": "compressor_filter",
+                 "filterEnabled": false, "filterIndex": 1}
+            ]
+        }));
+        assert_eq!(filters[0]["name"], "Noise Gate");
+        assert_eq!(filters[0]["enabled"], true);
+        assert_eq!(filters[1]["enabled"], false);
+        assert_eq!(filters[1]["index"], 1);
+    }
+
+    #[test]
+    fn named_lists_read_the_current_entry_and_the_names() {
+        let profiles = ObsPlugin::named_list_payload(
+            &serde_json::json!({
+                "currentProfileName": "Streaming",
+                "profiles": [{"name": "Streaming"}, {"name": "Recording"}]
+            }),
+            "currentProfileName",
+            "profiles",
+        );
+        assert_eq!(profiles["current"], "Streaming");
+        assert_eq!(profiles["items"], serde_json::json!(["Streaming", "Recording"]));
+
+        // A server that omits the list yields an empty array, not null.
+        let empty = ObsPlugin::named_list_payload(
+            &serde_json::json!({}),
+            "currentSceneCollectionName",
+            "sceneCollections",
+        );
+        assert_eq!(empty["current"], "");
+        assert_eq!(empty["items"], serde_json::json!([]));
+    }
+
+    #[test]
+    fn media_actions_translate_to_the_obs_vocabulary() {
+        assert_eq!(
+            ObsPlugin::media_action_for("play").unwrap(),
+            "MEDIA_INPUT_ACTION_PLAY"
+        );
+        assert_eq!(
+            ObsPlugin::media_action_for("previous").unwrap(),
+            "MEDIA_INPUT_ACTION_PREVIOUS"
+        );
+        assert!(ObsPlugin::media_action_for("shuffle").is_err());
     }
 
     /// A server that omits a list must yield an empty array, not null — the
